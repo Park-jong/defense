@@ -606,20 +606,21 @@ export class GameScene extends Phaser.Scene {
       if (skill.cd > 0) continue;
       if (best.dead) best = this.findTarget(t);
       if (!best) break;
-      t.barrel.rotation = Math.atan2(best.y - t.y, best.x - t.x);
+      t.barrel.rotation = t.k === 'frost' ? 0 : Math.atan2(best.y - t.y, best.x - t.x);
       this.autoSkill(t, skill.key, best);
       skill.cd = SKILL_DEFS[skill.key].cooldown;
     }
     if (best?.dead) best = this.findTarget(t);
     if (!best) return;
     const st = this.stats(t);
-    t.barrel.rotation = Math.atan2(best.y - t.y, best.x - t.x);
+    t.barrel.rotation = t.k === 'frost' ? 0 : Math.atan2(best.y - t.y, best.x - t.x);
     if (t.cd > 0) return;
     t.cd = st.rate;
     const d = TOWER_DEFS[t.k];
     const angle = Math.atan2(best.y - t.y, best.x - t.x);
     const reach = t.k === 'cruiser' ? 29 * (UNIT_WORLD_SCALE.cruiser ?? 1) : t.k === 'cannon' ? 31 * (UNIT_WORLD_SCALE.cannon ?? 1) : t.k === 'marine' && !t.host ? 31 : t.k === 'arrow' ? 15 : 8;
-    const muzzleX = t.x + Math.cos(angle) * reach, muzzleY = t.y + Math.sin(angle) * reach;
+    const muzzleX = t.k === 'frost' ? t.x : t.x + Math.cos(angle) * reach;
+    const muzzleY = t.k === 'frost' ? t.y - 18 : t.y + Math.sin(angle) * reach;
     const s = this.add.image(muzzleX, muzzleY, 'shot_' + t.k).setDepth(9).setRotation(angle);
     this.projs.push({ s, x: muzzleX, y: muzzleY, tgt: best, k: t.k, st });
     const flash = this.add.circle(muzzleX, muzzleY, t.k === 'cannon' ? 8 : 5, d.proj, .7).setDepth(9);

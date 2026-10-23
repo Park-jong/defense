@@ -116,30 +116,60 @@ const tankHead = `
 `;
 
 const cannonBase = `
-  <ellipse cx="32" cy="49" rx="27" ry="11" fill="#000" opacity=".35"/>
-  <path d="M8 42 18 31 33 24 47 31 57 43 49 53 33 59 17 53Z" fill="#4f3b1d" stroke="#292b1e" stroke-width="1.3"/>
-  <path d="M8 42 18 31 33 24 47 31 57 43 33 54Z" fill="url(#gold)"/>
-  <path d="M8 42 33 54 57 43 49 53 33 59 17 53Z" fill="url(#goldDark)"/>
-  <path d="M12 42 20 35 26 38 18 47Zm26-4 7-4 8 8-8 5ZM26 49l7-3 7 4-7 4Z" fill="#325b76" stroke="#83c7cc" stroke-width=".7"/>
-  <ellipse cx="32" cy="39" rx="15" ry="9" fill="#503e23" stroke="#edcf7d"/>
-  <ellipse cx="32" cy="36" rx="11" ry="7" fill="#183e56"/>
-  <ellipse cx="32" cy="35" rx="8" ry="5" fill="url(#blue)"/>
-  <path d="M13 38C10 30 15 19 24 17L24 25Q19 29 22 38L18 44Z" fill="url(#gold)" stroke="#6e5426" stroke-width=".8"/>
-  <path d="M42 17C53 21 56 31 51 41L45 44 42 37Q47 29 39 24Z" fill="url(#gold)" stroke="#6e5426" stroke-width=".8"/>
-  <path d="M23 49 27 37 33 35 38 39 42 50 33 55Z" fill="url(#gold)" stroke="#795b28"/>
-  <path d="m29 43 4-3 4 3-4 6Z" fill="url(#blue)" stroke="#bae5db" stroke-width=".6"/>
-  <path d="M15 34q0-9 6-12m25 0q6 5 5 12" fill="none" stroke="#ffe4a0" stroke-width="1.2"/>
-  <circle cx="20" cy="48" r="1.5" fill="#7fe5fc"/><circle cx="46" cy="48" r="1.5" fill="#7fe5fc"/>
+  <defs>
+    <linearGradient id="photonDeck" x1="0" y1="0" x2=".5" y2="1"><stop stop-color="#53775b"/><stop offset=".4" stop-color="#274d3b"/><stop offset="1" stop-color="#0e2c25"/></linearGradient>
+    <linearGradient id="photonIvory" x1="0" y1="0" x2=".5" y2="1"><stop stop-color="#f1f1d6"/><stop offset=".35" stop-color="#b6c5b6"/><stop offset="1" stop-color="#647e78"/></linearGradient>
+  </defs>
+  <ellipse cx="32" cy="48" rx="31" ry="15" fill="#000" opacity=".33"/>
+  <g stroke-linejoin="round">
+    <!-- Eight radial anchor shoes surround a low, emerald circular platform. -->
+    <path d="m10 23 8-3 7 7-8 6-10-3Zm23-7 9 2-2 10-11-1Zm19 7 8 4-4 8-11-6Z" fill="url(#gold)" stroke="#5c5127" stroke-width="1"/>
+    <path d="m7 23 7-3 3 6-9 4Zm28-7 7 2-2 5-9-1Zm20 7 5 4-4 5-6-3Z" fill="url(#photonIvory)" stroke="#41574c" stroke-width=".75"/>
+    <path d="M5 40C5 18 59 18 59 40v5C58 66 6 66 5 45Z" fill="#132e26" stroke="#273c26" stroke-width="1.2"/>
+    <ellipse cx="32" cy="40" rx="27" ry="17" fill="url(#photonDeck)" stroke="#9c9048" stroke-width="1.3"/>
+    <path d="M6 41C9 60 54 61 58 42v5C53 64 10 63 6 47Z" fill="#1d392a"/>
+    <path d="M7 42C10 60 54 60 57 43" fill="none" stroke="#c9ab50" stroke-width="1.1"/>
+    <ellipse cx="32" cy="39" rx="23" ry="14" fill="none" stroke="#182d20" stroke-width="3.5"/>
+    <ellipse cx="32" cy="38.5" rx="23" ry="14" fill="none" stroke="#dfbf54" stroke-width="1.6"/>
+    <ellipse cx="32" cy="39" rx="17" ry="10" fill="none" stroke="#0e2b20" stroke-width="3.3"/>
+    <ellipse cx="32" cy="38.5" rx="17" ry="10" fill="none" stroke="#ccb047" stroke-width="1.5"/>
+    <ellipse cx="32" cy="39" rx="10" ry="6" fill="#263f29" stroke="#e3c65a" stroke-width="1.2"/>
+    <path d="M15 30 20 33m24-3-4 3M13 48l6-3m30 2-6-3M32 50v6" stroke="#74956e" stroke-width="1.1"/>
+    <path d="M12 34q3-5 7-6m25 0q5 2 8 7M21 49q8 4 16 1" fill="none" stroke="#fff0a0" stroke-width=".7"/>
+    <path d="M2 33 9 30l5 8-5 6-7-4Zm50 4 6-5 5 4-1 9-9-1ZM8 48l10-4 6 7-9 9-10-4Zm33 2 8-5 11 9-6 6-12-4ZM26 53h12l-1 9-11 1-4-4Z" fill="url(#gold)" stroke="#5a5128" stroke-width="1"/>
+    <path d="M1 34 6 32l3 6-1 4-6-2Zm57 1 5 1-1 9-5-1-1-5ZM7 50l6-2 5 6-4 6-9-4Zm45 1 8 3-6 6-6-3ZM25 55h9l-1 7-7 1-4-4Z" fill="url(#photonIvory)" stroke="#435d53" stroke-width=".75"/>
+    <path d="m2 35 4-1m-1 6 2-1m52-2 3 1M8 51l4-1 3 4m36-1 6 2M25 56h7l-1 5" fill="none" stroke="#f6f4d8" stroke-width=".8"/>
+    <path d="m9 33 3 5m-3 1-1 2m46-3 2 5M16 47l5 4m-3 3 3-3m24-3 4 4m-13 2v6" stroke="#ffe391" stroke-width="1"/>
+  </g>
 `;
 const cannonHead = `
-  <ellipse cx="32" cy="28" rx="18" ry="14" fill="url(#energy)" opacity=".52"/>
-  <path d="M20 27Q17 16 24 10L28 17 26 28ZM38 27l-1-11 5-6q7 9 2 19Z" fill="url(#gold)" stroke="#7a5a27" stroke-width=".8"/>
-  <circle cx="32" cy="24" r="10" fill="#284e72" stroke="#bceefd" stroke-width=".65"/>
-  <circle cx="32" cy="24" r="9" fill="url(#blue)"/>
-  <ellipse cx="29" cy="21" rx="4" ry="3" fill="#e5ffff" opacity=".85"/>
-  <path d="M23 26q8 5 17-3m-12-7q-4 10 5 16" fill="none" stroke="#c3f8ff" stroke-width=".7" opacity=".8"/>
-  <path d="m27 33 5-4 6 3-5 6Z" fill="url(#gold)" stroke="#745322" stroke-width=".7"/>
-  <path d="m31 12 2-3 2 3-2 4Z" fill="#b7f9ff"/>
+  <defs>
+    <linearGradient id="photonCore" x1="0" y1="0" x2="1" y2=".2"><stop stop-color="#3d6750"/><stop offset=".3" stop-color="#739b67"/><stop offset=".6" stop-color="#2a503e"/><stop offset="1" stop-color="#132f26"/></linearGradient>
+    <linearGradient id="photonCrystal" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#efffe0"/><stop offset=".35" stop-color="#bde8b2"/><stop offset=".7" stop-color="#70c6b2"/><stop offset="1" stop-color="#2d7e76"/></linearGradient>
+  </defs>
+  <g stroke-linejoin="round">
+    <!-- A raised cylindrical emitter, ringed in gold, replaces the floating orb. -->
+    <ellipse cx="32" cy="40" rx="11" ry="6.5" fill="#18332a" stroke="#a38b37" stroke-width="1"/>
+    <path d="M22 31h20v8c-1 9-19 9-20 0Z" fill="url(#photonCore)" stroke="#345035" stroke-width=".8"/>
+    <ellipse cx="32" cy="31" rx="10" ry="6" fill="#274e38" stroke="#edcb60" stroke-width="1.4"/>
+    <path d="M22 36c5 6 15 6 20 0v3c-4 7-17 7-20 0Z" fill="url(#goldDark)" stroke="#d6b54e" stroke-width=".6"/>
+    <path d="M25 31v6m14-6v6" stroke="#8d9d5f" stroke-width="1"/>
+    <path d="M27 23h10v11c-1 5-9 5-10 0Z" fill="url(#photonCore)" stroke="#566a36" stroke-width=".8"/>
+    <path d="M27 25q5 4 10 0m-10 6q5 4 10 0" fill="none" stroke="#d9b64d" stroke-width="1.5"/>
+    <path d="M30 24v9" stroke="#d8cd79" stroke-width="1"/>
+    <ellipse cx="32" cy="23" rx="6" ry="3.5" fill="url(#gold)" stroke="#685b29" stroke-width=".7"/>
+    <ellipse cx="32" cy="22.5" rx="4" ry="2" fill="#284d36" stroke="#e5c86c" stroke-width=".7"/>
+    <path d="M29 15h6v8l-3 2-3-2Z" fill="url(#gold)" stroke="#65552a" stroke-width=".7"/>
+    <path d="M31 17v6" stroke="#fff1a6" stroke-width=".9"/>
+    <!-- Four slender crown prongs frame a small mint crystal. -->
+    <path d="M24 18 22 10 23 4l2 3v8l4 4m10-1 3-8-1-6-2 3v8l-4 4" fill="none" stroke="#65552b" stroke-width="3.2"/>
+    <path d="M24 18 22 10 23 4m16 14 3-8-1-6" fill="none" stroke="#e7c35f" stroke-width="1.4"/>
+    <path d="M27 20 26 13l1-3m10 10 1-7-1-3" fill="none" stroke="#ebcb71" stroke-width="1.6"/>
+    <path d="M32 8 36 13 34 19h-4l-2-6Z" fill="url(#photonCrystal)" stroke="#416f58" stroke-width=".7"/>
+    <path d="M32 8v8l-3-3Zm0 8 2 3h-4Z" fill="#ddffe0" opacity=".8"/>
+    <path d="m32 8 1 5 3 0" fill="none" stroke="#fbffe6" stroke-width=".8"/>
+    <path d="m25 16 3 1m8 0 3-1" stroke="#b2e5c5" stroke-width="1.2"/>
+  </g>
 `;
 
 const dragoonBase = `
