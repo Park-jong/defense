@@ -531,14 +531,15 @@ export class GameScene extends Phaser.Scene {
     t.cd = st.rate;
     const d = TOWER_DEFS[t.k];
     const angle = Math.atan2(best.y - t.y, best.x - t.x);
-    const reach = t.k === 'cruiser' ? 29 * (UNIT_WORLD_SCALE.cruiser ?? 1) : t.k === 'cannon' ? 25 : t.k === 'arrow' ? 15 : 8;
+    const reach = t.k === 'cruiser' ? 29 * (UNIT_WORLD_SCALE.cruiser ?? 1) : t.k === 'cannon' ? 31 * (UNIT_WORLD_SCALE.cannon ?? 1) : t.k === 'arrow' ? 15 : 8;
     const muzzleX = t.x + Math.cos(angle) * reach, muzzleY = t.y + Math.sin(angle) * reach;
     const s = this.add.image(muzzleX, muzzleY, 'shot_' + t.k).setDepth(9).setRotation(angle);
     this.projs.push({ s, x: muzzleX, y: muzzleY, tgt: best, k: t.k, st });
     const flash = this.add.circle(muzzleX, muzzleY, t.k === 'cannon' ? 8 : 5, d.proj, .7).setDepth(9);
     this.tweens.add({ targets: flash, scale: 1.8, alpha: 0, duration: 160, onComplete: () => flash.destroy() });
     if (t.k === 'cannon') {
-      this.tweens.add({ targets: t.barrel, x: t.x - Math.cos(angle) * 4, y: t.y - Math.sin(angle) * 4, duration: 70, yoyo: true });
+      const recoil = 5 * (UNIT_WORLD_SCALE.cannon ?? 1);
+      this.tweens.add({ targets: t.barrel, x: t.x - Math.cos(angle) * recoil, y: t.y - Math.sin(angle) * recoil, duration: 90, yoyo: true });
     } else if (t.k === 'frost' || t.k === 'sniper' || t.k === 'templar') {
       this.tweens.add({ targets: t.barrel, scale: { from: 1.1, to: 1 }, duration: 220 });
     } else if (t.k === 'cruiser') {

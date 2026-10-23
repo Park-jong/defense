@@ -53,41 +53,66 @@ const turretHead = `
 `;
 
 const tankBase = `
-  <ellipse cx="32" cy="46" rx="30" ry="14" fill="#000" opacity=".4"/>
-  <g stroke="#101e17" stroke-width="1.3">
-    <path d="M4 28 17 20 24 25 24 47 12 54 4 49Z" fill="#26352c"/>
-    <path d="M40 20 49 16 60 23 60 44 48 52 40 46Z" fill="#26352c"/>
-    <path d="M4 28 17 20 24 25 12 33Z" fill="#8e9980"/>
-    <path d="M40 20 49 16 60 23 48 31Z" fill="#8e9980"/>
+  <ellipse cx="30" cy="36" rx="29" ry="26" fill="#000" opacity=".38"/>
+  <g fill="url(#olive)" stroke="#17251d" stroke-width="1.1">
+    <path d="M2 3h10v7l-3 3H2Zm46 0h10v10h-7l-3-3ZM2 51h7l3 3v7H2Zm49 0h7v10H48v-7Z"/>
   </g>
-  <g stroke="#71806c" stroke-width="1.5">
-    <path d="m6 33 6 4m-6 1 6 4m-6 1 6 4m-6 1 6 4m39-17 7-5m-7 10 7-5m-7 10 7-5m-7 10 7-5"/>
+  <path d="M3 5h7M50 5h7M3 58h7m40 0h7" stroke="#e2dfbd" stroke-width="1"/>
+  <!-- Broad, independently armoured track pods. -->
+  <g stroke="#111e19" stroke-width="1.3">
+    <path d="M13 10h29l7 5v9l-6 3H13l-5-5v-7Zm0 29h30l6 4v9l-7 5H13l-5-5v-8Z" fill="#1d2924"/>
+    <path d="M14 12h27l5 4v6H12v-6Zm-2 32h34v7l-5 3H14l-2-3Z" fill="url(#gun)"/>
   </g>
-  <path d="M14 28 34 17 51 28 51 44 31 56 14 45Z" fill="#374b38" stroke="#15261b" stroke-width="1.3"/>
-  <path d="M14 28 34 17 51 28 31 40Z" fill="url(#olive)" stroke="#c2c3a0" stroke-width=".7"/>
-  <path d="M14 28 31 40 31 56 14 45Z" fill="#667451"/>
-  <path d="M31 40 51 28 51 44 31 56Z" fill="#3d5540"/>
-  <path d="m16 34 10 7v5l-10-7m22 1 10-6v6l-10 6" fill="url(#red)" stroke="#482b25" stroke-width=".7"/>
-  <path d="M17 32 5 40 2 38 10 29m38 8 13 6 1-4-12-8M25 48l-6 12h-7l6-15m26-1 6 13h8l-9-18" fill="url(#steel)" stroke="#20352a" stroke-width="1.1"/>
-  <path d="m10 55 10 1-1 4h-8Zm41-3 9 3-1 4-10-2Z" fill="#76836d" stroke="#26382b"/>
-  <path d="m19 29 8-5m-6 8 8-5m11-2 6 4m-9-2 6 4" stroke="#45543f" stroke-width="1.5"/>
-  <circle cx="19" cy="42" r="1.4" fill="#fbdf8d"/><circle cx="46" cy="41" r="1.2" fill="#dce9a5"/>
+  <g stroke="#111d18" stroke-width="1.6">
+    <path d="M16 13v8m5-8v8m5-8v8m5-8v8m5-8v8m5-7v7M16 45v8m5-8v8m5-8v8m5-8v8m5-8v8m5-8v7"/>
+  </g>
+  <path d="M13 22h31m-31 22h31" stroke="#c6c9b1" stroke-width="1"/>
+  <path d="M16 18h24l7 9v12l-7 9H16l-6-8V26Z" fill="url(#olive)" stroke="#17281e" stroke-width="1.4"/>
+  <path d="m17 19-4 8v11l4 8h8V19Z" fill="url(#steel)" stroke="#b1b79a" stroke-width=".6"/>
+  <path d="M37 20h3l5 8v9l-5 9h-3Z" fill="#697757"/>
+  <path d="M17 21h7v7h-9Zm-2 16h9v7h-7Z" fill="url(#red)" stroke="#532e25" stroke-width=".6"/>
+  <path d="M12 28h6v8h-6Z" fill="#1b2921"/>
+  <path d="M13 29h4m-4 2h4m-4 2h4m-4 2h4" stroke="#8d9b85" stroke-width=".7"/>
+  <!-- Deployed hydraulic arms cross above the tracks, clear of the turret. -->
+  <g fill="none" stroke-linejoin="bevel">
+    <path d="M22 25 7 8m31 17L53 8M22 39 7 56m31-17 15 17" stroke="#111c19" stroke-width="7"/>
+    <path d="M22 24 7 7m31 17L53 7M22 38 7 55m31-17 15 17" stroke="url(#steel)" stroke-width="4.5"/>
+    <path d="m17 19-7-8m33 8 7-8M17 43l-7 8m33-8 7 8" stroke="#e1e0c4" stroke-width="1.2"/>
+  </g>
+  <circle cx="31" cy="32" r="13" fill="#1c2b23" stroke="#a8b18e" stroke-width="1.2"/>
+  <circle cx="31" cy="32" r="10.5" fill="url(#steel)" stroke="#121f19" stroke-width="1.3"/>
+  <g fill="#e5d4a0" stroke="#303d2b" stroke-width=".5">
+    <circle cx="27" cy="20" r="1"/><circle cx="35" cy="20" r="1"/>
+    <circle cx="27" cy="44" r="1"/><circle cx="35" cy="44" r="1"/>
+  </g>
+  <path d="M43 26h3v3h-3Zm0 10h3v3h-3Z" fill="#ffda85"/>
 `;
 const tankHead = `
-  <ellipse cx="32" cy="32" rx="15" ry="9" fill="#1b2e23" stroke="#8b9676"/>
-  <path d="M17 22 29 15 43 19 47 28 34 38 20 32Z" fill="url(#olive)" stroke="#253a26" stroke-width="1.2"/>
-  <path d="M17 22 29 15 43 19 32 26Z" fill="#bcc2a0"/>
-  <path d="m21 22 7-4 5 2-7 4Z" fill="url(#red)"/>
-  <path d="M20 27 30 32 30 37 20 32m18-9 8 4-5 6-6-4Z" fill="#657656"/>
-  <path d="M28 26 35 22 58 29 61 33 54 38 30 31Z" fill="url(#gun)" stroke="#20342a" stroke-width="1.2"/>
-  <path d="m35 23 21 7m-24-2 22 7" stroke="#d0d6bd" stroke-width="1.2"/>
-  <path d="M49 27 57 28 63 32 63 38 56 42 49 37Z" fill="#384e3e" stroke="#15271c" stroke-width="1.2"/>
-  <path d="m49 27 8 1 6 4-8 5Z" fill="#bbc2a0"/>
-  <path d="m55 37 8-5v6l-7 4Z" fill="#14251c"/>
-  <path d="m57 37 4-3v3l-4 2Z" fill="#050f0a"/>
-  <path d="m29 28 6 2m-3-5 6 2m-2 0v5m4-4v5" stroke="#354e3c" stroke-width="1"/>
-  <ellipse cx="30" cy="21" rx="4" ry="2.5" fill="#4e6246" stroke="#d1d1ac" stroke-width=".6"/>
-  <path d="M22 20V9m0 1 3 2" stroke="#9da98c" stroke-width="1"/>
+  <path d="M17 25 23 21h12l7 6v13l-7 6H23l-6-5Z" fill="#101d17" opacity=".5"/>
+  <!-- Low, angular turret and heavy rear counterweight. Forward is +X. -->
+  <path d="M16 25 22 20h12l7 7v11l-7 6H22l-6-5Z" fill="url(#olive)" stroke="#17251b" stroke-width="1.3"/>
+  <path d="M17 25 23 21h10l5 5H23l-5 4Z" fill="#d7d6b2"/>
+  <path d="M17 36h6l4 6h7l6-5v3l-6 4H22l-6-5Z" fill="#45553d"/>
+  <path d="M18 26h6v11h-6Z" fill="url(#red)" stroke="#713f30" stroke-width=".7"/>
+  <path d="M19 27v8" stroke="#efb391" stroke-width="1"/>
+  <path d="M25 24h10l4 5v6l-5 5H25l-2-5v-6Z" fill="url(#steel)" stroke="#364a38" stroke-width=".8"/>
+  <circle cx="29" cy="27" r="3.5" fill="#53674b" stroke="#d3d3ae" stroke-width=".7"/>
+  <path d="M27 26h4v2h-4Z" fill="#2c402d"/>
+  <path d="M25 36h7m-6 2h6" stroke="#1b2b20" stroke-width="1.1"/>
+  <!-- Recoil cylinders flank the long siege cannon. -->
+  <path d="M34 26h14v3H34Zm0 10h14v3H34Z" fill="url(#gun)" stroke="#23382a" stroke-width=".8"/>
+  <path d="M38 27h9m-9 10h9" stroke="#dbe0c7" stroke-width=".8"/>
+  <path d="M33 28h9l4 1h11v7H46l-4 1h-9Z" fill="url(#gun)" stroke="#14271c" stroke-width="1"/>
+  <path d="M34 29h9l3 1h11" fill="none" stroke="#e4e5ca" stroke-width="1.2"/>
+  <path d="M38 29v7m5-7v7m9-6v5" stroke="#394e3c" stroke-width="1.3"/>
+  <path d="M54 27h6l3 3v7l-3 3h-6l-2-3v-7Z" fill="url(#olive)" stroke="#16271c" stroke-width="1.1"/>
+  <path d="M54 27h6l3 3h-9Z" fill="#dedec0"/>
+  <path d="M60 30h3v7l-3 3Z" fill="#1a2b20"/>
+  <path d="M61 31v5" stroke="#050d08" stroke-width="1.7"/>
+  <path d="M55 31h3m-3 3h3m-3 3h3" stroke="#1c3022" stroke-width="1.4"/>
+  <path d="M21 22v-9m0 0 3 2" fill="none" stroke="#b9c4a8" stroke-width=".8"/>
+  <circle cx="21" cy="13" r="1" fill="#ed8065"/>
+  <circle cx="36" cy="24" r="1" fill="#ffe4a5"/>
 `;
 
 const cannonBase = `
@@ -289,7 +314,7 @@ const layers: Record<TowerKey, { base: string; head: string }> = {
   cruiser: { base: cruiserBase, head: cruiserHead },
 };
 
-export const UNIT_WORLD_SCALE: Partial<Record<TowerKey, number>> = { cruiser: 1.3 };
+export const UNIT_WORLD_SCALE: Partial<Record<TowerKey, number>> = { cannon: 1.15, cruiser: 1.3 };
 
 export function unitImageUrl(key: TowerKey): string {
   const art = layers[key];
