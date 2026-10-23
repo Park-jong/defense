@@ -397,23 +397,29 @@ const firebatHead = `
   <path d="m45 32 10 2v8l-10 3Zm2 15 11 2v8l-11 3Z" fill="#72523a" stroke="#d2a46a" stroke-width=".8"/>
   <path d="m51 36 4 1v3l-4 1m2 10 5 1v3l-5 1" stroke="#ffb85c" stroke-width="2"/>
 `;
-const templarBase = `
-  <ellipse cx="32" cy="54" rx="22" ry="7" fill="#184d78" opacity=".35"/>
-  <ellipse cx="32" cy="53" rx="17" ry="4" fill="none" stroke="#8c92d7" stroke-width="1"/>
-  <path d="M23 22 41 22 46 43 53 53 39 57 32 52 24 57 11 53 18 43Z" fill="#514078" stroke="#292547" stroke-width="1.2"/>
-  <path d="m23 24 6 2-6 28-10-2 8-15m17-11 4-2 2 13 8 15-11 3Z" fill="#8f7ab1"/>
-  <path d="m28 28 4 5 5-5 2 28-7-4-7 4Z" fill="url(#gold)" stroke="#856533" stroke-width=".7"/>
-  <path d="m30 34 2 2 3-2-3 13Z" fill="#5e5a91"/>
-  <path d="m20 28-8 10-5-3 8-12m30 5 8 10 5-3-8-12" stroke="url(#gold)" stroke-width="5" fill="none"/>
+const archonBase = `
+  <ellipse cx="32" cy="57" rx="22" ry="5" fill="#08182e" opacity=".6"/>
+  <ellipse cx="32" cy="56" rx="17" ry="3" fill="#36baff" opacity=".18"/>
 `;
-const templarHead = `
-  <ellipse cx="32" cy="20" rx="15" ry="16" fill="url(#energy)" opacity=".28"/>
-  <path d="M20 22Q19 10 32 4q13 6 12 18l-6 10H26Z" fill="url(#gold)" stroke="#88682e" stroke-width="1"/>
-  <path d="M25 17 32 9 39 17 36 27 32 30 28 27Z" fill="#3f3b66"/>
-  <path d="m27 19 4 2m2 0 4-2" stroke="#b3eeff" stroke-width="1.6"/>
-  <path d="m30 27 2-2 3 2-3 5Z" fill="#b8ebff"/>
-  <circle cx="8" cy="33" r="8" fill="url(#energy)"/><circle cx="55" cy="33" r="8" fill="url(#energy)"/>
-  <path d="m5 31 3 2-2 4 5-3m41-2 4 2-2 4 5-5" fill="none" stroke="#d8bfff" stroke-width="1.2"/>
+const archonHead = `
+  <defs>
+    <radialGradient id="archonAura"><stop stop-color="#ecffff" stop-opacity=".92"/><stop offset=".43" stop-color="#83f9ff" stop-opacity=".85"/><stop offset=".69" stop-color="#2cd6ff" stop-opacity=".65"/><stop offset=".84" stop-color="#2467ff" stop-opacity=".75"/><stop offset="1" stop-color="#282baa" stop-opacity="0"/></radialGradient>
+    <linearGradient id="archonBody" x1="0" y1="0" x2="1" y2=".5"><stop stop-color="#041024"/><stop offset=".58" stop-color="#143958"/><stop offset="1" stop-color="#3286a1"/></linearGradient>
+  </defs>
+  <circle cx="32" cy="30" r="30" fill="url(#archonAura)"/>
+  <path d="m9 15 5-7 8 2 6-7 9 4 8-2 5 8 8 4-3 9 5 8-6 6-1 10-9 2-6 6-9-3-9 2-4-8-9-4 2-10-5-7Z" fill="none" stroke="#3475ff" stroke-width="3" opacity=".3"/>
+  <path d="M12 18Q22 1 41 9M51 18Q65 35 46 49M35 55Q10 55 8 34" fill="none" stroke="#42e9ff" stroke-width="2" opacity=".8"/>
+  <path d="m12 15 7 1-3 6 5 3-6 5-4-1 2 7-5 4m23-33 3 7-5 5m18-8-3 7 7 4-4 6 7 5-4 7 4 3m-34-2 5 2-1 7 7-3 3 6 7-4" fill="none" stroke="#d4fdff" stroke-width="1.1" opacity=".85"/>
+  <path d="M25 22q7-6 15 0l-1 9-4 8 1 8-4 8-4-1 2-8-4-8-2-7Z" fill="url(#archonBody)" stroke="#5be5f3" stroke-width=".55"/>
+  <path d="m27 23-8 4-5 11 2 5 3-1-2-5 5-7 7-2m9-6 7 3 5-5 5 1 3 4-5-2-4 6-9 1" fill="url(#archonBody)" stroke="#55cee4" stroke-width=".55"/>
+  <path d="m16 38-2 5 2 4 1-5 3 5 1-2-3-6m32-18 6-2 4 3-5-1 4 4-1 2-5-4" fill="#081b32"/>
+  <path d="m27 39-5 6 2 6 5 1-4-5 7-6m2 10 4 2 5-1-4 4-7-1" fill="#0a2039" stroke="#4cb7d0" stroke-width=".5"/>
+  <path d="M27 11 39 17 38 23 33 26 28 23 25 17Z" fill="#030c1d" stroke="#309ac8" stroke-width=".7"/>
+  <path d="m28 18 7 3 3-2-3 5-4-2Z" fill="#174163"/><path d="m30 20 5 2 2-1" fill="none" stroke="#71faff" stroke-width="1"/>
+  <path d="m25 28 5 3-2 4 6-1 3-7m-7 11 4 2" fill="none" stroke="#66e9ed" stroke-width=".8" opacity=".65"/>
+  <path d="M10 43q13 14 33 7M16 9q-9 10-9 19M50 11q7 6 8 13" fill="none" stroke="#98faff" stroke-width=".8"/>
+  <path d="m8 26 5-3-1-5m32 28 5-4-2-4m-26 9 5-4-2-4" fill="none" stroke="#baadff" stroke-width="1.3"/>
+  <circle cx="50" cy="24" r="7" fill="url(#energy)"/><circle cx="50" cy="24" r="2" fill="#dcffff"/>
 `;
 // The cruiser is one complete turning hull; only its ground shadow stays fixed.
 const cruiserBase = `
@@ -532,7 +538,7 @@ const layers: Record<TowerKey, { base: string; head: string }> = {
   sniper: { base: dragoonBase, head: dragoonHead },
   marine: { base: marineBase, head: marineHead },
   firebat: { base: firebatBase, head: firebatHead },
-  templar: { base: templarBase, head: templarHead },
+  templar: { base: archonBase, head: archonHead },
   cruiser: { base: cruiserBase, head: cruiserHead },
   bunker: { base: bunkerBase, head: '' },
 };

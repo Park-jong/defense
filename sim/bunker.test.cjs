@@ -158,7 +158,7 @@ test('ESC로 하차를 취소해도 병력과 스킬은 벙커에 남는다', ()
   assert.equal(s.cellFree(8, 1), true);
 });
 
-test('시간 가속은 벙커 건물 대신 탑승한 보병 각각에 적용된다', () => {
+test('아칸의 에너지 공명은 벙커 건물 대신 탑승한 보병 각각에 적용된다', () => {
   const s = setup(), b = place(s, 'bunker');
   s.recruit(b.id, 0, 'marine'); s.recruit(b.id, 1, 'firebat');
   const templar = place(s, 'templar', 8, 1);

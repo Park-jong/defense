@@ -70,11 +70,18 @@ export function makeTextures(scene: Phaser.Scene): void {
     g.fillStyle(0xffc15a, .85).fillEllipse(20, 12, 16, 12);
     g.fillStyle(0xffe4a1).fillEllipse(23, 12, 9, 7);
   });
-  tex('shot_templar', 24, 24, g => {
-    g.fillStyle(0xb98cff, .15).fillCircle(12, 12, 12);
-    g.fillStyle(0xa684e9, .5).fillCircle(12, 12, 8);
-    g.lineStyle(2, 0xe5d6ff).lineBetween(4, 12, 10, 8).lineBetween(10, 8, 14, 15).lineBetween(14, 15, 21, 11);
-    g.fillStyle(0xffffff).fillCircle(12, 12, 3);
+  tex('shot_templar', 56, 48, g => {
+    g.fillStyle(0x286dff, .18).fillTriangle(0, 24, 29, 7, 29, 41);
+    g.fillStyle(0x72eaff, .35).fillTriangle(4, 24, 27, 17, 27, 31);
+    for (let r = 23; r > 2; r -= 2) g.fillStyle(0x348dff, .045 + (1 - r / 23) * .09).fillCircle(29, 24, r);
+    g.fillStyle(0x277bff, .85).fillCircle(29, 24, 14);
+    g.fillStyle(0x49dfff, .9).fillCircle(29, 24, 10);
+    g.fillStyle(0xc0ffff).fillCircle(29, 24, 6);
+    g.fillStyle(0xffffff).fillCircle(30, 23, 3);
+    g.lineStyle(1.3, 0xd5ffff, .95).lineBetween(16, 10, 23, 14).lineBetween(23, 14, 20, 20)
+      .lineBetween(36, 8, 33, 15).lineBetween(33, 15, 42, 19).lineBetween(42, 19, 39, 27)
+      .lineBetween(19, 29, 14, 35).lineBetween(14, 35, 25, 39).lineBetween(25, 39, 29, 33)
+      .lineBetween(37, 32, 42, 35).lineBetween(42, 35, 46, 29);
   });
   tex('shot_cruiser', 26, 12, g => {
     g.fillStyle(0xff735b, .2).fillEllipse(13, 6, 26, 12);

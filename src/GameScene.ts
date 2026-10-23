@@ -617,14 +617,14 @@ export class GameScene extends Phaser.Scene {
       if (skill.cd > 0) continue;
       if (best.dead) best = this.findTarget(t);
       if (!best) break;
-      t.barrel.rotation = t.k === 'frost' || t.k === 'sniper' ? 0 : Math.atan2(best.y - t.y, best.x - t.x);
+      t.barrel.rotation = t.k === 'frost' || t.k === 'sniper' || t.k === 'templar' ? 0 : Math.atan2(best.y - t.y, best.x - t.x);
       this.autoSkill(t, skill.key, best);
       skill.cd = SKILL_DEFS[skill.key].cooldown;
     }
     if (best?.dead) best = this.findTarget(t);
     if (!best) return;
     const st = this.stats(t);
-    t.barrel.rotation = t.k === 'frost' || t.k === 'sniper' ? 0 : Math.atan2(best.y - t.y, best.x - t.x);
+    t.barrel.rotation = t.k === 'frost' || t.k === 'sniper' || t.k === 'templar' ? 0 : Math.atan2(best.y - t.y, best.x - t.x);
     if (t.cd > 0) return;
     t.cd = st.rate;
     if (t.k === 'sniper') { t.charge = { target: best, left: DRAGOON_CHARGE_TIME }; return; }
@@ -636,9 +636,9 @@ export class GameScene extends Phaser.Scene {
     const angle = Math.atan2(best.y - t.y, best.x - t.x);
     const reach = t.host ? BUNKER_BARREL_LENGTH : t.k === 'cruiser' ? 29 * (UNIT_WORLD_SCALE.cruiser ?? 1) : t.k === 'cannon' ? 31 * (UNIT_WORLD_SCALE.cannon ?? 1) : t.k === 'marine' ? 31 : t.k === 'arrow' ? 15 : 8;
     const port = t.k === 'arrow' ? TURRET_LAUNCH_PORTS[t.shotPort++ % TURRET_LAUNCH_PORTS.length] : null;
-    const muzzleX = t.k === 'sniper' ? t.x + DRAGOON_EMITTER.x : port ? t.x + port.x * Math.cos(angle) - port.y * Math.sin(angle) : t.k === 'frost' ? t.x : t.x + Math.cos(angle) * reach;
-    const muzzleY = t.k === 'sniper' ? t.y + DRAGOON_EMITTER.y : port ? t.y + port.x * Math.sin(angle) + port.y * Math.cos(angle) : t.k === 'frost' ? t.y - 18 : t.y + Math.sin(angle) * reach;
-    const flightAngle = t.k === 'sniper' ? Math.atan2(best.y - muzzleY, best.x - muzzleX) : angle;
+    const muzzleX = t.k === 'templar' ? t.x + 18 : t.k === 'sniper' ? t.x + DRAGOON_EMITTER.x : port ? t.x + port.x * Math.cos(angle) - port.y * Math.sin(angle) : t.k === 'frost' ? t.x : t.x + Math.cos(angle) * reach;
+    const muzzleY = t.k === 'templar' ? t.y - 8 : t.k === 'sniper' ? t.y + DRAGOON_EMITTER.y : port ? t.y + port.x * Math.sin(angle) + port.y * Math.cos(angle) : t.k === 'frost' ? t.y - 18 : t.y + Math.sin(angle) * reach;
+    const flightAngle = t.k === 'sniper' || t.k === 'templar' ? Math.atan2(best.y - muzzleY, best.x - muzzleX) : angle;
     const s = this.add.image(muzzleX, muzzleY, 'shot_' + t.k).setDepth(9).setRotation(flightAngle);
     this.projs.push({ s, x: muzzleX, y: muzzleY, tgt: best, k: t.k, st });
     if (t.host) {
@@ -646,6 +646,8 @@ export class GameScene extends Phaser.Scene {
       const flame = this.add.image(muzzleX, muzzleY, 'bunker_muzzle').setOrigin(0, .5).setRotation(angle).setScale(scale).setDepth(12);
       this.tweens.add({ targets: flame, scaleX: scale * 1.3, scaleY: scale * .65, alpha: 0,
         duration: t.k === 'firebat' ? 150 : 90, onComplete: () => flame.destroy() });
+    } else if (t.k === 'templar') {
+      this.archonBurst(muzzleX, muzzleY, 24);
     } else if (t.k === 'sniper') {
       const flare = this.add.image(muzzleX, muzzleY, 'dragoon_charge').setScale(.8).setDepth(12);
       this.tweens.add({ targets: flare, scale: 1.25, alpha: 0, duration: 180, onComplete: () => flare.destroy() });
@@ -695,6 +697,25 @@ export class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: beam, alpha: 0, duration: 360, onComplete: () => beam.destroy() });
   }
 
+  private archonBurst(x: number, y: number, radius: number): void {
+    const glow = this.add.image(x, y, 'shot_templar').setDepth(20).setScale(radius / 24);
+    this.tweens.add({ targets: glow, scale: radius / 15, alpha: 0, duration: 250, onComplete: () => glow.destroy() });
+    const arcs = this.add.graphics().setPosition(x, y).setDepth(21);
+    arcs.lineStyle(2, 0x64cfff, .85).strokeCircle(0, 0, radius * .7);
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4, c = Math.cos(a), s = Math.sin(a);
+      const points = [
+        { x: c * 5, y: s * 5 },
+        { x: c * radius * .4 - s * 5, y: s * radius * .4 + c * 5 },
+        { x: c * radius * .65 + s * 4, y: s * radius * .65 - c * 4 },
+        { x: c * radius, y: s * radius },
+      ];
+      arcs.lineStyle(4, 0x237dff, .35).strokePoints(points, false);
+      arcs.lineStyle(1.2, 0xd8ffff, .95).strokePoints(points, false);
+    }
+    this.tweens.add({ targets: arcs, scale: 1.15, alpha: 0, duration: 220, onComplete: () => arcs.destroy() });
+  }
+
   private autoSkill(t: Tower, key: SkillKey, target: Enemy): void {
     const d = SKILL_DEFS[key], st = this.stats(t);
     const nearby = this.enemies.filter(e => !e.dead && Math.hypot(e.x - t.x, e.y - t.y) <= st.range)
@@ -737,6 +758,7 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'storm':
         this.fields.push({ x: target.x, y: target.y, radius: 85, left: 4, tick: .5, dmg: st.dmg * .9, color: d.color });
+        this.archonBurst(target.x, target.y, 65);
         this.skillRing(target.x, target.y, 85, d.color);
         break;
       case 'warp':
@@ -763,9 +785,12 @@ export class GameScene extends Phaser.Scene {
   private hit(p: Projectile): void {
     const e = p.tgt, st = p.st;
     if (st.splash) {
-      this.fxBoom.explode(14, e.x, e.y);
-      const ring = this.add.circle(e.x, e.y, 6, 0xff8a65, .3).setStrokeStyle(2, 0xff8a65).setDepth(21);
-      this.tweens.add({ targets: ring, scale: st.splash / 6, alpha: 0, duration: 300, onComplete: () => ring.destroy() });
+      if (p.k === 'templar') this.archonBurst(e.x, e.y, st.splash);
+      else {
+        this.fxBoom.explode(14, e.x, e.y);
+        const ring = this.add.circle(e.x, e.y, 6, 0xff8a65, .3).setStrokeStyle(2, 0xff8a65).setDepth(21);
+        this.tweens.add({ targets: ring, scale: st.splash / 6, alpha: 0, duration: 300, onComplete: () => ring.destroy() });
+      }
       for (const o of this.enemies) {
         if (o.dead || Math.hypot(o.x - e.x, o.y - e.y) > st.splash) continue;
         this.damageEnemy(o, st.dmg);
@@ -833,6 +858,18 @@ export class GameScene extends Phaser.Scene {
           g.fillStyle(p ? p.k === 'firebat' ? 0xffa15c : 0xa7d5e7 : 0x1d2c22).fillRect(x, y, 7, 4);
           g.lineStyle(1, 0x8da17c, .7).strokeRect(x, y, 7, 4);
         });
+      }
+      if (t.k === 'templar') {
+        const phase = this.time.now / 180;
+        const cy = t.y - 2;
+        g.lineStyle(1, 0x6de8ff, .25 + Math.sin(phase) * .12).strokeCircle(t.x, cy, 25 + Math.sin(phase) * 2);
+        for (let i = 0; i < 3; i++) {
+          const a = phase * .35 + i * Math.PI * 2 / 3, r = 24 + Math.sin(phase + i) * 3;
+          g.lineStyle(1.2, 0xb9faff, .65).lineBetween(t.x + Math.cos(a) * r, cy + Math.sin(a) * r,
+            t.x + Math.cos(a + .2) * (r - 5), cy + Math.sin(a + .2) * (r - 5))
+            .lineBetween(t.x + Math.cos(a + .2) * (r - 5), cy + Math.sin(a + .2) * (r - 5),
+              t.x + Math.cos(a + .35) * r, cy + Math.sin(a + .35) * r);
+        }
       }
       if (t.charge) {
         const progress = 1 - t.charge.left / DRAGOON_CHARGE_TIME;
