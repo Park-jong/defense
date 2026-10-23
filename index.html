@@ -3,14 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>타워 디펜스 (Phaser + TS)</title>
+  <meta name="theme-color" content="#101512">
+  <meta name="description" content="프런티어 기지 방어 — SF 전술 타워 디펜스">
+  <title>FRONTIER — 기지 방어</title>
   <style>
-    html, body { margin:0; height:100%; background:#12161c; overflow:hidden; }
+    html, body { margin:0; height:100%; background:#080c0b; overflow:hidden; }
+    body { background:radial-gradient(ellipse at 50% 35%, #25302b 0%, #111815 45%, #060908 100%); }
     #game { width:100%; height:100%; }
+    canvas { display:block; box-shadow:0 0 0 1px #475146, 0 0 0 5px #111713, 0 20px 90px #000c; }
   </style>
 </head>
 <body>
-  <div id="game"></div>
+  <div id="game" role="application" aria-label="프런티어 기지 방어. B 보급 상점, 1~8 유닛 선택, Space 웨이브 시작, P 일시정지, U 업그레이드, S 회수. 장착한 스킬은 자동 사용됩니다."></div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
