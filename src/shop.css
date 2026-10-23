@@ -101,56 +101,80 @@
 @media(max-width:480px) { .supply-shop { width:calc(100vw - 16px); max-height:calc(100dvh - 16px); } .shop-header h2 { font-size:20px; } .shop-header h2 small { display:none; } .shop-eyebrow { font-size:8px; letter-spacing:1px; } .shop-grid { gap:8px; } .shop-card { padding:10px; } .shop-card h3 { font-size:14px; } .shop-card-top { flex-wrap:wrap; } .shop-card>p { font-size:10px; min-height:68px; } .focused-skills { grid-template-columns:1fr; } .shop-footer>span { font-size:8px; } .shop-wallet strong { font-size:17px; } .shop-tabs button { padding:9px 12px; } .shop-tabs button small { margin-left:6px; } }
 @media(max-width:480px) { .shop-notice { height:76px; } }
 /* 가로 휴대폰(낮은 화면): 창을 화면 안에 맞추고 머리글·탭·카드를 줄여 카드를 가로로 더 많이 보여준다. 내용 영역만 스크롤. */
+/* 가로 휴대폰처럼 낮은 화면: 제목·탭·미네랄·닫기를 한 줄로 합치고, 카드는 그림 왼쪽·정보 오른쪽의 가로형으로 줄인다. */
 @media(max-height:520px) {
-  .supply-shop { width:calc(100dvw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)); max-width:none; height:calc(100dvh - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); max-height:none; box-shadow:0 0 0 3px #1d2820,0 10px 40px #000c; }
-  .shop-header { padding:6px 14px; gap:10px; }
-  .shop-eyebrow { font-size:8px; letter-spacing:1px; }
-  .shop-header h2 { font-size:17px; margin:2px 0 0; }
-  .shop-header h2 small { margin-left:8px; padding:2px 6px; font-size:9px; }
-  .shop-wallet span { font-size:9px; margin-bottom:2px; }
-  .shop-wallet strong { font-size:16px; }
-  .supply-shop .shop-close { width:36px; height:36px; font-size:22px; }
-  .shop-tabs { padding:5px 14px; gap:6px; }
-  .shop-tabs button { padding:8px 14px; font-size:12px; min-height:36px; }
-  .shop-tabs button small { margin-left:8px; }
-  .shop-tabs>span,.shop-filter>span { display:none; }
-  .shop-content { padding:8px 14px 10px; }
-  .shop-filter { margin-bottom:8px; }
-  .shop-filter button { min-height:34px; padding:6px 12px; font-size:11px; }
-  .shop-grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+  .supply-shop { width:calc(100dvw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)); max-width:none; height:calc(100dvh - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); max-height:none; box-shadow:0 0 0 3px #1d2820,0 10px 40px #000c;
+    background:linear-gradient(#1f2d22 0 44px,#111a16 44px); }
+  .supply-shop[open] { display:grid; grid-template-columns:auto minmax(0,1fr) auto auto; grid-template-rows:44px minmax(0,1fr); align-items:center; }
+  .shop-header { display:contents; }
+  .shop-header>div:first-child { grid-column:1; padding:0 12px; }
+  .shop-eyebrow, .shop-header h2 small, .shop-wallet span, .shop-footer, .shop-filter { display:none; }
+  .shop-header h2 { margin:0; font-size:15px; letter-spacing:0; white-space:nowrap; }
+  .shop-tabs { grid-column:2; grid-row:1; padding:0 6px; gap:5px; border:0; background:none; min-width:0; overflow-x:auto; scrollbar-width:none; }
+  .shop-tabs button { padding:0 12px; min-height:34px; font-size:12px; white-space:nowrap; }
+  .shop-tabs button small { margin-left:6px; }
+  .shop-tabs>span { display:none; }
+  .shop-wallet { grid-column:3; margin:0; padding:0 10px; }
+  .shop-wallet strong { font-size:15px; }
+  .supply-shop .shop-close { grid-column:4; width:34px; height:34px; margin:0 6px 0 0; font-size:20px; }
+  .shop-content { grid-column:1 / -1; grid-row:2; align-self:stretch; padding:8px 10px 10px; border-top:1px solid #46543a; }
+  .shop-grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
   .focused-skills { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .shop-card { padding:8px; }
-  .shop-card-top { font-size:8px; }
-  .shop-unit-art { height:62px; margin:3px 0; }
-  .shop-unit-art img { width:58px; height:58px; }
-  .shop-unit-art>span { display:none; }
-  .shop-card h3 { font-size:13px; margin:2px 0 4px; }
-  .shop-card>p { font-size:10px; line-height:1.45; min-height:0; margin:0 0 6px; }
-  .shop-stats { padding:5px 0; margin:auto 0 6px; }
-  .shop-stats dd { font-size:13px; margin-top:2px; }
-  .shop-unit-skills { margin:0 0 6px; }
-  .shop-card-note { margin:0 0 6px; }
-  .supply-shop .shop-purchase { min-height:36px; }
-  .shop-roster { padding-bottom:8px; margin-bottom:8px; }
-  .shop-roster button { min-height:34px; padding:6px 10px; }
-  .shop-skill-context { margin-bottom:8px; min-height:0; }
-  .shop-skill-art { height:56px; }
-  .shop-skill-art>span { font-size:34px; }
-  .shop-skill-meta { padding:6px 0; margin:auto 0 8px; }
-  .shop-notice { height:auto; min-height:36px; padding:8px 10px; margin:0 0 8px; }
-  .shop-footer { padding:5px 14px; gap:10px; }
-  .shop-footer button { min-height:36px; padding:6px 12px; }
-  .bunker-slots { grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
-  .bunker-slot { padding:8px; gap:5px; }
-  .bunker-slot h3 { font-size:13px; }
-  .bunker-slot p { font-size:9px; line-height:1.45; margin:0 0 3px; }
-  .bunker-crew-art { width:44px; height:44px; }
-  .bunker-crew-skills { min-height:0; gap:3px; font-size:9px; }
-  .bunker-slot button { min-height:36px; padding:5px; }
-  .bunker-vacancy { height:44px; font-size:26px; }
-  .bunker-board-label { margin-top:3px; gap:4px; }
-  .bunker-board-label select { min-height:36px; }
-  .bunker-empty { margin:0 auto 8px; }
-  .bunker-empty h3 { font-size:15px; margin:4px 0; }
+
+  /* 가로형 카드: [그림 | 이름 · 가격] / [그림 | 능력치·설명] / [구매 버튼] */
+  .shop-card { display:grid; grid-template-columns:48px minmax(0,1fr) auto; grid-template-areas:"art name cost" "art info info" "art meta meta" "btn btn btn"; column-gap:8px; row-gap:3px; align-items:center; padding:7px 8px; }
+  .shop-card-top { grid-area:cost; font-size:0; }
+  .shop-card-top span { display:none; }
+  .shop-card-top b { font-size:11px; }
+  .shop-unit-art, .shop-skill-art { grid-area:art; align-self:start; height:48px; margin:0; gap:0; background:radial-gradient(ellipse,#6876532b,transparent 70%); }
+  .shop-unit-art img { width:46px; height:46px; }
+  .shop-unit-art>span, .shop-skill-art>small { display:none; }
+  .shop-skill-art>span { font-size:28px; }
+  .shop-card h3 { grid-area:name; margin:0; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .unit-card>p, .shop-unit-skills, .shop-card-note { display:none; }
+  .shop-stats { grid-area:info; margin:0; padding:3px 0; gap:2px; border-bottom:0; }
+  .shop-stats dt { font-size:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .shop-stats dd { font-size:12px; margin-top:1px; }
+  .skill-card>p { grid-area:info; margin:0; font-size:10px; line-height:1.4; min-height:0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .shop-skill-meta { grid-area:meta; margin:0; padding:2px 0 0; font-size:9px; border:0; }
+  .supply-shop .shop-purchase { grid-area:btn; min-height:32px; font-size:11px; margin-top:3px; }
+
+  /* 스킬 탭: 장착 대상 목록은 한 줄로, 유닛 소개는 이름·강화 버튼만 남긴 한 줄로, 안내 문구도 한 줄로 */
+  .shop-roster { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; padding-bottom:6px; margin-bottom:6px; gap:5px; }
+  .shop-roster>span { white-space:nowrap; }
+  .shop-roster button { min-height:32px; padding:4px 10px; white-space:nowrap; }
+  .shop-skill-context { min-height:0; margin-bottom:6px; gap:8px; }
+  .shop-skill-context>img, .shop-skill-context p { display:none; }
+  .shop-skill-context b { font-size:13px; }
+  .supply-shop .shop-skill-context>.shop-purchase { width:auto; min-width:0; margin:0 0 0 auto; padding:4px 12px; }
+
+  /* 일괄 관리(전체·벙커): 머리말과 버튼을 줄이고 유닛 종류별 묶음은 3열로 */
+  .shop-batch { padding:8px; margin-bottom:8px; }
+  .shop-batch-header { gap:8px; margin-bottom:6px; }
+  .shop-batch h3 { font-size:13px; }
+  .shop-batch p { margin-top:2px; font-size:9px; line-height:1.4; }
+  .supply-shop .shop-batch-header>.shop-purchase { flex:0 0 150px; min-height:34px; margin:0; padding:4px; }
+  .shop-batch-groups { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+  .shop-batch-group { padding:7px; gap:4px; }
+  .shop-batch-group header { gap:6px; }
+  .shop-batch-group header img { width:30px; height:30px; }
+  .shop-batch-group h4 { font-size:11px; }
+  .supply-shop .shop-batch-group .shop-purchase { min-height:32px; margin:0; padding:4px; font-size:10px; }
+  .shop-notice { height:auto; min-height:0; padding:5px 8px; margin:0 0 6px; font-size:10px; }
+
+  /* 벙커 주둔 */
+  .bunker-slots { grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+  .bunker-slot { padding:7px; gap:4px; }
+  .bunker-slot h3 { font-size:12px; }
+  .bunker-slot p { font-size:9px; line-height:1.4; margin:0 0 2px; }
+  .bunker-crew-art { width:40px; height:40px; }
+  .bunker-crew-skills { min-height:0; gap:2px; font-size:9px; }
+  .bunker-slot button { min-height:32px; padding:4px; font-size:10px; }
+  .bunker-vacancy { height:36px; font-size:22px; }
+  .bunker-board-label { margin-top:2px; gap:3px; }
+  .bunker-board-label select { min-height:32px; }
+  .bunker-empty { margin:0 auto 6px; }
+  .bunker-empty img { width:64px; height:64px; }
+  .bunker-empty h3 { font-size:14px; margin:4px 0; }
   .bunker-empty p { font-size:11px; line-height:1.5; }
 }
