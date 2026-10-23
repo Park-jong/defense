@@ -16,6 +16,7 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
-# .claude(에이전트, 훅, 스킬, 설정)는 저장소에서 제외한다.
-.claude/
+# .claude는 저장소에 포함한다 (에이전트, 훅, 스킬, TODO).
+# 개인 로컬 설정과 에이전트 요약 산출물만 제외한다.
+.claude/settings.local.json
 agent-summaries/
