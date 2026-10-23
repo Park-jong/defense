@@ -19,7 +19,7 @@
 .shop-tabs button small { margin-left:12px; color:#849675; font:10px monospace; }
 .shop-tabs .is-active,.shop-filter .is-active,.shop-roster .is-active { border-color:#9bbb72; color:#d5edac; background:#30422a; }
 .shop-tabs>span { margin-left:auto; font-size:10px; color:#77866c; }
-.shop-content { padding:18px 28px 26px; overflow-y:auto; scrollbar-width:thin; scrollbar-color:#596b49 #152018; }
+.shop-content { min-height:0; padding:18px 28px 26px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#596b49 #152018; }
 .shop-filter { display:flex; gap:6px; align-items:center; margin-bottom:18px; }
 .shop-filter button { font-size:11px; padding:7px 12px; }
 .shop-filter>span { margin-left:auto; font-size:10px; color:#82947a; }
@@ -58,10 +58,12 @@
 .shop-skill-meta { display:flex; justify-content:space-between; gap:10px; font-size:10px; color:#adbd9b; padding:11px 0; margin:auto 0 12px; border-top:1px solid #3b4834; border-bottom:1px solid #3b4834; }
 .is-equipped { border-color:#8ca464; }
 .is-equipped .shop-purchase { opacity:.8!important; }
-.shop-notice { font-size:11px; padding:12px; color:#c9e7a5; background:#233b22; border:1px solid #536e3b; margin:0 0 16px; }
+.shop-notice { display:flex; align-items:center; height:56px; font-size:11px; line-height:1.6; padding:12px; color:#a5b995; background:#1b2b1d; border:1px solid #3c5034; margin:0 0 16px; }
+.shop-notice.is-success { color:#c9e7a5; background:#233b22; border-color:#536e3b; }
 .shop-footer { display:flex; gap:16px; align-items:center; padding:14px 28px; border-top:1px solid #46543a; background:#18231b; flex-shrink:0; }
 .shop-footer>span { color:#8b9d7b; font-size:9px; line-height:1.6; }
 .shop-footer button { margin-left:auto; padding:9px 14px; white-space:nowrap; font-size:11px; }
 .shop-footer kbd { margin-left:10px; color:#92a77d; font:9px monospace; }
 @media(max-width:800px) { .shop-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .shop-tabs>span,.shop-filter>span { display:none; } .shop-header { padding:18px; gap:14px; } .shop-tabs { padding:10px 18px; } .shop-content { padding:15px 18px; } .shop-footer { padding:12px 18px; } .shop-wallet strong { font-size:20px; } }
 @media(max-width:480px) { .supply-shop { width:calc(100vw - 16px); max-height:calc(100dvh - 16px); } .shop-header h2 { font-size:20px; } .shop-header h2 small { display:none; } .shop-eyebrow { font-size:8px; letter-spacing:1px; } .shop-grid { gap:8px; } .shop-card { padding:10px; } .shop-card h3 { font-size:14px; } .shop-card-top { flex-wrap:wrap; } .shop-card>p { font-size:10px; min-height:68px; } .focused-skills { grid-template-columns:1fr; } .shop-footer>span { font-size:8px; } .shop-wallet strong { font-size:17px; } .shop-tabs button { padding:9px 12px; } .shop-tabs button small { margin-left:6px; } }
+@media(max-width:480px) { .shop-notice { height:76px; } }

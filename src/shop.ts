@@ -25,12 +25,17 @@ export class SupplyShop {
     this.dialog.className = 'supply-shop';
     this.dialog.setAttribute('aria-label', '보급 상점');
     document.body.append(this.dialog);
+    // Phaser also listens on window; modal pointer events must stay inside the shop.
+    for (const type of ['pointerdown', 'pointerup', 'pointermove', 'pointercancel', 'mousedown', 'mouseup', 'mousemove', 'touchstart', 'touchmove', 'touchend', 'touchcancel', 'wheel']) {
+      this.dialog.addEventListener(type, e => e.stopPropagation(), { passive: true });
+    }
     this.dialog.addEventListener('cancel', e => { e.preventDefault(); this.close(); });
     this.dialog.addEventListener('keydown', e => {
       e.stopPropagation();
       if (e.key.toLowerCase() === 'b') { e.preventDefault(); this.close(); }
     });
     this.dialog.addEventListener('click', e => {
+      e.stopPropagation();
       const button = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-action]');
       if (!button || button.disabled) return;
       const { action, key } = button.dataset;
@@ -43,9 +48,9 @@ export class SupplyShop {
         const skill = key as SkillKey;
         this.notice = this.actions.equip(skill) ? `${SKILL_DEFS[skill].name} 장착 완료. 적을 만나면 자동으로 사용합니다.` : '장착할 유닛과 보유 미네랄을 확인해 주세요.';
       }
-      this.render();
+      this.render(action === 'equip' || action === 'filter');
       const next = this.dialog.querySelector<HTMLButtonElement>(`button[data-action="${action}"][data-key="${key}"]`);
-      if (next && !next.disabled) next.focus();
+      if (next && !next.disabled) next.focus({ preventScroll: true });
     });
   }
 
@@ -54,9 +59,10 @@ export class SupplyShop {
     if (!this.dialog.open) this.dialog.showModal();
   }
   close(): void { if (this.dialog.open) this.dialog.close(); this.actions.close(); }
-  destroy(): void { this.dialog.remove(); }
+  destroy(): void { this.close(); this.dialog.remove(); }
 
-  private render(): void {
+  private render(preserveScroll = false): void {
+    const scrollTop = preserveScroll ? this.dialog.querySelector<HTMLElement>('.shop-content')?.scrollTop ?? 0 : 0;
     const state = this.actions.state();
     const selected = state.units.find(u => u.id === state.selectedId);
     const unitCount = (k: TowerKey) => state.units.filter(u => u.k === k).length;
@@ -96,9 +102,10 @@ export class SupplyShop {
       <nav class="shop-tabs" aria-label="상점 메뉴">${button('tab', 'units', '유닛 보급 <small>08</small>', this.tab === 'units')}${button('tab', 'skills', '자동 스킬 <small>16</small>', this.tab === 'skills')}<span>구매 → 배치 → 스킬 장착</span></nav>
       <div class="shop-content">
         ${this.tab === 'units' ? `<div class="shop-filter">${button('filter', 'all', '전체 유닛', this.faction === 'all')}${button('filter', 'terran', '테란', this.faction === 'terran')}${button('filter', 'protoss', '프로토스', this.faction === 'protoss')}<span>미네랄은 전장에 배치할 때 차감됩니다.</span></div>` : `${roster}<div class="shop-skill-context">${selected ? `<img src="${this.images.get(selected.k)}" alt="" width="54" height="54"><div><b>${TOWER_DEFS[selected.k].name} <span>Lv.${selected.lvl}</span></b><p>장착 ${selected.skills.length}/${SKILL_SLOTS} · 스킬은 적이 사거리 안에 있을 때 자동 사용</p></div>` : '<div><b>유닛을 선택하면 전용 스킬을 구매할 수 있습니다.</b><p>같은 종류의 유닛도 스킬은 각각 장착합니다. 아래는 전체 스킬 목록입니다.</p></div>'}</div>`}
-        ${this.notice ? `<p class="shop-notice" role="status">✓ ${this.notice}</p>` : ''}
+        ${this.tab === 'skills' ? `<p class="shop-notice ${this.notice ? 'is-success' : ''}" role="status">${this.notice ? '✓ ' + this.notice : '전용 스킬을 장착하면 적 탐지와 재사용 대기시간에 따라 자동으로 발동합니다.'}</p>` : ''}
         <div class="shop-grid ${this.tab === 'skills' && selected ? 'focused-skills' : ''}">${cards}</div>
       </div>
       <footer class="shop-footer"><span>유닛당 스킬 2개 · 추가 조작 없이 자동 발동 · 회수 시 스킬 비용도 70% 환급</span><button type="button" data-action="close">전장 복귀 <kbd>ESC</kbd></button></footer>`;
+    this.dialog.querySelector<HTMLElement>('.shop-content')!.scrollTop = scrollTop;
   }
 }

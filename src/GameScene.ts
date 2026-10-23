@@ -52,6 +52,7 @@ export class GameScene extends Phaser.Scene {
   private repeat = 0;
   private shop!: SupplyShop;
   private shopOpen = false;
+  private shopInputEnabled = true;
   private fields: SkillField[] = [];
   private shopBtn!: Btn;
   private skillBtn!: Btn;
@@ -117,7 +118,7 @@ export class GameScene extends Phaser.Scene {
       select: id => { this.selected = this.towers.find(t => `${t.c},${t.r}` === id) ?? null; this.building = null; },
       choose: k => this.chooseBuild(k, true),
       equip: k => this.equipSkill(k),
-      close: () => { this.shopOpen = false; },
+      close: () => { this.shopOpen = false; this.input.enabled = this.shopInputEnabled; },
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.shop.destroy());
 
@@ -299,6 +300,8 @@ export class GameScene extends Phaser.Scene {
   private openShop(tab: 'units' | 'skills' = 'units'): void {
     if (this.over || this.shopOpen) return;
     this.shopOpen = true; this.hover = null;
+    this.shopInputEnabled = this.input.enabled;
+    this.input.enabled = false;
     this.shop.open(tab);
   }
 
