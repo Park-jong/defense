@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import {
-  CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE, COLS, CONSOLE_Y, ENEMY_DEFS, EnemyKey, FINAL_BOSS_HP_MULT, FONT, GAME_W, H, MAP_H, MAP_Y, MAX_CATCHUP_SEC, MAX_WAVE, MOBILE_LAYOUT, ROWS, SIDE_W, STEP_SEC, T, TEST_GOLD, TOWER_DEFS, TOWER_KEYS, TowerKey, W, WP, pathCells,
+  CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE, COLS, CONSOLE_Y, ENEMY_DEFS, EnemyKey, FINAL_BOSS_HP_MULT, FONT, GAME_W, H, MAP_H, MAP_Y, MAX_CATCHUP_SEC, MAX_WAVE, MOBILE_LAYOUT, RENDER_SCALE, ROWS, SIDE_W, STEP_SEC, T, TEST_GOLD, TOWER_DEFS, TOWER_KEYS, TowerKey, W, WP, pathCells,
 } from './config';
 import { drawMap, makeTextures } from './textures';
 import { Btn, mkBtn } from './ui';
@@ -109,6 +109,8 @@ export class GameScene extends Phaser.Scene {
   // ---------- 생성 ----------
   create(): void {
     makeTextures(this);
+    // 캔버스는 RENDER_SCALE배 픽셀이므로 카메라를 같은 배율로 확대해 게임 좌표(GAME_W×H)를 화면에 꽉 채운다.
+    this.cameras.main.setZoom(RENDER_SCALE).centerOn(GAME_W / 2, H / 2);
     drawMap(this, COLS, ROWS);
 
     // scene.restart() 시 인스턴스가 재사용되므로 상태를 초기화한다.
@@ -154,10 +156,11 @@ export class GameScene extends Phaser.Scene {
 
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => { this.hover = this.cellAt(p); });
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.onMapClick(p));
-    // 건설 명령 영역을 좌우로 40px 넘게 밀면 쪽을 넘긴다.
+    // 건설 명령 영역을 좌우로 40px 넘게 밀면 쪽을 넘긴다. 포인터의 down/up 좌표는 캔버스 픽셀이라 게임 좌표로 나눈다.
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
-      const a = this.buildArea, dx = p.upX - p.downX, dy = p.upY - p.downY;
-      const inside = p.downX >= a.x && p.downX <= a.x + a.w && p.downY >= a.y && p.downY <= a.y + a.h;
+      const k = RENDER_SCALE, a = this.buildArea;
+      const downX = p.downX / k, downY = p.downY / k, dx = (p.upX - p.downX) / k, dy = (p.upY - p.downY) / k;
+      const inside = downX >= a.x && downX <= a.x + a.w && downY >= a.y && downY <= a.y + a.h;
       if (inside && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) this.setBuildPage(this.buildPage + (dx < 0 ? 1 : -1));
     });
     this.input.mouse?.disableContextMenu();
@@ -166,8 +169,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private cellAt(p: Phaser.Input.Pointer): Cell | null {
-    if (p.y < MAP_Y || p.y >= CONSOLE_Y || p.x < 0 || p.x >= W) return null;
-    return { c: Math.floor(p.x / T), r: Math.floor((p.y - MAP_Y) / T) };
+    // 카메라 줌이 있으므로 화면 좌표(p.x)가 아니라 게임 세계 좌표로 칸을 찾는다.
+    const x = p.worldX, y = p.worldY;
+    if (y < MAP_Y || y >= CONSOLE_Y || x < 0 || x >= W) return null;
+    return { c: Math.floor(x / T), r: Math.floor((y - MAP_Y) / T) };
   }
 
   // ---------- UI ----------

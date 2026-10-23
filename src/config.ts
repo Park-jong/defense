@@ -32,6 +32,13 @@ export interface Point { x: number; y: number }
 const WP_CELLS = [[-1, 2], [16, 2], [16, 5], [3, 5], [3, 9], [20, 9]] as const;
 export const WP: Point[] = WP_CELLS.map(([c, r]) => ({ x: (c + .5) * T, y: MAP_Y + (r + .5) * T }));
 
+/**
+ * 캔버스를 게임 좌표의 몇 배 픽셀로 그릴지. 고밀도 화면(휴대폰 등)에서 CSS로 늘려 흐려지는 것을 막는다.
+ * 게임 좌표는 그대로 두고 카메라 줌과 텍스트 해상도로 맞춘다. 일반 모니터에서는 1.
+ */
+export let RENDER_SCALE = 1;
+export function setRenderScale(scale: number): void { RENDER_SCALE = scale; }
+
 /** 가로로 긴 터치 화면용 배치: 상단바·하단 콘솔 대신 맵 오른쪽에 세로 패널을 둔다. */
 export function useMobileLayout(): void {
   MOBILE_LAYOUT = true;

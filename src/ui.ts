@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { FONT } from './config';
+import { FONT, RENDER_SCALE } from './config';
 
 export interface Btn {
   enabled: boolean;
@@ -47,7 +47,8 @@ export function mkBtn(scene: Phaser.Scene, x: number, y: number, w: number, h: n
   };
   hit.on('pointerover', () => { hover = true; paint(); });
   hit.on('pointerout', () => { hover = false; paint(); });
-  if (opts.tap) hit.on('pointerup', (p: Phaser.Input.Pointer) => { if (b.enabled && p.getDistance() < 12) cb(); });
+  // getDistance()는 캔버스 픽셀 단위라 렌더 배율을 곱해 게임 좌표 기준 12px로 맞춘다.
+  if (opts.tap) hit.on('pointerup', (p: Phaser.Input.Pointer) => { if (b.enabled && p.getDistance() < 12 * RENDER_SCALE) cb(); });
   else hit.on('pointerdown', () => { if (b.enabled) cb(); });
   paint();
   return b;

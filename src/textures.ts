@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ENEMY_DEFS, FONT, MAP_H, MAP_Y, T, W, WP, pathCells } from './config';
+import { ENEMY_DEFS, FONT, MAP_H, MAP_Y, RENDER_SCALE, T, W, WP, pathCells } from './config';
 
 /** All art is generated locally: no image downloads or external assets. */
 export function makeTextures(scene: Phaser.Scene): void {
@@ -176,8 +176,10 @@ export function makeTextures(scene: Phaser.Scene): void {
 export function drawMap(scene: Phaser.Scene, cols: number, rows: number): void {
   const key = 'battlefield';
   if (!scene.textures.exists(key)) {
-    const texture = scene.textures.createCanvas(key, W, MAP_H)!;
+    // 고밀도 화면에서도 선명하도록 RENDER_SCALE배 크기로 그리고, 화면에는 W×MAP_H로 표시한다.
+    const texture = scene.textures.createCanvas(key, W * RENDER_SCALE, MAP_H * RENDER_SCALE)!;
     const ctx = texture.context;
+    ctx.setTransform(RENDER_SCALE, 0, 0, RENDER_SCALE, 0, 0);
     let seed = 842;
     const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
     ctx.fillStyle = '#343b37'; ctx.fillRect(0, 0, W, MAP_H);
@@ -221,7 +223,7 @@ export function drawMap(scene: Phaser.Scene, cols: number, rows: number): void {
     ctx.fillStyle = shade; ctx.fillRect(0, 0, W, MAP_H);
     texture.refresh();
   }
-  scene.add.image(0, MAP_Y, key).setOrigin(0);
+  scene.add.image(0, MAP_Y, key).setOrigin(0).setDisplaySize(W, MAP_H);
   const g = scene.add.graphics();
   // Landing-zone markings and a powered exit gate.
   g.lineStyle(1, 0x859274, .2).strokeCircle(480, MAP_Y + 357, 59).strokeCircle(480, MAP_Y + 357, 66);
