@@ -13,17 +13,17 @@ export let CONSOLE_Y = MAP_Y + MAP_H;
 /** 캔버스 크기. 데스크톱 960×856(상단바 + 맵 + 하단 콘솔), 모바일 1280×576(맵 + 오른쪽 패널). */
 export let GAME_W = W;
 export let H = 856;
-export const MAX_WAVE = 30;
+export const MAX_WAVE = 50;
 /** 게임 로직 고정 스텝(초). 실제 경과 시간을 이 단위로 나눠 진행한다. */
 export const STEP_SEC = 1 / 60;
 /** 창이 가려져 루프가 드물게 돌 때 한 번에 따라잡는 최대 시간(초). */
 export const MAX_CATCHUP_SEC = 60;
-/** 웨이브 클리어 보너스 = BASE + PER_WAVE * 웨이브. 웨이브 30 시작 시점의 누적 골드가 약 12,000이 되도록 맞춤. */
+/** 웨이브 클리어 보너스 = BASE + PER_WAVE * 웨이브. */
 export const CLEAR_BONUS_BASE = 17;
 export const CLEAR_BONUS_PER_WAVE = 4;
 /** 최종 보스(마지막 웨이브의 보스) 체력 배율. */
 export const FINAL_BOSS_HP_MULT = 1;
-/** 테스트 모드(`?test`): 마지막 스테이지(30)를 반복하며, 후반 수준의 골드로 시작한다. */
+/** 테스트 모드(`?test`): MAX_WAVE 스테이지를 반복하며, 아래의 고정 미네랄을 지급한다. */
 export const TEST_GOLD = 12000;
 export const FONT = '"Malgun Gothic", system-ui, sans-serif';
 

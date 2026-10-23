@@ -283,7 +283,7 @@ for (const [name, strat] of Object.entries(STRATEGIES)) {
 
   console.log(`보스 분석 (경로 길이 ${PATH_LEN}px, 보스 속도 ${ENEMY_DEFS.boss.speed}px/s, 슬로우 미적용)`);
   console.log('웨이브 | 보스 체력 | 통과 시간(s) | 필요 DPS | 타워 합계 DPS | 체류 반영 총피해 | 총피해/체력');
-  for (const w of [10, 20, 30]) {
+  for (let w = 10; w <= MAX_WAVE; w += 10) {
     const b = bossInfo(w), s = r.bossSnap[w];
     const need = (b.hp / b.time).toFixed(1);
     if (s) {

@@ -34,6 +34,7 @@ function sprite(x = 0, y = 0) {
     setScale(scale) { this.scale = scale; return this; },
     setVisible(visible) { this.visible = visible; return this; },
     setRotation(rotation) { this.rotation = rotation; return this; },
+    setTint() { return this; }, clearTint() { return this; },
     destroy() { this.destroyed = true; },
   };
 }
@@ -431,4 +432,59 @@ test('솟은 콘솔 장갑 위에서는 건설·맵 입력을 막고 가운데 �
       assert.equal(s.gold, gold - TOWER_DEFS.marine.cost);
     }
   } finally { config.setRenderScale(originalScale); }
+});
+
+test('30 이후 50까지 보병·돌격·중장갑 웨이브가 이어지고 40·50에는 보스가 출현한다', () => {
+  const { MAX_WAVE } = load('./config');
+  assert.equal(MAX_WAVE, 50);
+  for (const [wave, count, bosses] of [[30, 55, 1], [31, 55, 0], [39, 68, 0], [40, 71, 1], [49, 84, 0], [50, 87, 1]]) {
+    const s = setup(); s.banner = () => {}; s.wave = wave - 1; s.startWave();
+    assert.equal(s.wave, wave); assert.equal(s.waveActive, true); assert.equal(s.spawnQ.length, count);
+    assert.equal(s.spawnQ.filter(type => type === 'boss').length, bosses);
+    for (const type of ['grunt', 'runner', 'tank']) assert.ok(s.spawnQ.includes(type));
+  }
+});
+
+test('1~49 클리어 보상을 지급하고 50에서만 승리하며 51스테이지는 시작할 수 없다', () => {
+  const { CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE } = load('./config');
+  const s = setup(), results = []; let expectedGold = s.gold;
+  s.banner = () => {}; s.endGame = win => { s.over = true; results.push(win); };
+  for (let wave = 1; wave <= 50; wave++) {
+    s.startWave(); assert.equal(s.wave, wave); assert.equal(s.waveActive, true);
+    // All enemies have been defeated; exercise the scene's actual wave-completion path.
+    s.spawnQ = []; s.step(1 / 60);
+    assert.equal(s.waveActive, false);
+    if (wave < 50) {
+      expectedGold += CLEAR_BONUS_BASE + wave * CLEAR_BONUS_PER_WAVE;
+      assert.equal(s.over, false); assert.deepEqual(results, []);
+    }
+    assert.equal(s.gold, expectedGold);
+  }
+  assert.deepEqual(results, [true]);
+  s.startWave(); assert.equal(s.wave, 50); assert.equal(s.waveActive, false);
+  s.over = false; s.startWave(); // The stage cap also guards independently of the victory overlay.
+  assert.equal(s.wave, 50); assert.equal(s.waveActive, false); assert.deepEqual(s.spawnQ, []);
+});
+
+test('50스테이지 보스도 후반 체력 증가와 돌파 시 즉시 패배 규칙을 따른다', () => {
+  const { ENEMY_DEFS, FINAL_BOSS_HP_MULT, WP } = load('./config'), s = setup();
+  s.wave = 40; s.spawn('boss'); const previous = s.enemies[0].hp;
+  s.enemies = []; s.wave = 50; s.spawn('boss'); const boss = s.enemies[0];
+  assert.ok(Number.isFinite(boss.hp) && boss.hp > previous);
+  assert.equal(boss.hp, ENEMY_DEFS.boss.hp * Math.pow(1.17, 49) * FINAL_BOSS_HP_MULT);
+  const results = []; s.endGame = win => { s.over = true; results.push(win); };
+  s.shakeAll = () => {}; s.uiCam = { flash() {} }; boss.seg = WP.length;
+  s.step(1 / 60);
+  assert.equal(s.bossLeaked, true); assert.equal(s.lives, 0); assert.deepEqual(results, [false]);
+});
+
+test('테스트 모드는 50스테이지를 반복하며 일반 모드의 최종 승리로 종료하지 않는다', () => {
+  const s = setup(); s.banner = () => {}; s.testMode = true; s.wave = 50;
+  s.endGame = () => { throw new Error('Test mode must remain repeatable'); };
+  for (const repeat of [1, 2]) {
+    s.startWave(); assert.equal(s.wave, 50); assert.equal(s.repeat, repeat);
+    assert.equal(s.spawnQ.length, 87); assert.equal(s.spawnQ.at(-1), 'boss');
+    s.spawnQ = []; s.step(1 / 60);
+    assert.equal(s.over, false); assert.equal(s.waveActive, false);
+  }
 });
