@@ -9,8 +9,9 @@ export interface Btn {
   show(v: boolean): void;
 }
 
+/** tap: 누르는 순간이 아니라, 거의 움직이지 않고 손을 뗐을 때 실행한다 (밀어서 넘기는 목록 안의 버튼용). */
 export function mkBtn(scene: Phaser.Scene, x: number, y: number, w: number, h: number,
-                      label: string, cb: () => void, size = 14, icon?: string): Btn {
+                      label: string, cb: () => void, size = 14, icon?: string, opts: { tap?: boolean } = {}): Btn {
   const frame = scene.add.graphics().setDepth(30);
   const hit = scene.add.zone(x, y, w, h).setOrigin(0).setDepth(33)
     .setInteractive({ useHandCursor: true });
@@ -46,7 +47,8 @@ export function mkBtn(scene: Phaser.Scene, x: number, y: number, w: number, h: n
   };
   hit.on('pointerover', () => { hover = true; paint(); });
   hit.on('pointerout', () => { hover = false; paint(); });
-  hit.on('pointerdown', () => { if (b.enabled) cb(); });
+  if (opts.tap) hit.on('pointerup', (p: Phaser.Input.Pointer) => { if (b.enabled && p.getDistance() < 12) cb(); });
+  else hit.on('pointerdown', () => { if (b.enabled) cb(); });
   paint();
   return b;
 }

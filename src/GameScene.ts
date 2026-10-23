@@ -9,6 +9,9 @@ import { EquippedSkill, SKILL_DEFS, SKILL_SLOTS, SkillKey, UnitBuff } from './ca
 import { SupplyShop } from './shop';
 import { BUNKER_BARREL_LENGTH, BUNKER_CAPACITY, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
 
+/** 건설 명령 한 쪽에 보이는 유닛 수. */
+const BUILD_PAGE_SIZE = 4;
+
 interface Tower {
   id: string;
   k: TowerKey; c: number; r: number; x: number; y: number;
@@ -86,6 +89,11 @@ export class GameScene extends Phaser.Scene {
   /** 배치마다 다른 초상화 크기와 기지 내구도 막대 위치. */
   private portraitSize = 88;
   private lifeMeter = { x: 832, y: 31, w: 54 };
+  /** 건설 명령의 현재 쪽과, 좌우로 밀어 넘기는 영역. */
+  private buildPage = 0;
+  private buildArea = { x: 0, y: 0, w: 0, h: 0 };
+  private buildPageTxt?: Phaser.GameObjects.Text;
+  private buildPageBtn?: Btn;
   private pauseTxt!: Phaser.GameObjects.Text;
   private towerBtns: Btn[] = [];
   private goBtn!: Btn;
@@ -146,6 +154,12 @@ export class GameScene extends Phaser.Scene {
 
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => { this.hover = this.cellAt(p); });
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.onMapClick(p));
+    // 건설 명령 영역을 좌우로 40px 넘게 밀면 쪽을 넘긴다.
+    this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
+      const a = this.buildArea, dx = p.upX - p.downX, dy = p.upY - p.downY;
+      const inside = p.downX >= a.x && p.downX <= a.x + a.w && p.downY >= a.y && p.downY <= a.y + a.h;
+      if (inside && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) this.setBuildPage(this.buildPage + (dx < 0 ? 1 : -1));
+    });
     this.input.mouse?.disableContextMenu();
     this.input.keyboard?.addCapture('SPACE');
     this.input.keyboard?.on('keydown', (e: KeyboardEvent) => this.onKey(e));
@@ -215,11 +229,16 @@ export class GameScene extends Phaser.Scene {
     this.statusTxt = text(L, 257, '', 13, '#849a76');
 
     // 건설 명령
-    this.shopBtn = mkBtn(this, x0 + 10, 294, pw - 18, 34, `보급 상점 · 유닛 9종 · 스킬${this.kb(' [B]')}`, () => this.openShop(), 13);
-    this.towerBtns = TOWER_KEYS.slice(0, 4).map((k, i) => {
-      const d = TOWER_DEFS[k];
-      return mkBtn(this, x0 + 10 + (i % 2) * 153, 334 + Math.floor(i / 2) * 80, 149, 76, `${d.name} · ${d.cost}`, () => this.chooseBuild(k), 12, k);
+    this.shopBtn = mkBtn(this, x0 + 10, 294, pw - 94, 34, `보급 상점 · 스킬${this.kb(' [B]')}`, () => this.openShop(), 13);
+    // 9종을 2×2 네 칸씩 쪽으로 나눈다. 좌우로 밀거나 오른쪽 위 쪽 버튼을 눌러 넘긴다.
+    this.buildPageBtn = mkBtn(this, right - 80, 294, 72, 34, '', () => this.setBuildPage(this.buildPage + 1), 13);
+    this.towerBtns = TOWER_KEYS.map((k, i) => {
+      const d = TOWER_DEFS[k], slot = i % BUILD_PAGE_SIZE;
+      return mkBtn(this, x0 + 10 + (slot % 2) * 153, 334 + Math.floor(slot / 2) * 80, 149, 76, `${d.name} · ${d.cost}`,
+        () => this.chooseBuild(k), 12, k, { tap: true });
     });
+    this.buildArea = { x: x0 + 10, y: 334, w: pw - 18, h: 156 };
+    this.setBuildPage(0);
     this.goBtn = mkBtn(this, x0 + 10, 498, 160, 66, '▶  웨이브 시작', () => this.startWave(), 15);
     this.goBtn.act(true);
     this.spdBtn = mkBtn(this, x0 + 176, 498, 66, 66, '배속 ×1', () => {
@@ -301,10 +320,17 @@ export class GameScene extends Phaser.Scene {
     this.shopBtn = mkBtn(this, 807, y + 20, 130, 21, `보급 상점${this.kb(' [B]')}`, () => this.openShop(), 10);
     this.skillBtn = mkBtn(this, 441, y + 24, 67, 21, '스킬 장착', () => this.openShop(this.selected?.k === 'bunker' ? 'garrison' : 'skills'), 9);
     this.skillBtn.show(false);
-    this.towerBtns = TOWER_KEYS.slice(0, 4).map((k, i) => {
+    // 9종을 4개씩 쪽으로 나눠 ◀ ▶로 넘긴다 (터치 기기는 이 영역을 좌우로 밀어도 넘어간다).
+    this.towerBtns = TOWER_KEYS.map((k, i) => {
       const d = TOWER_DEFS[k];
-      return mkBtn(this, 544 + i * 100, y + 43, 94, 95, `${this.kb(`[${i + 1}] `)}${d.name}\n${d.cost} 미네랄`, () => this.chooseBuild(k), 10, k);
+      return mkBtn(this, 558 + (i % BUILD_PAGE_SIZE) * 92, y + 43, 86, 95, `${this.kb(`[${i + 1}] `)}${d.name}\n${d.cost} 미네랄`,
+        () => this.chooseBuild(k), 10, k, { tap: true });
     });
+    mkBtn(this, 538, y + 43, 16, 95, '◀', () => this.setBuildPage(this.buildPage - 1), 10);
+    mkBtn(this, 926, y + 43, 16, 95, '▶', () => this.setBuildPage(this.buildPage + 1), 10);
+    this.buildPageTxt = text(616, y + 26, '', 9, '#8ea17d').setFontFamily('monospace');
+    this.buildArea = { x: 538, y: y + 43, w: 404, h: 95 };
+    this.setBuildPage(0);
     this.goBtn = mkBtn(this, 544, y + 146, 206, 38, `▶  웨이브 시작${this.kb('  [SPACE]')}`, () => this.startWave(), 12);
     this.goBtn.act(true);
     this.spdBtn = mkBtn(this, 756, y + 146, 86, 38, '배속 ×1', () => {
@@ -332,7 +358,7 @@ export class GameScene extends Phaser.Scene {
       this.lifeTxt.setColor(this.lives <= 5 ? '#e29a7f' : '#b7dc8e');
       this.goBtn.set(this.over ? '작전 종료' : this.waveActive ? `${MOBILE_LAYOUT ? '교전' : '교전 중'} · 남은 적 ${remaining}` : `▶  웨이브 시작${this.kb('  [SPACE]')}`);
     }
-    TOWER_KEYS.slice(0, 4).forEach((k, i) => {
+    TOWER_KEYS.forEach((k, i) => {
       this.towerBtns[i].act(this.building === k);
       this.towerBtns[i].en(!this.over && (this.gold >= TOWER_DEFS[k].cost || this.building === k));
     });
@@ -401,8 +427,21 @@ export class GameScene extends Phaser.Scene {
     else if (e.key === 's' || e.key === 'S') this.sell();
   }
 
+  /** 건설 명령의 쪽을 바꾼다. 양 끝에서는 반대쪽 끝으로 돈다. */
+  private setBuildPage(page: number): void {
+    const pages = Math.ceil(TOWER_KEYS.length / BUILD_PAGE_SIZE);
+    this.buildPage = (page % pages + pages) % pages;
+    this.towerBtns.forEach((b, i) => b.show(Math.floor(i / BUILD_PAGE_SIZE) === this.buildPage));
+    const label = `${this.buildPage + 1} / ${pages}`;
+    this.buildPageTxt?.setText(label);
+    this.buildPageBtn?.set(`${label} ▸`);
+  }
+
   private chooseBuild(k: TowerKey, force = false): void {
     if (this.over) return;
+    // 단축키나 상점으로 고른 유닛이 보이도록 그 유닛이 있는 쪽으로 넘긴다.
+    const page = Math.floor(TOWER_KEYS.indexOf(k) / BUILD_PAGE_SIZE);
+    if (page !== this.buildPage) this.setBuildPage(page);
     this.building = (!force && this.building === k) ? null : k;
     this.selected = null; this.unloading = null;
   }
