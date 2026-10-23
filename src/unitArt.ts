@@ -15,42 +15,89 @@ const defs = `<defs>
 const svg = (body: string) => `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">${defs}${body}</svg>`;
 
 const turretBase = `
-  <ellipse cx="32" cy="49" rx="26" ry="11" fill="#000" opacity=".4"/>
-  <path d="M8 39 21 30 43 30 56 39 56 48 43 56 21 56 8 48Z" fill="#192b28" stroke="#0c1815" stroke-width="1.5"/>
-  <path d="M8 39 21 30 43 30 56 39 43 48 21 48Z" fill="url(#steel)" stroke="#87988a" stroke-width=".7"/>
-  <path d="M8 39 21 48 43 48 56 39 56 46 43 54 21 54 8 46Z" fill="#3a5146"/>
-  <path d="m13 40 10 6m-5-10 10 6m19-7-9 6m15-1-9 6" stroke="#c9b364" stroke-width="2"/>
-  <path d="M23 23 32 18 41 23 41 41 32 47 23 41Z" fill="#263a33" stroke="#15241e"/>
-  <path d="M23 23 32 28 32 47 23 41Z" fill="url(#olive)"/>
-  <path d="M32 28 41 23 41 41 32 47Z" fill="#415c4c"/>
-  <path d="M23 23 32 18 41 23 32 28Z" fill="#bac1a3"/>
-  <path d="m26 30 3 2v8l-3-2m10-6 3-2v8l-3 2" fill="#142b25"/>
-  <path d="m26 33 3 2m7 0 3-2" stroke="#7cdb9c" stroke-width="1.3"/>
-  <path d="M18 33v11m28-11v11" stroke="#293c33" stroke-width="3"/>
-  <circle cx="17" cy="44" r="1" fill="#d6ded1"/><circle cx="47" cy="44" r="1" fill="#d6ded1"/>
+  <defs>
+    <linearGradient id="turretPlinth" x1="0" y1="0" x2=".4" y2="1"><stop stop-color="#717784"/><stop offset=".25" stop-color="#424956"/><stop offset=".7" stop-color="#242933"/><stop offset="1" stop-color="#141b24"/></linearGradient>
+    <linearGradient id="turretTrim" x1="0" y1="0" x2=".4" y2="1"><stop stop-color="#e0e1d7"/><stop offset=".35" stop-color="#9da6aa"/><stop offset="1" stop-color="#47545a"/></linearGradient>
+    <pattern id="turretHazard" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="skewX(-25)"><rect width="5" height="5" fill="#e8be49"/><rect width="2.5" height="5" fill="#20262b"/></pattern>
+  </defs>
+  <ellipse cx="32" cy="53" rx="29" ry="10" fill="#000" opacity=".4"/>
+  <g stroke-linejoin="round">
+    <!-- Four white-edged feet brace a squat, dark armoured plinth. -->
+    <path d="M8 42 18 35h28l11 8v11l-10 8H17L6 54Z" fill="#19212a" stroke="#0b1219" stroke-width="1.3"/>
+    <path d="m8 42 8-6 9 7-7 9-11-3Zm32 1 7-7 10 7v7l-11 3ZM8 49l12 2 6 8-9 3-11-8Zm32 6 8-6 10 5-11 8-10-2Z" fill="url(#turretHazard)" stroke="#111a21" stroke-width="1"/>
+    <path d="m7 43 2-2v7l9 3 4-3 2 2-5 5L6 51Zm43-3 7 3v8l-4 2-2-2 3-2v-5ZM7 53l10 6 8-3 1 3-9 4-11-7Zm35 5 5 2 10-6 1 2-11 7-7-3Z" fill="url(#turretTrim)" stroke="#26323a" stroke-width=".6"/>
+    <path d="M20 31 38 29 46 36 51 47 39 54 20 51 12 43Z" fill="url(#turretPlinth)" stroke="#111b25" stroke-width="1.3"/>
+    <path d="M20 31 38 29 46 36 32 43 15 39Z" fill="#535a67" stroke="#929a9a" stroke-width=".6"/>
+    <path d="M15 39 32 43 39 54 20 51 12 43Z" fill="#343b4a"/>
+    <path d="M32 43 46 36 51 47 39 54Z" fill="#202b37"/>
+    <path d="m19 35 15 3m-13-6 14 3m-12-4 14 2" stroke="#202a35" stroke-width="1.4"/>
+    <path d="m21 36 2-3m4 5 2-4m4 5 2-4" stroke="#a1a8a8" stroke-width=".7"/>
+    <path d="m18 42 3 1v5l-3-1Zm7 2 3 1v5l-3-1Zm13 1 3-2v5l-3 2Zm6-4 3-2v5l-3 2Z" fill="#111c25" stroke="#66727b" stroke-width=".6"/>
+    <!-- Silver conduit and front service socket. -->
+    <path d="M24 46 20 45l-7 8v5l5 2 8-8Z" fill="url(#turretTrim)" stroke="#14232b" stroke-width="1"/>
+    <ellipse cx="16" cy="56" rx="3.2" ry="4.2" transform="rotate(30 16 56)" fill="#354751" stroke="#b5beb9" stroke-width=".8"/>
+    <path d="m20 49 3 2m-5 0 3 2" stroke="#e0e3d6" stroke-width=".8"/>
+    <ellipse cx="32" cy="34" rx="12" ry="7" fill="#131e25" stroke="#9ba7a8" stroke-width="1"/>
+    <path d="M22 27h20v7c-1 8-19 8-20 0Z" fill="url(#turretTrim)" stroke="#192932"/>
+    <path d="M23 30q9 6 18 0m-18 4q9 6 18 0" fill="none" stroke="#26343c" stroke-width="1.2"/>
+    <ellipse cx="32" cy="27" rx="10" ry="6" fill="#414e58" stroke="#c0c8c3" stroke-width=".8"/>
+    <path d="M27 22h10v9l-5 3-5-3Z" fill="url(#turretTrim)" stroke="#24343e"/>
+    <path d="M30 25v6m4-7v7" stroke="#2a3941" stroke-width="1"/>
+    <g fill="#a8b4ae" stroke="#28353e" stroke-width=".5"><circle cx="14" cy="42" r=".9"/><circle cx="47" cy="46" r=".9"/><circle cx="30" cy="47" r=".9"/></g>
+  </g>
 `;
 const turretHead = `
-  <ellipse cx="32" cy="30" rx="12" ry="8" fill="#10251e" stroke="#8f9e83"/>
-  <path d="M22 22 30 17 41 22 41 33 32 39 22 33Z" fill="url(#steel)" stroke="#1a3027"/>
-  <path d="M12 17 23 11 36 15 36 28 25 34 12 30Z" fill="#263b33" stroke="#101d17" stroke-width="1.2"/>
-  <path d="M12 17 23 11 36 15 25 22Z" fill="url(#olive)" stroke="#b5bca0" stroke-width=".6"/>
-  <path d="M12 17 25 22 25 34 12 30Z" fill="url(#red)"/>
-  <path d="M25 22 36 15 36 28 25 34Z" fill="#263a32"/>
-  <path d="M31 30 42 23 56 28 56 40 45 47 31 42Z" fill="#263b33" stroke="#101d17" stroke-width="1.2"/>
-  <path d="M31 30 42 23 56 28 45 36Z" fill="url(#olive)" stroke="#b5bca0" stroke-width=".6"/>
-  <path d="M31 30 45 36 45 47 31 42Z" fill="url(#red)"/>
-  <path d="M45 36 56 28 56 40 45 47Z" fill="#1c3029"/>
-  <g fill="#111c18" stroke="#a3b29c" stroke-width=".55">
-    <ellipse cx="29" cy="22" rx="1.6" ry="2"/><ellipse cx="33" cy="19.5" rx="1.6" ry="2"/>
-    <ellipse cx="29" cy="28" rx="1.6" ry="2"/><ellipse cx="33" cy="25.5" rx="1.6" ry="2"/>
-    <ellipse cx="49" cy="36" rx="1.6" ry="2"/><ellipse cx="53" cy="33.5" rx="1.6" ry="2"/>
-    <ellipse cx="49" cy="42" rx="1.6" ry="2"/><ellipse cx="53" cy="39.5" rx="1.6" ry="2"/>
+  <defs>
+    <linearGradient id="turretPod" x1="0" y1="0" x2=".7" y2="1"><stop stop-color="#686d78"/><stop offset=".24" stop-color="#363d48"/><stop offset=".7" stop-color="#161e28"/><stop offset="1" stop-color="#0a121a"/></linearGradient>
+    <linearGradient id="turretRim" x1="0" y1="0" x2=".2" y2="1"><stop stop-color="#f0f1e5"/><stop offset=".4" stop-color="#b6c2c1"/><stop offset="1" stop-color="#596d75"/></linearGradient>
+    <radialGradient id="turretMissile"><stop stop-color="#c4fff0"/><stop offset=".3" stop-color="#68cdb6"/><stop offset=".75" stop-color="#267c70"/><stop offset="1" stop-color="#163e3e"/></radialGradient>
+  </defs>
+  <g stroke-linejoin="round">
+    <!-- Tall, canted three-round pods straddle an exposed tracking mechanism. -->
+    <path d="M37 5 47 3 53 8 60 27 54 32 42 27 33 12Z" fill="url(#turretPod)" stroke="#0c151e" stroke-width="1.3"/>
+    <path d="m37 5 10-2 5 5-10 3-9 1Z" fill="#464b54" stroke="#8a9395" stroke-width=".5"/>
+    <path d="m37 10 7 1 6 15-7-2Z" fill="#111b23" stroke="#596771" stroke-width=".6"/>
+    <path d="m40 12 3 1m-1 3 3 1m-1 3 3 1" stroke="#83918e" stroke-width="1"/>
+    <path d="M48 7 53 10 59 27 53 30 45 11Z" fill="#0b1d22" stroke="#53686b" stroke-width=".7"/>
+    <path d="M49 7 53 10 59 27 54 30" fill="none" stroke="url(#turretRim)" stroke-width="2.1"/>
+    <g fill="url(#turretMissile)" stroke="#315a58" stroke-width=".5">
+      <ellipse cx="51" cy="13" rx="1.8" ry="2.1" transform="rotate(-20 51 13)"/>
+      <ellipse cx="53" cy="19" rx="1.8" ry="2.1" transform="rotate(-20 53 19)"/>
+      <ellipse cx="55" cy="25" rx="1.8" ry="2.1" transform="rotate(-20 55 25)"/>
+    </g>
+    <!-- Optics, gimbal bearings, actuator rods and bundled control cables. -->
+    <path d="M23 22 27 13h8l7 11-6 10-10 1-5-7Z" fill="#43514f" stroke="#15252a" stroke-width="1"/>
+    <path d="M27 17 32 14l6 7-3 5-8-2Z" fill="url(#turretRim)" stroke="#293c42" stroke-width=".6"/>
+    <path d="m28 19 3-2 5 5-3 2Z" fill="#222e34"/>
+    <path d="m30 24 6 1 2 7-6 3-4-6Z" fill="#909c94" stroke="#314247" stroke-width=".7"/>
+    <path d="m30 26 5 2m-4 1 4 2" stroke="#26373c" stroke-width="1.2"/>
+    <path d="M28 13 27 8l4-3 5 3 1 6-5 3Z" fill="#3c4b50" stroke="#899b98" stroke-width=".7"/>
+    <circle cx="32" cy="11" r="2.6" fill="#112a2b" stroke="#b5c9c0" stroke-width=".8"/>
+    <circle cx="32" cy="11" r="1.6" fill="url(#turretMissile)"/>
+    <path d="M27 9 25 7l-3 3-1 10m15-5 5 1 4 10-5 5" fill="none" stroke="#101c22" stroke-width="2.5"/>
+    <path d="m26 10-2 1-1 8m14-3 3 1 3 9-4 4" fill="none" stroke="#b3beb4" stroke-width=".8"/>
+    <path d="m26 25-3 6m16-7 3 7" stroke="#c2cec3" stroke-width="1.8"/>
+    <circle cx="38" cy="28" r="2.2" fill="#2c3d43" stroke="#a1b1aa" stroke-width=".7"/>
+    <!-- Near pod: black recessed launch bay and a heavy silver C-shaped rim. -->
+    <path d="M8 17 21 10 29 13 35 18 43 36 37 42 20 37 9 29Z" fill="url(#turretPod)" stroke="#0a141e" stroke-width="1.3"/>
+    <path d="m8 17 13-7 8 3 5 6-13 5-12-2Z" fill="#434a56" stroke="#7e898e" stroke-width=".6"/>
+    <path d="m11 19 10-5 5 1-10 5Zm4 6 11-4 4 11-9 2-9-6Z" fill="#202c39" stroke="#0b1822" stroke-width=".7"/>
+    <path d="m13 22 9-4m-6 6 8-3m-8 7 10-3m-7 7 9-3" stroke="#5e6c78" stroke-width=".8"/>
+    <path d="M32 17 36 19 43 36 37 40 29 22Z" fill="#092025" stroke="#4c6266" stroke-width=".7"/>
+    <path d="M33 17 36 19 43 36 38 40" fill="none" stroke="url(#turretRim)" stroke-width="2.5"/>
+    <path d="M29 20 35 38" stroke="#6e8487" stroke-width="1"/>
+    <g fill="url(#turretMissile)" stroke="#315a58" stroke-width=".5">
+      <ellipse cx="35" cy="22" rx="1.8" ry="2.1" transform="rotate(-20 35 22)"/>
+      <ellipse cx="37" cy="28" rx="1.8" ry="2.1" transform="rotate(-20 37 28)"/>
+      <ellipse cx="39" cy="34" rx="1.8" ry="2.1" transform="rotate(-20 39 34)"/>
+    </g>
+    <path d="m12 18 3-1m11-3 2 2m-12 17 3 1m25-27 2-1m0 16 1 2" stroke="#c0c4b2" stroke-width=".6"/>
+    <g fill="#9caeaa" stroke="#263940" stroke-width=".4"><circle cx="11" cy="27" r=".8"/><circle cx="29" cy="17" r=".8"/><circle cx="45" cy="8" r=".8"/><circle cx="50" cy="28" r=".8"/></g>
   </g>
-  <path d="m16 18 6 2m-6 4 6 2m13 7 7 2m-7 4 7 2" stroke="#f0ac8e" stroke-width=".8" opacity=".7"/>
-  <path d="M32 18V8m0 0 4 3" stroke="#9cab91" stroke-width="1.2"/>
-  <circle cx="32" cy="8" r="1.5" fill="#f46b50"/>
-  <path d="m29 35 6-3 4 2-6 4Z" fill="#a2bca2"/>
 `;
+
+// Local offsets from the rotating turret's (32, 32) pivot to its two launch bays.
+export const TURRET_LAUNCH_PORTS = [{ x: 5, y: -4 }, { x: 21, y: -13 }];
 
 const tankBase = `
   <ellipse cx="30" cy="36" rx="29" ry="26" fill="#000" opacity=".38"/>

@@ -4,7 +4,7 @@ import {
 } from './config';
 import { drawMap, makeTextures } from './textures';
 import { Btn, mkBtn } from './ui';
-import { loadUnitArt, UNIT_WORLD_SCALE } from './unitArt';
+import { loadUnitArt, TURRET_LAUNCH_PORTS, UNIT_WORLD_SCALE } from './unitArt';
 import { EquippedSkill, SKILL_DEFS, SKILL_SLOTS, SkillKey, UnitBuff } from './catalog';
 import { SupplyShop } from './shop';
 import { BUNKER_CAPACITY, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
@@ -12,7 +12,7 @@ import { BUNKER_CAPACITY, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfan
 interface Tower {
   id: string;
   k: TowerKey; c: number; r: number; x: number; y: number;
-  lvl: number; cd: number; spent: number;
+  lvl: number; cd: number; spent: number; shotPort: number;
   base: Phaser.GameObjects.Image; barrel: Phaser.GameObjects.Image;
   skills: EquippedSkill[]; buffs: UnitBuff[];
   host?: Tower; passengers: (Tower | null)[];
@@ -379,7 +379,7 @@ export class GameScene extends Phaser.Scene {
     if (k === 'cruiser') this.tweens.add({ targets: barrel, y: y - 2, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
     if (k === 'frost') this.tweens.add({ targets: barrel, alpha: { from: .72, to: 1 }, duration: 1100, yoyo: true, repeat: -1 });
     this.fxPlace.explode(8, x, y);
-    const t: Tower = { id: String(++this.nextUnitId), k, c, r, x, y, lvl: 1, cd: 0, spent: TOWER_DEFS[k].cost, base, barrel, skills: [], buffs: [], passengers: Array(BUNKER_CAPACITY).fill(null) };
+    const t: Tower = { id: String(++this.nextUnitId), k, c, r, x, y, lvl: 1, cd: 0, shotPort: 0, spent: TOWER_DEFS[k].cost, base, barrel, skills: [], buffs: [], passengers: Array(BUNKER_CAPACITY).fill(null) };
     this.towers.push(t);
     return t;
   }
@@ -619,8 +619,9 @@ export class GameScene extends Phaser.Scene {
     const d = TOWER_DEFS[t.k];
     const angle = Math.atan2(best.y - t.y, best.x - t.x);
     const reach = t.k === 'cruiser' ? 29 * (UNIT_WORLD_SCALE.cruiser ?? 1) : t.k === 'cannon' ? 31 * (UNIT_WORLD_SCALE.cannon ?? 1) : t.k === 'marine' && !t.host ? 31 : t.k === 'arrow' ? 15 : 8;
-    const muzzleX = t.k === 'frost' ? t.x : t.x + Math.cos(angle) * reach;
-    const muzzleY = t.k === 'frost' ? t.y - 18 : t.y + Math.sin(angle) * reach;
+    const port = t.k === 'arrow' ? TURRET_LAUNCH_PORTS[t.shotPort++ % TURRET_LAUNCH_PORTS.length] : null;
+    const muzzleX = port ? t.x + port.x * Math.cos(angle) - port.y * Math.sin(angle) : t.k === 'frost' ? t.x : t.x + Math.cos(angle) * reach;
+    const muzzleY = port ? t.y + port.x * Math.sin(angle) + port.y * Math.cos(angle) : t.k === 'frost' ? t.y - 18 : t.y + Math.sin(angle) * reach;
     const s = this.add.image(muzzleX, muzzleY, 'shot_' + t.k).setDepth(9).setRotation(angle);
     this.projs.push({ s, x: muzzleX, y: muzzleY, tgt: best, k: t.k, st });
     const flash = this.add.circle(muzzleX, muzzleY, t.k === 'cannon' ? 8 : 5, d.proj, .7).setDepth(9);
@@ -630,7 +631,7 @@ export class GameScene extends Phaser.Scene {
       this.tweens.add({ targets: t.barrel, x: t.x - Math.cos(angle) * recoil, y: t.y - Math.sin(angle) * recoil, duration: 90, yoyo: true });
     } else if (t.k === 'frost' || t.k === 'sniper' || t.k === 'templar') {
       this.tweens.add({ targets: t.barrel, scale: { from: 1.1, to: 1 }, duration: 220 });
-    } else if (t.k === 'cruiser') {
+    } else if (t.k === 'arrow' || t.k === 'cruiser') {
       this.tweens.add({ targets: t.barrel, alpha: { from: .88, to: 1 }, duration: 140 });
     } else {
       this.tweens.add({ targets: t.barrel, scale: { from: .94, to: 1 }, duration: 100 });
