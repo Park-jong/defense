@@ -1,6 +1,9 @@
 import Phaser from 'phaser';
 import { H, W } from './config';
 import { GameScene } from './GameScene';
+import { setupRotateHint } from './mobile';
+
+setupRotateHint();
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,

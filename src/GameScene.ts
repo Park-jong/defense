@@ -54,6 +54,8 @@ export class GameScene extends Phaser.Scene {
   private speed = 1;
   private paused = false;
   private over = false;
+  /** 터치 위주 기기(손가락 입력)면 단축키 안내를 숨기고 두 번 탭 배치·취소 버튼을 쓴다. */
+  private touchUI = false;
   private lastTick = 0;
   private stepAcc = 0;
   private bossLeaked = false;
@@ -64,6 +66,7 @@ export class GameScene extends Phaser.Scene {
   private shopInputEnabled = true;
   private fields: SkillField[] = [];
   private shopBtn!: Btn;
+  private cancelBtn!: Btn;
   private skillBtn!: Btn;
   private uiCache: { hud?: string; info?: string } = {};
 
@@ -109,6 +112,7 @@ export class GameScene extends Phaser.Scene {
     this.building = null; this.selected = null; this.hover = null;
     this.speed = 1; this.paused = false; this.over = false; this.bossLeaked = false;
     this.lastTick = 0; this.stepAcc = 0;
+    this.touchUI = window.matchMedia('(pointer: coarse)').matches;
     this.uiCache = {};
     this.towerBtns = [];
     this.fields = []; this.shopOpen = false;
@@ -183,8 +187,18 @@ export class GameScene extends Phaser.Scene {
     metal.fillStyle(0x5dacc0).fillTriangle(587, 27, 580, 36, 587, 44).fillTriangle(589, 27, 596, 36, 589, 44);
     text(742, 10, 'BASE INTEGRITY', 9, '#87977a').setLetterSpacing(1);
     this.lifeTxt = text(742, 26, '', 17, '#b7dc8e').setFontFamily('monospace');
-    text(903, 16, 'SOLO', 9, '#a5ba8d').setLetterSpacing(1);
-    text(901, 33, '● LIVE', 8, '#8eb967');
+    if (this.touchUI && this.scale.fullscreen.available) {
+      mkBtn(this, 878, 12, 66, 32, '⛶ 전체화면', () => {}, 9);
+      // 브라우저는 전체화면 요청을 사용자 제스처(pointerup) 안에서만 허용한다.
+      this.add.zone(878, 12, 66, 32).setOrigin(0).setDepth(34).setInteractive().on('pointerup', () => {
+        if (this.scale.isFullscreen) { this.scale.stopFullscreen(); return; }
+        this.scale.startFullscreen();
+        (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape').catch(() => {});
+      });
+    } else {
+      text(903, 16, 'SOLO', 9, '#a5ba8d').setLetterSpacing(1);
+      text(901, 33, '● LIVE', 8, '#8eb967');
+    }
     text(24, y + 23, '전술 지도', 11, '#b7c2a2');
     text(140, y + 25, 'F-07', 9, '#72866a').setFontFamily('monospace');
     this.add.rectangle(24, y + 48, 162, 108, 0x0a1711).setOrigin(0).setStrokeStyle(1, 0x556447).setDepth(27);
@@ -205,24 +219,29 @@ export class GameScene extends Phaser.Scene {
     this.upBtn = mkBtn(this, 224, y + 163, 166, 25, '', () => this.upgrade(), 10);
     this.sellBtn = mkBtn(this, 396, y + 163, 112, 25, '', () => this.sell(), 10);
     this.upBtn.show(false); this.sellBtn.show(false);
+    // 우클릭·ESC가 없는 터치 기기를 위한 취소. 선택된 유닛이 없을 때만 회수 버튼 자리에 나타난다.
+    this.cancelBtn = mkBtn(this, 396, y + 163, 112, 25, `✕ 취소${this.kb(' [ESC]')}`, () => this.cancelCommand(), 10);
+    this.cancelBtn.show(false);
     this.statusTxt = text(225, y + 170, '', 10, '#849a76');
     text(546, y + 24, '건설 명령', 11, '#b7c2a2');
-    this.shopBtn = mkBtn(this, 807, y + 20, 130, 21, '보급 상점 [B]', () => this.openShop(), 10);
+    this.shopBtn = mkBtn(this, 807, y + 20, 130, 21, `보급 상점${this.kb(' [B]')}`, () => this.openShop(), 10);
     this.skillBtn = mkBtn(this, 441, y + 24, 67, 21, '스킬 장착', () => this.openShop(this.selected?.k === 'bunker' ? 'garrison' : 'skills'), 9);
     this.skillBtn.show(false);
     this.towerBtns = TOWER_KEYS.slice(0, 4).map((k, i) => {
       const d = TOWER_DEFS[k];
-      return mkBtn(this, 544 + i * 100, y + 43, 94, 95, `[${i + 1}] ${d.name}\n${d.cost} 미네랄`, () => this.chooseBuild(k), 10, k);
+      return mkBtn(this, 544 + i * 100, y + 43, 94, 95, `${this.kb(`[${i + 1}] `)}${d.name}\n${d.cost} 미네랄`, () => this.chooseBuild(k), 10, k);
     });
-    this.goBtn = mkBtn(this, 544, y + 146, 206, 38, '▶  웨이브 시작  [SPACE]', () => this.startWave(), 12);
+    this.goBtn = mkBtn(this, 544, y + 146, 206, 38, `▶  웨이브 시작${this.kb('  [SPACE]')}`, () => this.startWave(), 12);
     this.goBtn.act(true);
     this.spdBtn = mkBtn(this, 756, y + 146, 86, 38, '배속 ×1', () => {
       this.speed = this.speed % 3 + 1; this.spdBtn.set('배속 ×' + this.speed);
     }, 11);
-    this.pauseBtn = mkBtn(this, 848, y + 146, 90, 38, '정지 [P]', () => this.togglePause(), 11);
-    text(16, H - 17, 'B 상점    /    1–9 유닛    /    U 강화·주둔    /    S 회수    /    ESC 취소    /    스킬 자동 사용', 9, '#7d8b73');
+    this.pauseBtn = mkBtn(this, 848, y + 146, 90, 38, `정지${this.kb(' [P]')}`, () => this.togglePause(), 11);
+    text(16, H - 17, this.touchUI
+      ? '탭: 유닛 선택    /    건설은 같은 칸을 두 번 탭해 확정    /    ✕ 취소    /    보급 상점에서 유닛 9종·스킬    /    스킬 자동 사용'
+      : 'B 상점    /    1–9 유닛    /    U 강화·주둔    /    S 회수    /    ESC 취소    /    스킬 자동 사용', 9, '#7d8b73');
     text(W - 16, H - 17, `FRONTIER  /  v${__APP_VERSION__}`, 9, '#616f5b').setOrigin(1, 0).setFontFamily('monospace');
-    this.pauseTxt = this.add.text(W / 2, MAP_Y + MAP_H / 2, '전술 일시정지\n[ P ] 작전 재개', {
+    this.pauseTxt = this.add.text(W / 2, MAP_Y + MAP_H / 2, this.touchUI ? '전술 일시정지\n재개 버튼으로 작전 재개' : '전술 일시정지\n[ P ] 작전 재개', {
       fontFamily: FONT, fontSize: '28px', align: 'center', lineSpacing: 18, color: '#c5e49e',
       backgroundColor: '#0b1715ee', padding: { x: 42, y: 28 }, stroke: '#253a25', strokeThickness: 1,
     }).setOrigin(.5).setDepth(40).setVisible(false);
@@ -237,7 +256,7 @@ export class GameScene extends Phaser.Scene {
       this.mineralTxt.setText(this.gold.toLocaleString());
       this.lifeTxt.setText(`${Math.max(0, this.lives)} / 20`);
       this.lifeTxt.setColor(this.lives <= 5 ? '#e29a7f' : '#b7dc8e');
-      this.goBtn.set(this.over ? '작전 종료' : this.waveActive ? `교전 중 · 남은 적 ${remaining}` : '▶  웨이브 시작  [SPACE]');
+      this.goBtn.set(this.over ? '작전 종료' : this.waveActive ? `교전 중 · 남은 적 ${remaining}` : `▶  웨이브 시작${this.kb('  [SPACE]')}`);
     }
     TOWER_KEYS.slice(0, 4).forEach((k, i) => {
       this.towerBtns[i].act(this.building === k);
@@ -261,7 +280,9 @@ export class GameScene extends Phaser.Scene {
       }
     } else {
       title = '기지 사령부';
-      msg = this.unloading ? `${TOWER_DEFS[this.unloading.k].name} 하차 대기\n빈 구역을 클릭하세요.\nESC 취소 · 병력은 탑승 유지` : 'FRONTIER COMMAND\n[B] 상점 · 유닛 9종\n벙커 → 병력 관리 → 탑승\n스킬 장착 → 자동 사용';
+      msg = this.unloading
+        ? `${TOWER_DEFS[this.unloading.k].name} 하차 대기\n${this.touchUI ? '빈 구역을 두 번 탭하세요.\n✕ 취소' : '빈 구역을 클릭하세요.\nESC 취소'} · 병력은 탑승 유지`
+        : `FRONTIER COMMAND\n${this.kb('[B] ')}상점 · 유닛 9종\n벙커 → 병력 관리 → 탑승\n스킬 장착 → 자동 사용`;
     }
     const cache = title + msg;
     if (this.uiCache.info !== cache) {
@@ -271,25 +292,34 @@ export class GameScene extends Phaser.Scene {
       if (k) this.unitImage.setDisplaySize(88, 88); else this.unitImage.setDisplaySize(88, 104);
     }
     this.upBtn.show(!!t); this.sellBtn.show(!!t); this.statusTxt.setVisible(!t);
+    this.cancelBtn.show(!t && !this.over && !!(this.building || this.unloading));
     this.skillBtn.show(!!t && !this.over);
     this.skillBtn.set(t?.k === 'bunker' ? '병력 관리' : '스킬 장착');
-    this.statusTxt.setText(this.unloading ? '빈 구역 클릭 하차 / ESC 취소' : this.testMode ? `시험 작전 / ${this.repeat}회차` : this.building ? '빈 구역 클릭 배치 / ESC 취소' : this.paused ? '작전 일시정지' : this.waveActive ? '방어 시스템 가동 중' : '명령 대기 / SPACE 출격');
+    this.statusTxt.setText(this.unloading ? (this.touchUI ? '빈 구역 두 번 탭 하차' : '빈 구역 클릭 하차 / ESC 취소')
+      : this.testMode ? `시험 작전 / ${this.repeat}회차`
+      : this.building ? (this.touchUI ? '빈 구역 두 번 탭 배치' : '빈 구역 클릭 배치 / ESC 취소')
+      : this.paused ? '작전 일시정지' : this.waveActive ? '방어 시스템 가동 중' : this.touchUI ? '명령 대기 / 웨이브 시작' : '명령 대기 / SPACE 출격');
     if (t) {
       const occupied = t.k === 'bunker' && t.passengers.some(Boolean);
-      this.upBtn.set(t.k === 'bunker' ? '[U] 병력 관리 · 4칸' : t.lvl < 3 ? `[U] 강화  ${this.upgradeCost(t)} 미네랄` : '최대 강화 완료');
+      this.upBtn.set(t.k === 'bunker' ? `${this.kb('[U] ')}병력 관리 · 4칸` : t.lvl < 3 ? `${this.kb('[U] ')}강화  ${this.upgradeCost(t)} 미네랄` : '최대 강화 완료');
       this.upBtn.en(!this.over && (t.k === 'bunker' || t.lvl < 3 && this.gold >= this.upgradeCost(t)));
-      this.sellBtn.set(occupied ? '병력 하차 후 회수' : `[S] 회수 +${this.sellValue(t)}`);
+      this.sellBtn.set(occupied ? '병력 하차 후 회수' : `${this.kb('[S] ')}회수 +${this.sellValue(t)}`);
       this.sellBtn.en(!this.over && !occupied);
     }
   }
 
   // ---------- 입력 ----------
+  /** 키보드 단축키 안내. 터치 기기에서는 보여 줄 키가 없으므로 비운다. */
+  private kb(hint: string): string { return this.touchUI ? '' : hint; }
+
+  private cancelCommand(): void { this.building = null; this.selected = null; this.unloading = null; this.hover = null; }
+
   private onKey(e: KeyboardEvent): void {
     if (e.repeat) return;
     if (this.shopOpen) { if (e.key === 'Escape' || e.key.toLowerCase() === 'b') this.shop.close(); return; }
     if (e.key.toLowerCase() === 'b') { this.openShop(); return; }
     if (e.key >= '1' && e.key <= '9') this.chooseBuild(TOWER_KEYS[+e.key - 1], true);
-    else if (e.key === 'Escape') { this.building = null; this.selected = null; this.unloading = null; }
+    else if (e.key === 'Escape') this.cancelCommand();
     else if (e.key === ' ') this.startWave();
     else if (e.key === 'p' || e.key === 'P') this.togglePause();
     else if (e.key === 'u' || e.key === 'U') this.upgrade();
@@ -306,21 +336,26 @@ export class GameScene extends Phaser.Scene {
     if (this.over) return;
     this.paused = !this.paused;
     this.pauseTxt.setVisible(this.paused);
-    this.pauseBtn.set(this.paused ? '재개 [P]' : '정지 [P]');
+    this.pauseBtn.set(`${this.paused ? '재개' : '정지'}${this.kb(' [P]')}`);
   }
 
   private onMapClick(p: Phaser.Input.Pointer): void {
     if (this.over || this.shopOpen) return;
-    if (p.rightButtonDown()) { this.building = null; this.selected = null; this.unloading = null; return; }
+    if (p.rightButtonDown()) { this.cancelCommand(); return; }
     const cell = this.cellAt(p);
     if (!cell) return;
-    if (this.unloading) { this.finishUnload(cell.c, cell.r); return; }
     const t = this.towers.find(t => !t.host && t.c === cell.c && t.r === cell.r);
+    // 터치에는 호버가 없으므로, 첫 탭은 위치·사거리 미리보기만 하고 같은 칸을 다시 탭해야 확정한다.
+    if (p.wasTouch && (this.unloading || (this.building && !t)) && (this.hover?.c !== cell.c || this.hover?.r !== cell.r)) {
+      this.hover = cell;
+      return;
+    }
+    if (this.unloading) { this.finishUnload(cell.c, cell.r); if (p.wasTouch) this.hover = null; return; }
     if (t) {
       this.selected = this.selected === t ? null : t; this.building = null;
       if (this.selected?.k === 'bunker') this.openShop('garrison');
     }
-    else if (this.building) this.placeTower(cell.c, cell.r);
+    else if (this.building) { this.placeTower(cell.c, cell.r); if (p.wasTouch) this.hover = null; }
     else this.selected = null;
   }
 
