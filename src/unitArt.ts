@@ -303,6 +303,25 @@ const cruiserHead = `
   </g>
 `;
 
+const bunkerBase = `
+  <ellipse cx="32" cy="47" rx="31" ry="14" fill="#000" opacity=".4"/>
+  <path d="M3 32 11 18 32 10 53 18 61 32 61 47 48 58H16L3 47Z" fill="#25352b" stroke="#121d17" stroke-width="1.5"/>
+  <path d="M4 32 13 20 32 13 51 20 60 32 48 43H16Z" fill="url(#olive)" stroke="#bcc4a5" stroke-width=".8"/>
+  <path d="M4 34 16 44h32l12-10v11L47 55H17L4 45Z" fill="url(#steel)" stroke="#17291d"/>
+  <path d="M12 22 24 17h16l12 5 5 10-10 8H17L7 32Z" fill="#5c6d50" stroke="#243725" stroke-width="1.1"/>
+  <path d="M16 21 25 18h14l9 3-6 5H22Z" fill="#c6c8a5"/>
+  <path d="M18 27h28l6 6-7 5H19l-7-5Z" fill="url(#olive)" stroke="#aeb798" stroke-width=".6"/>
+  <path d="M23 28h18v7H23Z" fill="#718064" stroke="#344934"/>
+  <path d="M27 30h10m-10 2h10" stroke="#2a3e2b" stroke-width="1"/>
+  <path d="m9 30 9 6v8l-9-6Zm37 6 9-6v8l-9 6ZM16 43h12v7H16Zm20 0h12v7H36Z" fill="#0b1712" stroke="#b2bc98" stroke-width=".8"/>
+  <path d="M27 43h10v12H27Z" fill="#354c39" stroke="#14291b"/>
+  <path d="M29 45h6v8h-6Z" fill="#192d20"/>
+  <path d="M5 40v5l8 6v-5Zm54 0v5l-8 6v-5Z" fill="url(#red)"/>
+  <path d="M12 22v-9m0 0 4 3" stroke="#c4cdb4" stroke-width="1"/>
+  <circle cx="12" cy="13" r="1.4" fill="#e68b68"/>
+  <path d="m17 54 5-2 4 2m12 0 4-2 5 2" fill="none" stroke="#d3bf73" stroke-width="1.4"/>
+`;
+
 const layers: Record<TowerKey, { base: string; head: string }> = {
   arrow: { base: turretBase, head: turretHead },
   cannon: { base: tankBase, head: tankHead },
@@ -312,6 +331,7 @@ const layers: Record<TowerKey, { base: string; head: string }> = {
   firebat: { base: firebatBase, head: firebatHead },
   templar: { base: templarBase, head: templarHead },
   cruiser: { base: cruiserBase, head: cruiserHead },
+  bunker: { base: bunkerBase, head: '' },
 };
 
 export const UNIT_WORLD_SCALE: Partial<Record<TowerKey, number>> = { cannon: 1.15, cruiser: 1.3 };

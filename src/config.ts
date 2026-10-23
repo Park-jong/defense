@@ -46,6 +46,7 @@ export const TOWER_DEFS = {
   firebat: { name: '파이어뱃', faction: 'terran', role: '화염 / 범위', cost: 110, range: 88, dmg: 14, rate: .4, splash: 32, color: 0xb96347, proj: 0xff9a45, barrel: 14, desc: '짧은 사거리의 쌍열 화염방사기로 몰려오는 적을 태웁니다.' },
   templar: { name: '하이 템플러', faction: 'protoss', role: '마법 / 지원', cost: 190, range: 160, dmg: 22, rate: 1.2, color: 0xb497db, proj: 0xcfafff, barrel: 12, desc: '사이오닉 폭풍과 아군 강화로 전장의 흐름을 바꿉니다.' },
   cruiser: { name: '배틀크루저', faction: 'terran', role: '중화력 / 범위', cost: 300, range: 195, dmg: 46, rate: 1.1, splash: 38, color: 0xa2b4c2, proj: 0xff8a76, barrel: 24, desc: '방어 구역에 정박하는 전투순양함. 야마토 포와 융단 폭격을 사용합니다.' },
+  bunker: { name: '벙커', faction: 'terran', role: '주둔 / 보병 4기', cost: 40, range: 0, dmg: 0, rate: 1, color: 0x8f9d76, proj: 0xffe8a3, barrel: 0, desc: '빈 벙커는 공격하지 않습니다. 마린·파이어뱃 최대 4기 탑승, 각 병력의 사거리 +24. 스킬도 자동 사용합니다.' },
 } satisfies Record<string, TowerDef>;
 
 export type TowerKey = keyof typeof TOWER_DEFS;

@@ -7,12 +7,15 @@ import { Btn, mkBtn } from './ui';
 import { loadUnitArt, UNIT_WORLD_SCALE } from './unitArt';
 import { EquippedSkill, SKILL_DEFS, SKILL_SLOTS, SkillKey, UnitBuff } from './catalog';
 import { SupplyShop } from './shop';
+import { BUNKER_CAPACITY, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
 
 interface Tower {
+  id: string;
   k: TowerKey; c: number; r: number; x: number; y: number;
   lvl: number; cd: number; spent: number;
   base: Phaser.GameObjects.Image; barrel: Phaser.GameObjects.Image;
   skills: EquippedSkill[]; buffs: UnitBuff[];
+  host?: Tower; passengers: (Tower | null)[];
 }
 
 interface Enemy {
@@ -36,6 +39,8 @@ export class GameScene extends Phaser.Scene {
   private lives = 20;
   private wave = 0;
   private towers: Tower[] = [];
+  private nextUnitId = 0;
+  private unloading: Tower | null = null;
   private enemies: Enemy[] = [];
   private projs: Projectile[] = [];
   private spawnQ: EnemyKey[] = [];
@@ -95,6 +100,7 @@ export class GameScene extends Phaser.Scene {
     this.lives = 20;
     this.wave = this.testMode ? MAX_WAVE : 0;
     this.towers = []; this.enemies = []; this.projs = [];
+    this.nextUnitId = 0; this.unloading = null;
     this.spawnQ = []; this.spawnT = 0; this.waveActive = false;
     this.building = null; this.selected = null; this.hover = null;
     this.speed = 1; this.paused = false; this.over = false; this.bossLeaked = false;
@@ -113,11 +119,15 @@ export class GameScene extends Phaser.Scene {
 
     this.buildUI();
     this.shop = new SupplyShop({
-      state: () => ({ gold: this.gold, selectedId: this.selected ? `${this.selected.c},${this.selected.r}` : null,
-        units: this.towers.map(t => ({ id: `${t.c},${t.r}`, k: t.k, lvl: t.lvl, skills: t.skills })) }),
-      select: id => { this.selected = this.towers.find(t => `${t.c},${t.r}` === id) ?? null; this.building = null; },
+      state: () => ({ gold: this.gold, selectedId: this.selected?.id ?? null,
+        units: this.towers.map(t => ({ id: t.id, k: t.k, lvl: t.lvl, skills: t.skills, c: t.c, r: t.r,
+          hostId: t.host?.id, passengers: t.passengers.map(p => p?.id ?? null) })) }),
+      select: id => { this.selected = this.towers.find(t => t.id === id) ?? null; this.building = null; this.unloading = null; },
       choose: k => this.chooseBuild(k, true),
       equip: k => this.equipSkill(k),
+      recruit: (id, slot, key) => this.recruit(id, slot, key),
+      board: (id, slot, unitId) => this.board(id, slot, unitId),
+      unload: id => this.beginUnload(id),
       close: () => { this.shopOpen = false; this.input.enabled = this.shopInputEnabled; },
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.shop.destroy());
@@ -193,7 +203,7 @@ export class GameScene extends Phaser.Scene {
     this.statusTxt = text(225, y + 170, '', 10, '#849a76');
     text(546, y + 24, '건설 명령', 11, '#b7c2a2');
     this.shopBtn = mkBtn(this, 807, y + 20, 130, 21, '보급 상점 [B]', () => this.openShop(), 10);
-    this.skillBtn = mkBtn(this, 441, y + 24, 67, 21, '스킬 장착', () => this.openShop('skills'), 9);
+    this.skillBtn = mkBtn(this, 441, y + 24, 67, 21, '스킬 장착', () => this.openShop(this.selected?.k === 'bunker' ? 'garrison' : 'skills'), 9);
     this.skillBtn.show(false);
     this.towerBtns = TOWER_KEYS.slice(0, 4).map((k, i) => {
       const d = TOWER_DEFS[k];
@@ -205,7 +215,7 @@ export class GameScene extends Phaser.Scene {
       this.speed = this.speed % 3 + 1; this.spdBtn.set('배속 ×' + this.speed);
     }, 11);
     this.pauseBtn = mkBtn(this, 848, y + 146, 90, 38, '정지 [P]', () => this.togglePause(), 11);
-    text(16, H - 17, 'B 상점    /    1–8 유닛    /    U 강화    /    S 회수    /    ESC 취소    /    스킬은 자동 사용', 9, '#7d8b73');
+    text(16, H - 17, 'B 상점    /    1–9 유닛    /    U 강화·주둔    /    S 회수    /    ESC 취소    /    스킬 자동 사용', 9, '#7d8b73');
     text(W - 16, H - 17, `FRONTIER  /  v${__APP_VERSION__}`, 9, '#616f5b').setOrigin(1, 0).setFontFamily('monospace');
     this.pauseTxt = this.add.text(W / 2, MAP_Y + MAP_H / 2, '전술 일시정지\n[ P ] 작전 재개', {
       fontFamily: FONT, fontSize: '28px', align: 'center', lineSpacing: 18, color: '#c5e49e',
@@ -235,11 +245,18 @@ export class GameScene extends Phaser.Scene {
     if (k) {
       const d = TOWER_DEFS[k], st = t ? this.stats(t) : d;
       title = `${d.name}  ${t ? 'Lv.' + t.lvl : '/ 건설 대기'}`;
-      msg = `공격 ${st.dmg.toFixed(0)} · 사거리 ${st.range.toFixed(0)}\n공격 속도 ${(1 / st.rate).toFixed(1)}/초\n자동 스킬 ${t?.skills.length ?? 0}/${SKILL_SLOTS}`;
-      msg += t?.skills.length ? '\n' + t.skills.map(s => `${SKILL_DEFS[s.key].name} ${s.cd > 0 ? Math.ceil(s.cd) + '초' : '준비'}`).join('\n') : '\n상점에서 스킬을 장착하세요.';
+      if (k === 'bunker') {
+        const crew = t?.passengers.filter((p): p is Tower => !!p) ?? [];
+        title = `벙커  ${crew.length}/${BUNKER_CAPACITY} 주둔`;
+        msg = `보병 최대 4기 · 사거리 +${BUNKER_RANGE_BONUS}\n` + (crew.length ? crew.map(p => `${TOWER_DEFS[p.k].name} Lv.${p.lvl} · 스킬 ${p.skills.length}/2`).join('\n') : '현재 주둔 병력 없음\n빈 벙커는 공격하지 않습니다.\n[병력 관리]에서 탑승·구매');
+      } else {
+        msg = `공격 ${st.dmg.toFixed(0)} · 사거리 ${st.range.toFixed(0)}\n공격 속도 ${(1 / st.rate).toFixed(1)}/초\n자동 스킬 ${t?.skills.length ?? 0}/${SKILL_SLOTS}`;
+        msg += t?.skills.length ? '\n' + t.skills.map(s => `${SKILL_DEFS[s.key].name} ${s.cd > 0 ? Math.ceil(s.cd) + '초' : '준비'}`).join('\n') : '\n상점에서 스킬을 장착하세요.';
+        if (t?.host) title += ' / 탑승';
+      }
     } else {
       title = '기지 사령부';
-      msg = 'FRONTIER COMMAND\n[B] 상점 · 유닛 8종\n유닛 선택 → 전장 배치\n스킬 장착 → 자동 사용';
+      msg = this.unloading ? `${TOWER_DEFS[this.unloading.k].name} 하차 대기\n빈 구역을 클릭하세요.\nESC 취소 · 병력은 탑승 유지` : 'FRONTIER COMMAND\n[B] 상점 · 유닛 9종\n벙커 → 병력 관리 → 탑승\n스킬 장착 → 자동 사용';
     }
     const cache = title + msg;
     if (this.uiCache.info !== cache) {
@@ -250,12 +267,14 @@ export class GameScene extends Phaser.Scene {
     }
     this.upBtn.show(!!t); this.sellBtn.show(!!t); this.statusTxt.setVisible(!t);
     this.skillBtn.show(!!t && !this.over);
-    this.statusTxt.setText(this.testMode ? `시험 작전 / ${this.repeat}회차` : this.building ? '빈 구역 클릭 배치 / ESC 취소' : this.paused ? '작전 일시정지' : this.waveActive ? '방어 시스템 가동 중' : '명령 대기 / SPACE 출격');
+    this.skillBtn.set(t?.k === 'bunker' ? '병력 관리' : '스킬 장착');
+    this.statusTxt.setText(this.unloading ? '빈 구역 클릭 하차 / ESC 취소' : this.testMode ? `시험 작전 / ${this.repeat}회차` : this.building ? '빈 구역 클릭 배치 / ESC 취소' : this.paused ? '작전 일시정지' : this.waveActive ? '방어 시스템 가동 중' : '명령 대기 / SPACE 출격');
     if (t) {
-      this.upBtn.set(t.lvl < 3 ? `[U] 강화  ${this.upgradeCost(t)} 미네랄` : '최대 강화 완료');
-      this.upBtn.en(!this.over && t.lvl < 3 && this.gold >= this.upgradeCost(t));
-      this.sellBtn.set(`[S] 회수 +${this.sellValue(t)}`);
-      this.sellBtn.en(!this.over);
+      const occupied = t.k === 'bunker' && t.passengers.some(Boolean);
+      this.upBtn.set(t.k === 'bunker' ? '[U] 병력 관리 · 4칸' : t.lvl < 3 ? `[U] 강화  ${this.upgradeCost(t)} 미네랄` : '최대 강화 완료');
+      this.upBtn.en(!this.over && (t.k === 'bunker' || t.lvl < 3 && this.gold >= this.upgradeCost(t)));
+      this.sellBtn.set(occupied ? '병력 하차 후 회수' : `[S] 회수 +${this.sellValue(t)}`);
+      this.sellBtn.en(!this.over && !occupied);
     }
   }
 
@@ -264,8 +283,8 @@ export class GameScene extends Phaser.Scene {
     if (e.repeat) return;
     if (this.shopOpen) { if (e.key === 'Escape' || e.key.toLowerCase() === 'b') this.shop.close(); return; }
     if (e.key.toLowerCase() === 'b') { this.openShop(); return; }
-    if (e.key >= '1' && e.key <= '8') this.chooseBuild(TOWER_KEYS[+e.key - 1], true);
-    else if (e.key === 'Escape') { this.building = null; this.selected = null; }
+    if (e.key >= '1' && e.key <= '9') this.chooseBuild(TOWER_KEYS[+e.key - 1], true);
+    else if (e.key === 'Escape') { this.building = null; this.selected = null; this.unloading = null; }
     else if (e.key === ' ') this.startWave();
     else if (e.key === 'p' || e.key === 'P') this.togglePause();
     else if (e.key === 'u' || e.key === 'U') this.upgrade();
@@ -275,7 +294,7 @@ export class GameScene extends Phaser.Scene {
   private chooseBuild(k: TowerKey, force = false): void {
     if (this.over) return;
     this.building = (!force && this.building === k) ? null : k;
-    this.selected = null;
+    this.selected = null; this.unloading = null;
   }
 
   private togglePause(): void {
@@ -287,17 +306,21 @@ export class GameScene extends Phaser.Scene {
 
   private onMapClick(p: Phaser.Input.Pointer): void {
     if (this.over || this.shopOpen) return;
-    if (p.rightButtonDown()) { this.building = null; this.selected = null; return; }
+    if (p.rightButtonDown()) { this.building = null; this.selected = null; this.unloading = null; return; }
     const cell = this.cellAt(p);
     if (!cell) return;
-    const t = this.towers.find(t => t.c === cell.c && t.r === cell.r);
-    if (t) { this.selected = this.selected === t ? null : t; this.building = null; }
+    if (this.unloading) { this.finishUnload(cell.c, cell.r); return; }
+    const t = this.towers.find(t => !t.host && t.c === cell.c && t.r === cell.r);
+    if (t) {
+      this.selected = this.selected === t ? null : t; this.building = null;
+      if (this.selected?.k === 'bunker') this.openShop('garrison');
+    }
     else if (this.building) this.placeTower(cell.c, cell.r);
     else this.selected = null;
   }
 
   // ---------- 타워 ----------
-  private openShop(tab: 'units' | 'skills' = 'units'): void {
+  private openShop(tab: 'units' | 'skills' | 'garrison' = 'units'): void {
     if (this.over || this.shopOpen) return;
     this.shopOpen = true; this.hover = null;
     this.shopInputEnabled = this.input.enabled;
@@ -321,7 +344,7 @@ export class GameScene extends Phaser.Scene {
     const power = t.buffs.reduce((v, b) => v * b.power, 1);
     return {
       dmg: d.dmg * Math.pow(1.6, l) * power,
-      range: d.range * (1 + .08 * l),
+      range: d.range * (1 + .08 * l) + (t.host ? BUNKER_RANGE_BONUS : 0),
       rate: d.rate * Math.pow(.92, l) / haste,
       splash: d.splash ? d.splash * (1 + .1 * l) : 0,
       slow: d.slow ? Math.max(.2, d.slow - .08 * l) : 0,
@@ -332,7 +355,7 @@ export class GameScene extends Phaser.Scene {
 
   private cellFree(c: number, r: number): boolean {
     return c >= 0 && r >= 0 && c < COLS && r < ROWS && !pathCells.has(c + ',' + r)
-      && !this.towers.some(t => t.c === c && t.r === r);
+      && !this.towers.some(t => !t.host && t.c === c && t.r === r);
   }
 
   private placeTower(c: number, r: number): void {
@@ -341,6 +364,13 @@ export class GameScene extends Phaser.Scene {
     const d = TOWER_DEFS[k];
     if (!this.cellFree(c, r) || this.gold < d.cost) return;
     this.gold -= d.cost;
+    const t = this.createTower(k, c, r);
+    this.floatText(t.x, t.y, d.name, '#c7dfaa');
+    if (k === 'bunker') { this.building = null; this.selected = t; this.openShop('garrison'); }
+    else if (this.gold < d.cost) this.building = null;
+  }
+
+  private createTower(k: TowerKey, c: number, r: number): Tower {
     const x = (c + .5) * T, y = MAP_Y + (r + .5) * T;
     const base = this.add.image(x, y, 'base_' + k).setDepth(5);
     const barrel = this.add.image(x, y, 'barrel_' + k).setOrigin(.5).setDepth(6);
@@ -349,13 +379,66 @@ export class GameScene extends Phaser.Scene {
     if (k === 'cruiser') this.tweens.add({ targets: barrel, y: y - 2, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
     if (k === 'frost') this.tweens.add({ targets: barrel, alpha: { from: .72, to: 1 }, duration: 1100, yoyo: true, repeat: -1 });
     this.fxPlace.explode(8, x, y);
-    this.towers.push({ k, c, r, x, y, lvl: 1, cd: 0, spent: d.cost, base, barrel, skills: [], buffs: [] });
-    this.floatText(x, y, d.name, '#c7dfaa');
-    if (this.gold < d.cost) this.building = null;
+    const t: Tower = { id: String(++this.nextUnitId), k, c, r, x, y, lvl: 1, cd: 0, spent: TOWER_DEFS[k].cost, base, barrel, skills: [], buffs: [], passengers: Array(BUNKER_CAPACITY).fill(null) };
+    this.towers.push(t);
+    return t;
+  }
+
+  private boardingSlot(id: string, slot: number): Tower | undefined {
+    if (this.over || !Number.isInteger(slot) || slot < 0 || slot >= BUNKER_CAPACITY) return;
+    return this.towers.find(t => t.id === id && t.k === 'bunker' && !t.passengers[slot]);
+  }
+
+  private recruit(id: string, slot: number, key: InfantryKey): boolean {
+    const bunker = this.boardingSlot(id, slot);
+    if (!bunker || !isInfantry(key) || this.gold < TOWER_DEFS[key].cost) return false;
+    this.gold -= TOWER_DEFS[key].cost;
+    const unit = this.createTower(key, bunker.c, bunker.r);
+    this.garrison(bunker, slot, unit);
+    return true;
+  }
+
+  private board(id: string, slot: number, unitId: string): boolean {
+    const bunker = this.boardingSlot(id, slot), unit = this.towers.find(t => t.id === unitId);
+    if (!bunker || !unit || unit.host || !isInfantry(unit.k) || unit === this.unloading) return false;
+    this.garrison(bunker, slot, unit);
+    return true;
+  }
+
+  private garrison(bunker: Tower, slot: number, unit: Tower): void {
+    bunker.passengers[slot] = unit; unit.host = bunker;
+    unit.c = bunker.c; unit.r = bunker.r;
+    unit.x = bunker.x + BUNKER_PORTS[slot].x; unit.y = bunker.y + BUNKER_PORTS[slot].y;
+    this.tweens.killTweensOf([unit.base, unit.barrel]);
+    unit.base.setPosition(unit.x, unit.y).setVisible(false);
+    unit.barrel.setPosition(unit.x, unit.y).setVisible(false);
+    this.selected = bunker;
+  }
+
+  private beginUnload(id: string): boolean {
+    const unit = this.towers.find(t => t.id === id);
+    if (this.over || !unit?.host) return false;
+    this.unloading = unit; this.selected = null; this.building = null;
+    return true;
+  }
+
+  private finishUnload(c: number, r: number): void {
+    const unit = this.unloading;
+    if (!unit?.host || !this.cellFree(c, r)) return;
+    const slot = unit.host.passengers.indexOf(unit);
+    unit.host.passengers[slot] = null; unit.host = undefined;
+    unit.c = c; unit.r = r; unit.x = (c + .5) * T; unit.y = MAP_Y + (r + .5) * T;
+    this.tweens.killTweensOf([unit.base, unit.barrel]);
+    const scale = UNIT_WORLD_SCALE[unit.k] ?? 1;
+    unit.base.setPosition(unit.x, unit.y).setScale(scale).setVisible(true);
+    unit.barrel.setPosition(unit.x, unit.y).setScale(scale).setVisible(true);
+    this.fxPlace.explode(8, unit.x, unit.y);
+    this.unloading = null; this.selected = unit;
   }
 
   private upgrade(): void {
     const t = this.selected;
+    if (!this.over && t?.k === 'bunker') { this.openShop('garrison'); return; }
     if (this.over || !t || t.lvl >= 3 || this.gold < this.upgradeCost(t)) return;
     const c = this.upgradeCost(t);
     this.gold -= c; t.spent += c; t.lvl++;
@@ -367,9 +450,12 @@ export class GameScene extends Phaser.Scene {
   private sell(): void {
     const t = this.selected;
     if (this.over || !t) return;
+    if (t.k === 'bunker' && t.passengers.some(Boolean)) return;
     this.gold += this.sellValue(t);
     this.floatText(t.x, t.y, '+' + this.sellValue(t), '#ffd54f');
     t.base.destroy(); t.barrel.destroy();
+    if (t.host) t.host.passengers[t.host.passengers.indexOf(t)] = null;
+    if (this.unloading === t) this.unloading = null;
     this.towers = this.towers.filter(x => x !== t);
     this.selected = null;
   }
@@ -509,6 +595,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private towerAct(t: Tower, dt: number): void {
+    if (t.k === 'bunker') return;
     for (const buff of t.buffs) buff.left -= dt;
     t.buffs = t.buffs.filter(b => b.left > 0);
     for (const skill of t.skills) skill.cd = Math.max(0, skill.cd - dt);
@@ -623,7 +710,7 @@ export class GameScene extends Phaser.Scene {
         this.skillRing(target.x, target.y, 85, d.color);
         break;
       case 'warp':
-        for (const ally of this.towers) if (Math.hypot(ally.x - t.x, ally.y - t.y) <= 150) {
+        for (const ally of this.towers) if (ally.k !== 'bunker' && Math.hypot(ally.x - t.x, ally.y - t.y) <= 150) {
           ally.buffs.push({ left: 6, haste: 1.3, power: 1.3 }); this.skillBeam(t, ally, d.color);
         }
         this.skillRing(t.x, t.y, 150, d.color);
@@ -677,8 +764,9 @@ export class GameScene extends Phaser.Scene {
       }
     }
     const h = this.hover;
-    if (h && this.building && !this.over) {
-      const d = TOWER_DEFS[this.building], ok = this.cellFree(h.c, h.r) && this.gold >= d.cost;
+    const preview = this.unloading?.k ?? this.building;
+    if (h && preview && !this.over) {
+      const d = TOWER_DEFS[preview], ok = this.cellFree(h.c, h.r) && (!!this.unloading || this.gold >= d.cost);
       const color = ok ? 0xa9e875 : 0xe37962;
       const x = (h.c + .5) * T, y = MAP_Y + (h.r + .5) * T;
       g.fillStyle(color, ok ? .12 : .25).fillRect(h.c * T, MAP_Y + h.r * T, T, T);
@@ -689,11 +777,32 @@ export class GameScene extends Phaser.Scene {
       g.lineBetween(x - 9, y, x + 9, y).lineBetween(x, y - 9, x, y + 9);
     }
     for (const t of this.towers) {
+      if (t.host) {
+        // Occupants stay hidden; their individual barrels and lights appear at the apertures.
+        const color = t.k === 'firebat' ? 0xffa15c : 0xa7d5e7;
+        g.fillStyle(0x0b1712).fillCircle(t.x, t.y, 4);
+        g.lineStyle(3, 0x18281f).lineBetween(t.x, t.y, t.x + Math.cos(t.barrel.rotation) * 8, t.y + Math.sin(t.barrel.rotation) * 8);
+        g.lineStyle(1.5, color, .9).lineBetween(t.x, t.y, t.x + Math.cos(t.barrel.rotation) * 7, t.y + Math.sin(t.barrel.rotation) * 7);
+        g.fillStyle(color, .8).fillCircle(t.x, t.y, 1.8);
+        if (t === this.selected) {
+          const range = this.stats(t).range;
+          g.lineStyle(1, color, .5).strokeCircle(t.x, t.y, range);
+          g.lineStyle(1.5, color).strokeCircle(t.x, t.y, 6);
+        }
+        continue;
+      }
       if (t === this.selected) {
-        const r = this.stats(t).range;
+        const r = t.k === 'bunker' ? Math.max(0, ...t.passengers.filter((p): p is Tower => !!p).map(p => this.stats(p).range)) : this.stats(t).range;
         g.fillStyle(0xa9d879, .06).fillCircle(t.x, t.y, r);
         g.lineStyle(1, 0xa9d879, .55).strokeCircle(t.x, t.y, r);
         g.lineStyle(2, 0xa9d879).strokeEllipse(t.x, t.y + 8, 44, 28);
+      }
+      if (t.k === 'bunker') {
+        t.passengers.forEach((p, slot) => {
+          const x = t.x - 15 + slot * 10, y = t.y - 23;
+          g.fillStyle(p ? p.k === 'firebat' ? 0xffa15c : 0xa7d5e7 : 0x1d2c22).fillRect(x, y, 7, 4);
+          g.lineStyle(1, 0x8da17c, .7).strokeRect(x, y, 7, 4);
+        });
       }
       g.fillStyle(0xffd54f);
       for (let i = 0; i < t.lvl; i++) g.fillRect(t.c * T + 7 + i * 8, MAP_Y + t.r * T + T - 7, 6, 3);
@@ -716,7 +825,7 @@ export class GameScene extends Phaser.Scene {
     }
     const mini = this.miniGfx;
     mini.clear();
-    for (const t of this.towers) mini.fillStyle(t === this.selected ? 0xe0f7ad : 0x9bd76f).fillRect(25 + t.c * 8 + 2, CONSOLE_Y + 53 + t.r * 8 + 2, 4, 4);
+    for (const t of this.towers) if (!t.host) mini.fillStyle(t === this.selected || t === this.selected?.host ? 0xe0f7ad : 0x9bd76f).fillRect(25 + t.c * 8 + 2, CONSOLE_Y + 53 + t.r * 8 + 2, 4, 4);
     for (const e of this.enemies) {
       if (!e.dead && e.x >= 0 && e.x < W) mini.fillStyle(e.type === 'boss' ? 0xea85d8 : 0xe49674)
         .fillCircle(25 + e.x / W * 160, CONSOLE_Y + 53 + (e.y - MAP_Y) / MAP_H * 96, e.type === 'boss' ? 3 : 1.8);
