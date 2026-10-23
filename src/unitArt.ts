@@ -279,16 +279,13 @@ const dragoonHead = `
   <path d="m21 35 4 5m16-5-4 5" stroke="#f0d382" stroke-width="1.3"/>
 `;
 
-// The powered suit and rifle turn together; the soft ground shadow stays fixed.
+// The powered suit stays planted; only the rifle and gripping hands track targets.
 const marineBase = `
   <ellipse cx="31" cy="55" rx="24" ry="7" fill="#000" opacity=".3"/>
-`;
-const marineHead = `
   <defs>
     <linearGradient id="marineArmor" x1="0" y1="0" x2=".7" y2="1"><stop stop-color="#8b9ea9"/><stop offset=".18" stop-color="#536b88"/><stop offset=".48" stop-color="#2d4263"/><stop offset=".8" stop-color="#1b2b45"/><stop offset="1" stop-color="#111e2b"/></linearGradient>
     <linearGradient id="marineEdge" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#bbc3b9"/><stop offset=".3" stop-color="#7f8d86"/><stop offset="1" stop-color="#34423e"/></linearGradient>
     <radialGradient id="marineVisor" cx=".35" cy=".24" r=".8"><stop stop-color="#ffffd2"/><stop offset=".18" stop-color="#ffe66d"/><stop offset=".45" stop-color="#e9b72b"/><stop offset=".73" stop-color="#a56813"/><stop offset="1" stop-color="#4f3612"/></radialGradient>
-    <linearGradient id="marineRifle" x1="0" y1="0" x2=".2" y2="1"><stop stop-color="#7e8470"/><stop offset=".3" stop-color="#4b5442"/><stop offset="1" stop-color="#202c25"/></linearGradient>
   </defs>
   <g stroke-linejoin="round">
     <!-- Braced legs: thick greaves, exposed knee servos and metal toe caps. -->
@@ -335,12 +332,22 @@ const marineHead = `
     </g>
     <path d="M21 15q9 7 20 0v5l-6 2h-8l-6-2Z" fill="url(#marineEdge)" stroke="#182c29" stroke-width=".65"/>
     <path d="M24 18h3m9 0h3" stroke="#15251f" stroke-width="1.5"/>
-    <!-- Massive forearms and articulated gauntlets wrap around the rifle. -->
+    <!-- Braced upper arms stay with the suit; gripping hands move with the rifle. -->
     <path d="M6 30 14 28l7 8-3 8-9-3-5-5Z" fill="url(#marineArmor)" stroke="#132634" stroke-width="1.1"/>
     <path d="m7 32 6-2 5 5-1 4-8-3Z" fill="url(#marineArmor)" stroke="#87958b" stroke-width=".55"/>
     <path d="M46 29h7l2 7-6 6-8-3 2-6Z" fill="url(#marineArmor)" stroke="#132634" stroke-width="1"/>
     <path d="M10 36 17 33 24 36 23 43 17 45 10 42Z" fill="url(#marineArmor)" stroke="#a3ab95" stroke-width=".7"/>
     <path d="M13 37 17 35 21 37v5l-4 1-4-2Z" fill="#293e56"/>
+    <circle cx="16" cy="33" r=".9" fill="#b5e6ae"/>
+  </g>
+`;
+const marineHead = `
+  <defs>
+    <linearGradient id="marineWeaponArmor" x1="0" y1="0" x2=".7" y2="1"><stop stop-color="#8b9ea9"/><stop offset=".18" stop-color="#536b88"/><stop offset=".48" stop-color="#2d4263"/><stop offset=".8" stop-color="#1b2b45"/><stop offset="1" stop-color="#111e2b"/></linearGradient>
+    <linearGradient id="marineWeaponEdge" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#bbc3b9"/><stop offset=".3" stop-color="#7f8d86"/><stop offset="1" stop-color="#34423e"/></linearGradient>
+    <linearGradient id="marineRifle" x1="0" y1="0" x2=".2" y2="1"><stop stop-color="#7e8470"/><stop offset=".3" stop-color="#4b5442"/><stop offset="1" stop-color="#202c25"/></linearGradient>
+  </defs>
+  <g stroke-linejoin="round">
     <!-- Boxy C-14 receiver, long barrel shroud, magazine and hazard markings. -->
     <path d="M20 29 25 26h10l3 2 24 1v7l-4 3H39l-2 6h-6l-2-7h-8Z" fill="url(#marineRifle)" stroke="#0e1b16" stroke-width="1.1"/>
     <path d="M24 27h10l4 2 22 1M22 30v5" fill="none" stroke="#a5ae96" stroke-width=".8"/>
@@ -351,11 +358,10 @@ const marineHead = `
     <path d="M27 32h7v4h-7Z" fill="#0c1712"/>
     <path d="m34 37 4 1-2 5h-3Z" fill="#8d916d" stroke="#233329" stroke-width=".6"/>
     <path d="M26 36v5l3 1 1-4" fill="none" stroke="#899078" stroke-width="1.2"/>
-    <path d="M58 29h5v7h-5Z" fill="url(#marineEdge)" stroke="#172a21" stroke-width=".7"/>
+    <path d="M58 29h5v7h-5Z" fill="url(#marineWeaponEdge)" stroke="#172a21" stroke-width=".7"/>
     <path d="M61 30h2v4h-2Z" fill="#08120c"/>
-    <path d="M24 35h5v7h-5Zm20 1h8v5l-3 2-5-2Z" fill="url(#marineArmor)" stroke="#132630" stroke-width=".8"/>
+    <path d="M24 35h5v7h-5Zm20 1h8v5l-3 2-5-2Z" fill="url(#marineWeaponArmor)" stroke="#132630" stroke-width=".8"/>
     <path d="M25 36h3m-3 2h3m-3 2h3M45 37h6m-6 2h6m-5 2h4" stroke="#9ba694" stroke-width=".9"/>
-    <circle cx="16" cy="33" r=".9" fill="#b5e6ae"/>
   </g>
 `;
 const firebatBase = `
