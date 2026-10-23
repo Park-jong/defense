@@ -177,28 +177,84 @@ const dragoonHead = `
   <path d="m21 35 4 5m16-5-4 5" stroke="#f0d382" stroke-width="1.3"/>
 `;
 
+// The powered suit and rifle turn together; the soft ground shadow stays fixed.
 const marineBase = `
-  <ellipse cx="32" cy="53" rx="20" ry="7" fill="#000" opacity=".4"/>
-  <path d="m22 34-3 18-6 5 3 4 13-3 3-18 3 18 13 3 3-4-6-5-3-18Z" fill="url(#steel)" stroke="#1a2b30" stroke-width="1.4"/>
-  <path d="m22 39-2 11 8 1 2-11m5 0 2 11 8-1-2-11" fill="#3b5c80" stroke="#849fb0" stroke-width=".6"/>
-  <path d="m20 50 7 1m11 0 7-1" stroke="#d5d5ae" stroke-width="1.8"/>
-  <path d="M20 23 32 18 44 23 43 40 32 46 21 40Z" fill="#314b67" stroke="#172b37" stroke-width="1.2"/>
-  <path d="M20 23 32 18 44 23 32 30Z" fill="#7898b0"/>
-  <path d="m25 32 7 4 7-4v7l-7 4-7-4Z" fill="url(#steel)"/>
-  <path d="M18 24v12m28-12v12" stroke="#20354c" stroke-width="8"/>
-  <path d="M18 24v8m28-8v8" stroke="#6c8da8" stroke-width="5"/>
+  <ellipse cx="31" cy="55" rx="24" ry="7" fill="#000" opacity=".3"/>
 `;
 const marineHead = `
-  <path d="M21 14Q22 6 32 6q11 0 12 10v12l-11 7-12-7Z" fill="#385a7a" stroke="#162b39" stroke-width="1.2"/>
-  <path d="M22 16q11-8 21 0v8l-10 5-11-5Z" fill="#142d3b"/>
-  <path d="m24 17 8-3 9 3-1 5-8 3-8-3Z" fill="#efc179" stroke="#ffe3a7" stroke-width=".7"/>
-  <path d="m26 17 6-1 6 1" stroke="#fff4d4" stroke-width="1.3"/>
-  <path d="M19 16v11m27-11v11" stroke="#8dabb8" stroke-width="3"/>
-  <path d="m30 30 5-3 24 9v6l-6 3-23-9Z" fill="url(#gun)" stroke="#1a3031" stroke-width="1.1"/>
-  <path d="m45 34 12 5m-10-3v5m5-3v5" stroke="#bacac2" stroke-width="1"/>
-  <path d="m53 38 8-1v6l-7 3Z" fill="#233931"/>
-  <path d="m24 32 7 5m6-7 6 5" stroke="#587994" stroke-width="5"/>
-  <circle cx="22" cy="28" r="1.2" fill="#80dca1"/>
+  <defs>
+    <linearGradient id="marineArmor" x1="0" y1="0" x2=".7" y2="1"><stop stop-color="#8b9ea9"/><stop offset=".18" stop-color="#536b88"/><stop offset=".48" stop-color="#2d4263"/><stop offset=".8" stop-color="#1b2b45"/><stop offset="1" stop-color="#111e2b"/></linearGradient>
+    <linearGradient id="marineEdge" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#bbc3b9"/><stop offset=".3" stop-color="#7f8d86"/><stop offset="1" stop-color="#34423e"/></linearGradient>
+    <radialGradient id="marineVisor" cx=".35" cy=".24" r=".8"><stop stop-color="#ffffd2"/><stop offset=".18" stop-color="#ffe66d"/><stop offset=".45" stop-color="#e9b72b"/><stop offset=".73" stop-color="#a56813"/><stop offset="1" stop-color="#4f3612"/></radialGradient>
+    <linearGradient id="marineRifle" x1="0" y1="0" x2=".2" y2="1"><stop stop-color="#7e8470"/><stop offset=".3" stop-color="#4b5442"/><stop offset="1" stop-color="#202c25"/></linearGradient>
+  </defs>
+  <g stroke-linejoin="round">
+    <!-- Braced legs: thick greaves, exposed knee servos and metal toe caps. -->
+    <path d="M19 35 30 36 30 43 27 51 26 59H13l1-9 2-8Zm13 1 11-2 5 8 1 10 2 6H37l-2-9-4-8Z" fill="#101c27" stroke="#0b161c" stroke-width="1.3"/>
+    <path d="m19 38 9 1-3 10-9-1Zm16 0 7-1 5 10-10 3Z" fill="url(#marineArmor)" stroke="#78918f" stroke-width=".6"/>
+    <path d="m16 46 10 1 2 7-3 6H13l-1-6Zm23 1 9-3 4 9-3 6H37l-2-6Z" fill="url(#marineArmor)" stroke="#172730" stroke-width="1"/>
+    <path d="m15 48 8 1 1 5-4 2-6-2Zm24 1 7-2 3 6-5 2-5-1Z" fill="#525e52" stroke="#abb29a" stroke-width=".6"/>
+    <path d="m17 49 5 1m-6 2 6 1m18-2 6-2m-5 4 6-2" stroke="#1d2b27" stroke-width=".8"/>
+    <path d="m26 43-1 5m2-4-1 4m13-5 2 5m0-6 2 5" stroke="#b8c4bc" stroke-width="1.2"/>
+    <path d="M13 56 22 57 27 59v3H10v-3Zm24 0h10l6 3v3H36l-1-3Z" fill="url(#marineEdge)" stroke="#182923" stroke-width="1"/>
+    <path d="M12 60h13m12 0h14m-36-1v3m6-3v3m19-3v3m7-3v3" stroke="#3b4941" stroke-width=".8"/>
+    <path d="M20 32h19l4 7-9 6h-7l-10-5Z" fill="url(#marineArmor)" stroke="#152431"/>
+    <path d="m22 37 7 1 3 5-5-1Zm13 0 5-1-3 5-4 2Z" fill="#69725f" stroke="#a0a78e" stroke-width=".5"/>
+    <!-- Backpack and chest are enclosed by the oversized rounded pauldrons. -->
+    <path d="M18 16 21 9h21l5 8v18H18Z" fill="#17232b" stroke="#0c171c" stroke-width="1.2"/>
+    <path d="M17 17 25 13h13l9 6-2 16-9 6H25l-9-7Z" fill="url(#marineArmor)" stroke="#122431" stroke-width="1.1"/>
+    <path d="m23 20 7-2 8 1 5 5-4 6-10 2-7-5Z" fill="url(#marineArmor)" stroke="#718885" stroke-width=".6"/>
+    <path d="m26 24 6-2 5 2-2 5h-6Z" fill="#283b54"/>
+    <path d="M27 21h9m-8 1h7" stroke="#9da99c" stroke-width=".7"/>
+    <g fill="#14231f" stroke="url(#marineEdge)" stroke-width="1.1">
+      <ellipse cx="21" cy="23" rx="3.1" ry="3.8"/><ellipse cx="41" cy="23" rx="3.1" ry="3.8"/>
+      <circle cx="22" cy="32" r="3"/><circle cx="40" cy="32" r="3"/>
+    </g>
+    <g fill="#3b4940" stroke="#77816a" stroke-width=".45"><circle cx="21" cy="23" r="1.5"/><circle cx="41" cy="23" r="1.5"/></g>
+    <path d="M20 14C13 4 6 7 3 14L1 26l5 7 13-3 5-10Z" fill="url(#marineArmor)" stroke="#0f1e2b" stroke-width="1.2"/>
+    <path d="M40 14c8-11 14-6 17 2l2 14-7 5-13-6-3-9Z" fill="url(#marineArmor)" stroke="#0f1e2b" stroke-width="1.2"/>
+    <path d="M3 18Q6 6 13 10l8 7M40 16q8-10 14 0" fill="none" stroke="#b1b8a1" stroke-width=".8"/>
+    <path d="M3 27 7 30l10-2M42 29l9 3 5-3" fill="none" stroke="#74827c" stroke-width=".8"/>
+    <path d="m7 17 2-2m5 0 3 2m-10 7 2 1m4 2 3-1m29-8 2-2m5 6 1 3m-8 3 3 1" stroke="#b1b39a" stroke-width=".55" opacity=".8"/>
+    <text x="7" y="23" font-family="monospace" font-size="4.3" font-weight="bold" fill="#c6c9ac" transform="rotate(-16 11 21)">512</text>
+    <path d="m47 18 2 1 2-1-1 3 2 2-3-1-3 1 2-2Z" fill="#c6c9ac"/>
+    <g fill="#151f27" stroke="#9aa593" stroke-width=".35"><circle cx="7" cy="28" r=".7"/><circle cx="17" cy="19" r=".7"/><circle cx="44" cy="28" r=".7"/><circle cx="52" cy="20" r=".7"/></g>
+    <g fill="#101d1b" stroke="url(#marineEdge)" stroke-width="1">
+      <ellipse cx="23" cy="24" rx="2.5" ry="3.2"/><ellipse cx="39" cy="24" rx="2.5" ry="3.2"/>
+    </g>
+    <path d="M22 23l2 2m-2 0 2-2m14 0 2 2m-2 0 2-2" stroke="#717a65" stroke-width=".7"/>
+    <!-- The gold faceplate is a dome seated inside a dark armoured collar. -->
+    <g transform="translate(30 20) scale(.82 .85) translate(-30 -20)">
+    <path d="M20 16C19 8 23 2 30 2s12 6 12 14l-4 5H24Z" fill="#15212b" stroke="#0a141c" stroke-width="1.1"/>
+    <path d="M21 14C21 7 25 3 30 3s10 4 11 11" fill="none" stroke="#a1afa7" stroke-width=".85"/>
+    <path d="M23 14c0-6 3-9 7-9s8 3 8 9l-2 4H25Z" fill="url(#marineVisor)" stroke="#55431a" stroke-width=".7"/>
+    <path d="M25 10q5-5 10 0m-9-1 1 5" fill="none" stroke="#ffffbd" stroke-width="1.2"/>
+    <path d="m30 6 1 11m4-9 1 8m-12-4 13 1" fill="none" stroke="#f9d652" stroke-width=".5" opacity=".7"/>
+    </g>
+    <path d="M21 15q9 7 20 0v5l-6 2h-8l-6-2Z" fill="url(#marineEdge)" stroke="#182c29" stroke-width=".65"/>
+    <path d="M24 18h3m9 0h3" stroke="#15251f" stroke-width="1.5"/>
+    <!-- Massive forearms and articulated gauntlets wrap around the rifle. -->
+    <path d="M6 30 14 28l7 8-3 8-9-3-5-5Z" fill="url(#marineArmor)" stroke="#132634" stroke-width="1.1"/>
+    <path d="m7 32 6-2 5 5-1 4-8-3Z" fill="url(#marineArmor)" stroke="#87958b" stroke-width=".55"/>
+    <path d="M46 29h7l2 7-6 6-8-3 2-6Z" fill="url(#marineArmor)" stroke="#132634" stroke-width="1"/>
+    <path d="M10 36 17 33 24 36 23 43 17 45 10 42Z" fill="url(#marineArmor)" stroke="#a3ab95" stroke-width=".7"/>
+    <path d="M13 37 17 35 21 37v5l-4 1-4-2Z" fill="#293e56"/>
+    <!-- Boxy C-14 receiver, long barrel shroud, magazine and hazard markings. -->
+    <path d="M20 29 25 26h10l3 2 24 1v7l-4 3H39l-2 6h-6l-2-7h-8Z" fill="url(#marineRifle)" stroke="#0e1b16" stroke-width="1.1"/>
+    <path d="M24 27h10l4 2 22 1M22 30v5" fill="none" stroke="#a5ae96" stroke-width=".8"/>
+    <path d="M29 28h8v3h-8Z" fill="#1a2822"/>
+    <path d="m30 28 1 2m2-2 1 2m2-2 1 2" stroke="#d9bf55" stroke-width="1.1"/>
+    <path d="M40 30h17v5H40Z" fill="#354134" stroke="#707e64" stroke-width=".5"/>
+    <path d="m43 31-1 2m5-2-1 2m5-2-1 2m5-2-1 2" stroke="#14251d" stroke-width="1.4"/>
+    <path d="M27 32h7v4h-7Z" fill="#0c1712"/>
+    <path d="m34 37 4 1-2 5h-3Z" fill="#8d916d" stroke="#233329" stroke-width=".6"/>
+    <path d="M26 36v5l3 1 1-4" fill="none" stroke="#899078" stroke-width="1.2"/>
+    <path d="M58 29h5v7h-5Z" fill="url(#marineEdge)" stroke="#172a21" stroke-width=".7"/>
+    <path d="M61 30h2v4h-2Z" fill="#08120c"/>
+    <path d="M24 35h5v7h-5Zm20 1h8v5l-3 2-5-2Z" fill="url(#marineArmor)" stroke="#132630" stroke-width=".8"/>
+    <path d="M25 36h3m-3 2h3m-3 2h3M45 37h6m-6 2h6m-5 2h4" stroke="#9ba694" stroke-width=".9"/>
+    <circle cx="16" cy="33" r=".9" fill="#b5e6ae"/>
+  </g>
 `;
 const firebatBase = `
   <ellipse cx="32" cy="53" rx="24" ry="8" fill="#000" opacity=".4"/>
