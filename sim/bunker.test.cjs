@@ -292,3 +292,56 @@ test('잘못된 벙커 범위와 작전 종료 후에는 일괄 명령이 어떤
   assert.deepEqual(s.applyOrder({ type: 'skill', key: 'stim' }), { count: 0, cost: 0 });
   assert.equal(s.gold, gold); assert.equal(m.lvl, 1); assert.equal(m.skills.length, 0); assert.equal(b.lvl, 1);
 });
+
+test('선택이 없으면 9종 보급 아이콘, 유닛 선택 시 전용 명령, 빈 땅 클릭 시 다시 보급을 표시한다', () => {
+  const s = setup(), m = place(s, 'marine'); s.cancelCommand();
+  assert.equal(s.commands().length, 9); assert.ok(s.commands().every(c => c.id.startsWith('build:')));
+  s.cellAt = () => ({ c: m.c, r: m.r }); s.onMapClick({ wasTouch: false });
+  assert.equal(s.selected, m); assert.equal(s.commands()[0].id, 'upgrade:' + m.id);
+  assert.ok(s.commands()[1].id.startsWith('skill:stim:')); assert.ok(s.commands()[2].id.startsWith('skill:burst:'));
+  s.cellAt = () => ({ c: 8, r: 1 }); s.onMapClick({ wasTouch: false });
+  assert.equal(s.selected, null); assert.ok(s.commands().every(c => c.id.startsWith('build:'))); assert.equal(s.shopOpen, false);
+});
+
+test('명령 아이콘으로 강화·스킬을 바로 구매하고 장착한 스킬은 재구매 없이 자동 사용 상태로 표시한다', () => {
+  const s = setup(), m = place(s, 'marine'), other = place(s, 'firebat', 8, 1); s.selectUnit(m.id);
+  const gold = s.gold; s.commands()[0].run(); s.commands()[1].run(); s.commands()[2].run();
+  assert.equal(s.gold, gold - 52 - 75 - 85); assert.equal(m.lvl, 2); assert.equal(other.lvl, 1);
+  assert.deepEqual(m.skills.map(s => s.key), ['stim', 'burst']); assert.equal(s.shopOpen, false);
+  m.skills[0].cd = 6;
+  const skill = s.commands()[1]; assert.equal(skill.enabled, false); assert.equal(skill.active, true);
+  assert.equal(skill.price, undefined); assert.equal(skill.badge, '6s'); assert.equal(skill.progress, .5);
+  const after = s.gold; skill.run(); assert.equal(s.gold, after); assert.equal(m.skills[0].cd, 6);
+});
+
+test('벙커는 창을 자동으로 열지 않고 명령 아이콘에서 구매·탑승 병력 선택·강화·복귀·일괄 강화를 처리한다', () => {
+  const s = setup(), b = place(s, 'bunker'); assert.equal(s.shopOpen, false);
+  assert.equal(s.commands()[0].enabled, false); s.commands()[4].run(); s.commands()[5].run();
+  const [m, f] = b.passengers;
+  assert.equal(m.k, 'marine'); assert.equal(f.k, 'firebat');
+  s.commands()[0].run(); assert.equal(s.selected, m); s.commands()[0].run(); s.commands()[1].run();
+  assert.equal(m.lvl, 2); assert.equal(m.skills[0].key, 'stim'); assert.equal(m.base.visible, false);
+  s.commands()[6].run(); assert.equal(s.selected, b);
+  const order = s.commands()[6]; assert.equal(order.price, 104 + 88); order.run();
+  assert.equal(m.lvl, 3); assert.equal(f.lvl, 2); assert.equal(s.commands()[8].enabled, false);
+  assert.equal(s.shopOpen, false); assert.equal(s.selected, b);
+});
+
+test('탑승 병력의 하차 명령은 위치 확정 전까지 탑승을 유지하며 취소 아이콘은 보급 화면으로 돌아간다', () => {
+  const s = setup(), b = place(s, 'bunker'); s.commands()[4].run(); const m = b.passengers[0];
+  s.commands()[0].run(); s.commands()[7].run();
+  assert.equal(s.unloading, m); assert.equal(m.host, b); assert.equal(s.commands().filter(Boolean).length, 1);
+  s.commands()[8].run(); assert.equal(s.unloading, null); assert.equal(m.host, b); assert.equal(s.selected, null);
+  assert.ok(s.commands().every(c => c.id.startsWith('build:')));
+});
+
+test('선택 변경 후 스킬 단축키는 현재 유닛에 적용되고 중복·자금 부족·최대 강화·작전 종료는 비활성화한다', () => {
+  const s = setup(), m = place(s, 'marine'), f = place(s, 'firebat', 8, 1);
+  s.selectUnit(f.id); s.onKey({ key: 'z', repeat: false }); s.onKey({ key: 'x', repeat: false });
+  assert.deepEqual(f.skills.map(s => s.key), ['inferno', 'ignite']); assert.equal(m.skills.length, 0);
+  const gold = s.gold; s.onKey({ key: 'z', repeat: false }); assert.equal(s.gold, gold);
+  s.selectUnit(m.id); s.gold = 0; assert.equal(s.commands()[0].enabled, false); assert.equal(s.commands()[1].enabled, false);
+  s.gold = 1000; s.commands()[0].run(); s.commands()[0].run();
+  assert.equal(s.commands()[0].enabled, false); assert.equal(s.commands()[0].badge, 'MAX');
+  s.over = true; assert.ok(s.commands().filter(Boolean).every(c => !c.enabled));
+});

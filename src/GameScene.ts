@@ -5,13 +5,12 @@ import {
 import { drawMap, makeTextures } from './textures';
 import { Btn, mkBtn } from './ui';
 import { DRAGOON_EMITTER, FIREBAT_MUZZLES, loadUnitArt, SIEGE_MUZZLE, TURRET_LAUNCH_PORTS, UNIT_WORLD_SCALE } from './unitArt';
-import { EquippedSkill, SKILL_DEFS, SKILL_SLOTS, SkillKey, UnitBuff } from './catalog';
+import { EquippedSkill, SKILL_DEFS, SKILL_KEYS, SKILL_SLOTS, SkillKey, UnitBuff } from './catalog';
+import { CommandCard, UnitCommand } from './commandCard';
+import { loadCommandIcons } from './commandIcons';
 import { ShopState, SupplyShop } from './shop';
 import { MAX_UNIT_LEVEL, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
 import { BUNKER_BARREL_LENGTH, BUNKER_CAPACITY, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
-
-/** 건설 명령 한 쪽에 보이는 유닛 수. */
-const BUILD_PAGE_SIZE = 4;
 
 interface Tower {
   id: string;
@@ -73,8 +72,6 @@ export class GameScene extends Phaser.Scene {
   private shopInputEnabled = true;
   private fields: SkillField[] = [];
   private shopBtn!: Btn;
-  private cancelBtn!: Btn;
-  private skillBtn!: Btn;
   private uiCache: { hud?: string; info?: string } = {};
   /** 맵 영역 전용 카메라(확대·이동·흔들림)와 전체 화면 UI 카메라. */
   private mapCam!: Phaser.Cameras.Scene2D.Camera;
@@ -96,29 +93,25 @@ export class GameScene extends Phaser.Scene {
   private info!: Phaser.GameObjects.Text;
   private mineralTxt!: Phaser.GameObjects.Text;
   private lifeTxt!: Phaser.GameObjects.Text;
-  private statusTxt!: Phaser.GameObjects.Text;
   private unitTitle!: Phaser.GameObjects.Text;
   private unitImage!: Phaser.GameObjects.Image;
+  private statusImage?: Phaser.GameObjects.Image;
   private miniGfx!: Phaser.GameObjects.Graphics;
   /** 배치마다 다른 초상화 크기와 기지 내구도 막대 위치. */
   private portraitSize = 88;
   private lifeMeter = { x: 832, y: 31, w: 54 };
-  /** 건설 명령의 현재 쪽과, 좌우로 밀어 넘기는 영역. */
-  private buildPage = 0;
-  private buildArea = { x: 0, y: 0, w: 0, h: 0 };
-  private buildPageTxt?: Phaser.GameObjects.Text;
-  private buildPageBtn?: Btn;
+  private commandCard!: CommandCard;
+  private commandTitle!: Phaser.GameObjects.Text;
+  private commandHint!: Phaser.GameObjects.Text;
+  private commandTip?: Phaser.GameObjects.Rectangle;
   private pauseTxt!: Phaser.GameObjects.Text;
-  private towerBtns: Btn[] = [];
   private goBtn!: Btn;
   private spdBtn!: Btn;
   private pauseBtn!: Btn;
-  private upBtn!: Btn;
-  private sellBtn!: Btn;
 
   constructor() { super('game'); }
 
-  preload(): void { loadUnitArt(this); }
+  preload(): void { loadUnitArt(this); loadCommandIcons(this); }
 
   // ---------- 생성 ----------
   create(): void {
@@ -146,7 +139,6 @@ export class GameScene extends Phaser.Scene {
     this.lastTick = 0; this.stepAcc = 0;
     this.touchUI = window.matchMedia('(pointer: coarse)').matches;
     this.uiCache = {};
-    this.towerBtns = [];
     this.fields = []; this.shopOpen = false;
 
     this.gfx = this.add.graphics().setDepth(10);
@@ -167,7 +159,7 @@ export class GameScene extends Phaser.Scene {
     this.splitCameras();
     this.shop = new SupplyShop({
       state: () => this.shopState(),
-      select: id => { this.selected = this.towers.find(t => t.id === id) ?? null; this.building = null; this.unloading = null; },
+      select: id => this.selectUnit(id),
       choose: k => this.chooseBuild(k, true),
       equip: (k, id) => this.equipSkill(k, id),
       upgrade: id => this.upgradeUnit(id),
@@ -279,11 +271,6 @@ export class GameScene extends Phaser.Scene {
     this.mapDown = null;
     if (!this.gesture && md && md.id === p.id && !md.dragged && p.button === 0) this.onMapClick(p);
     if (![this.input.pointer1, this.input.pointer2].some(q => q && q !== p && q.isDown)) { this.gesture = false; this.pinch.d = 0; }
-    // 건설 명령 영역을 좌우로 40px 넘게 밀면 쪽을 넘긴다. 포인터의 down/up 좌표는 캔버스 픽셀이라 게임 좌표로 나눈다.
-    const k = RENDER_SCALE, ar = this.buildArea;
-    const downX = p.downX / k, downY = p.downY / k, dx = (p.upX - p.downX) / k, dy = (p.upY - p.downY) / k;
-    const inside = downX >= ar.x && downX <= ar.x + ar.w && downY >= ar.y && downY <= ar.y + ar.h;
-    if (inside && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) this.setBuildPage(this.buildPage + (dx < 0 ? 1 : -1));
   }
 
   // ---------- UI ----------
@@ -331,30 +318,14 @@ export class GameScene extends Phaser.Scene {
     // 유닛 정보
     box(88, 150);
     this.unitTitle = text(L, 96, '기지 사령부', 15, '#c9d7b2').setFontStyle('bold');
-    this.skillBtn = mkBtn(this, right - 104, 93, 86, 28, '스킬 장착', () => this.openShop(this.selected?.k === 'bunker' ? 'garrison' : 'skills'), 12);
-    this.skillBtn.show(false);
-    this.add.rectangle(L, 128, 64, 64, 0x0a1710).setOrigin(0).setStrokeStyle(1, 0x52634b).setDepth(27);
-    this.unitImage = this.add.image(L + 32, 160, 'portrait').setDisplaySize(60, 71).setDepth(28);
-    this.info = text(L + 76, 126, '', 13, '#a5b897').setLineSpacing(4).setWordWrapWidth(right - 20 - (L + 76));
+    this.add.rectangle(right - 84, 128, 64, 76, 0x0a1710).setOrigin(0).setStrokeStyle(1, 0x52634b).setDepth(27);
+    this.unitImage = this.add.image(right - 52, 166, 'portrait').setDisplaySize(60, 71).setDepth(28);
+    this.info = text(L, 126, '', 13, '#a5b897').setLineSpacing(4).setWordWrapWidth(200);
 
-    // 강화 · 회수 · 취소 (같은 줄)
-    this.upBtn = mkBtn(this, x0 + 10, 246, 176, 40, '', () => this.upgrade(), 13);
-    this.sellBtn = mkBtn(this, x0 + 192, 246, 118, 40, '', () => this.sell(), 13);
-    this.cancelBtn = mkBtn(this, x0 + 192, 246, 118, 40, `✕ 취소${this.kb(' [ESC]')}`, () => this.cancelCommand(), 13);
-    this.upBtn.show(false); this.sellBtn.show(false); this.cancelBtn.show(false);
-    this.statusTxt = text(L, 257, '', 13, '#849a76');
-
-    // 건설 명령
-    this.shopBtn = mkBtn(this, x0 + 10, 294, pw - 94, 34, `보급 상점 · 스킬${this.kb(' [B]')}`, () => this.openShop(), 13);
-    // 9종을 2×2 네 칸씩 쪽으로 나눈다. 좌우로 밀거나 오른쪽 위 쪽 버튼을 눌러 넘긴다.
-    this.buildPageBtn = mkBtn(this, right - 80, 294, 72, 34, '', () => this.setBuildPage(this.buildPage + 1), 13);
-    this.towerBtns = TOWER_KEYS.map((k, i) => {
-      const d = TOWER_DEFS[k], slot = i % BUILD_PAGE_SIZE;
-      return mkBtn(this, x0 + 10 + (slot % 2) * 153, 334 + Math.floor(slot / 2) * 80, 149, 76, `${d.name} · ${d.cost}`,
-        () => this.chooseBuild(k), 12, k, { tap: true });
-    });
-    this.buildArea = { x: x0 + 10, y: 334, w: pw - 18, h: 156 };
-    this.setBuildPage(0);
+    this.commandTitle = text(L, 245, '', 13, '#cedfb1').setFontStyle('bold');
+    this.commandHint = text(L, 266, '', 10, '#a3ba94').setLineSpacing(2).setWordWrapWidth(280);
+    this.shopBtn = mkBtn(this, right - 110, 240, 92, 24, '', () => this.selected ? this.cancelCommand() : this.openShop('manage'), 11);
+    this.commandCard = new CommandCard(this, x0 + 10, 314, pw - 20, 176, command => this.describeCommand(command), true);
     this.goBtn = mkBtn(this, x0 + 10, 498, 160, 66, '▶  웨이브 시작', () => this.startWave(), 15);
     this.goBtn.act(true);
     this.spdBtn = mkBtn(this, x0 + 176, 498, 66, 66, '배속 ×1', () => {
@@ -370,7 +341,7 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(.5).setDepth(40).setVisible(false);
   }
 
-  /** 데스크톱용: 상단 상황판 + 맵 + 하단 콘솔(전술 지도 · 유닛 정보 · 건설 명령). */
+  /** 데스크톱용: 전술지도 → 상태정보 → 초상화 → 3×3 커맨드. 웨이브 시작은 지도 위에 배치. */
   private buildDesktopUI(): void {
     const y = CONSOLE_Y;
     const metal = this.add.graphics().setDepth(25);
@@ -393,8 +364,9 @@ export class GameScene extends Phaser.Scene {
     metal.fillStyle(0x060c08).fillRect(0, y + 3, W, 5);
     for (let x = 8; x < W; x += 18) metal.fillStyle(0x363e30).fillRect(x, y + 4, 10, 2);
     panel(8, y + 12, 194, 184);
-    panel(208, y + 12, 316, 184);
-    panel(530, y + 12, 422, 184);
+    panel(208, y + 12, 350, 184);
+    panel(564, y + 12, 144, 184);
+    panel(714, y + 12, 238, 184);
     text(21, 10, 'FRONTIER', 21, '#d2d7be').setFontStyle('bold').setLetterSpacing(3);
     text(23, 36, '기지 방어   /   SECTOR 07', 9, '#8a967b').setLetterSpacing(1);
     text(316, 10, 'OPERATION', 8, '#77876d').setLetterSpacing(2);
@@ -408,9 +380,9 @@ export class GameScene extends Phaser.Scene {
       text(903, 16, 'SOLO', 9, '#a5ba8d').setLetterSpacing(1);
       text(901, 33, '● LIVE', 8, '#8eb967');
     }
-    text(24, y + 23, '전술 지도', 11, '#b7c2a2');
-    text(140, y + 25, 'F-07', 9, '#72866a').setFontFamily('monospace');
-    this.add.rectangle(24, y + 48, 162, 108, 0x0a1711).setOrigin(0).setStrokeStyle(1, 0x556447).setDepth(27);
+    text(24, y + 169, '전술 지도', 11, '#b7c2a2');
+    text(140, y + 171, 'F-07', 9, '#72866a').setFontFamily('monospace');
+    this.add.rectangle(24, y + 50, 162, 108, 0x0a1711).setOrigin(0).setStrokeStyle(1, 0x556447).setDepth(27);
     const mini = this.add.graphics().setDepth(28);
     for (const cell of pathCells) {
       const [c, r] = cell.split(',').map(Number);
@@ -419,43 +391,28 @@ export class GameScene extends Phaser.Scene {
     mini.lineStyle(1, 0x7a9663, .5).strokeRect(27, y + 51, 156, 102);
     for (let yy = y + 51; yy < y + 156; yy += 3) mini.fillStyle(0x000000, .15).fillRect(25, yy, 160, 1);
     this.miniGfx = this.add.graphics().setDepth(29);
-    text(26, y + 167, '● 아군', 9, '#a6d97a');
-    text(94, y + 167, '● 적군', 9, '#d78e72');
     this.unitTitle = text(224, y + 26, '기지 사령부', 14, '#c9d7b2').setFontStyle('bold');
-    this.add.rectangle(224, y + 51, 90, 106, 0x0a1710).setOrigin(0).setStrokeStyle(1, 0x52634b).setDepth(27);
-    this.unitImage = this.add.image(269, y + 104, 'portrait').setDisplaySize(88, 104).setDepth(28);
-    this.info = text(326, y + 53, '', 11, '#a5b897').setLineSpacing(7);
-    this.upBtn = mkBtn(this, 224, y + 163, 166, 25, '', () => this.upgrade(), 10);
-    this.sellBtn = mkBtn(this, 396, y + 163, 112, 25, '', () => this.sell(), 10);
-    this.upBtn.show(false); this.sellBtn.show(false);
-    // 우클릭·ESC가 없는 터치 기기를 위한 취소. 선택된 유닛이 없을 때만 회수 버튼 자리에 나타난다.
-    this.cancelBtn = mkBtn(this, 396, y + 163, 112, 25, `✕ 취소${this.kb(' [ESC]')}`, () => this.cancelCommand(), 10);
-    this.cancelBtn.show(false);
-    this.statusTxt = text(225, y + 170, '', 10, '#849a76');
-    text(546, y + 24, '건설 명령', 11, '#b7c2a2');
-    this.shopBtn = mkBtn(this, 807, y + 20, 130, 21, `보급 상점${this.kb(' [B]')}`, () => this.openShop(), 10);
-    this.skillBtn = mkBtn(this, 441, y + 24, 67, 21, '스킬 장착', () => this.openShop(this.selected?.k === 'bunker' ? 'garrison' : 'skills'), 9);
-    this.skillBtn.show(false);
-    // 9종을 4개씩 쪽으로 나눠 ◀ ▶로 넘긴다 (터치 기기는 이 영역을 좌우로 밀어도 넘어간다).
-    this.towerBtns = TOWER_KEYS.map((k, i) => {
-      const d = TOWER_DEFS[k];
-      return mkBtn(this, 558 + (i % BUILD_PAGE_SIZE) * 92, y + 43, 86, 95, `${this.kb(`[${i + 1}] `)}${d.name}\n${d.cost} 미네랄`,
-        () => this.chooseBuild(k), 10, k, { tap: true });
-    });
-    mkBtn(this, 538, y + 43, 16, 95, '◀', () => this.setBuildPage(this.buildPage - 1), 10);
-    mkBtn(this, 926, y + 43, 16, 95, '▶', () => this.setBuildPage(this.buildPage + 1), 10);
-    this.buildPageTxt = text(616, y + 26, '', 9, '#8ea17d').setFontFamily('monospace');
-    this.buildArea = { x: 538, y: y + 43, w: 404, h: 95 };
-    this.setBuildPage(0);
-    this.goBtn = mkBtn(this, 544, y + 146, 206, 38, `▶  웨이브 시작${this.kb('  [SPACE]')}`, () => this.startWave(), 12);
+    this.statusImage = this.add.image(254, y + 105, 'unit_marine').setDisplaySize(64, 64).setTint(0x75df8a).setAlpha(.65).setDepth(28).setVisible(false);
+    this.info = text(302, y + 53, '', 11, '#a5b897').setLineSpacing(7).setWordWrapWidth(238);
+    this.portraitSize = 96;
+    text(582, y + 26, 'COM LINK', 10, '#9db88c').setFontFamily('monospace').setLetterSpacing(1);
+    this.add.rectangle(582, y + 49, 108, 114, 0x0a1710).setOrigin(0).setStrokeStyle(1, 0x52634b).setDepth(27);
+    this.unitImage = this.add.image(636, y + 106, 'portrait').setDisplaySize(96, 113).setDepth(28);
+    text(592, y + 172, '● ONLINE', 10, '#8bad76').setFontFamily('monospace');
+    this.commandTitle = text(728, y + 26, '', 10, '#cedfb1').setFontStyle('bold');
+    this.commandTip = this.add.rectangle(648, y - 122, 304, 114, 0x0a1710, .97).setOrigin(0).setStrokeStyle(1, 0x8aab69).setDepth(34).setVisible(false);
+    this.commandHint = text(660, y - 110, '', 11, '#c0d5a7').setLineSpacing(4).setWordWrapWidth(278).setDepth(35).setVisible(false);
+    this.shopBtn = mkBtn(this, 836, y + 21, 102, 22, '', () => this.selected ? this.cancelCommand() : this.openShop('manage'), 9);
+    this.commandCard = new CommandCard(this, 728, y + 49, 210, 132, command => this.describeCommand(command));
+    this.goBtn = mkBtn(this, 24, y + 20, 162, 26, `▶  웨이브 시작${this.kb('  [SPACE]')}`, () => this.startWave(), 11);
     this.goBtn.act(true);
-    this.spdBtn = mkBtn(this, 756, y + 146, 86, 38, '배속 ×1', () => {
+    this.spdBtn = mkBtn(this, 224, y + 163, 154, 25, '배속 ×1', () => {
       this.speed = this.speed % 3 + 1; this.spdBtn.set('배속 ×' + this.speed);
     }, 11);
-    this.pauseBtn = mkBtn(this, 848, y + 146, 90, 38, `정지${this.kb(' [P]')}`, () => this.togglePause(), 11);
+    this.pauseBtn = mkBtn(this, 384, y + 163, 158, 25, `정지${this.kb(' [P]')}`, () => this.togglePause(), 11);
     text(16, H - 17, this.touchUI
-      ? '탭: 유닛 선택    /    건설은 같은 칸을 두 번 탭해 확정    /    ✕ 취소    /    보급 상점에서 유닛 9종·스킬    /    스킬 자동 사용'
-      : 'B 상점    /    1–9 유닛    /    U 강화·주둔    /    S 회수    /    ESC 취소    /    스킬 자동 사용', 9, '#7d8b73');
+      ? '유닛 선택 → 명령 아이콘    /    빈 땅 → 유닛 보급    /    건설은 같은 칸을 두 번 탭    /    스킬 자동 사용'
+      : '1–9 유닛 보급    /    U 강화    /    Z·X 스킬 장착    /    S 회수    /    ESC 선택 해제    /    B 상세 관리', 9, '#7d8b73');
     text(W - 16, H - 17, `FRONTIER  /  v${__APP_VERSION__}`, 9, '#616f5b').setOrigin(1, 0).setFontFamily('monospace');
     this.pauseTxt = this.add.text(W / 2, MAP_Y + MAP_H / 2, this.touchUI ? '전술 일시정지\n재개 버튼으로 작전 재개' : '전술 일시정지\n[ P ] 작전 재개', {
       fontFamily: FONT, fontSize: '28px', align: 'center', lineSpacing: 18, color: '#c5e49e',
@@ -474,10 +431,6 @@ export class GameScene extends Phaser.Scene {
       this.lifeTxt.setColor(this.lives <= 5 ? '#e29a7f' : '#b7dc8e');
       this.goBtn.set(this.over ? '작전 종료' : this.waveActive ? `${MOBILE_LAYOUT ? '교전' : '교전 중'} · 남은 적 ${remaining}` : `▶  웨이브 시작${this.kb('  [SPACE]')}`);
     }
-    TOWER_KEYS.forEach((k, i) => {
-      this.towerBtns[i].act(this.building === k);
-      this.towerBtns[i].en(!this.over && (this.gold >= TOWER_DEFS[k].cost || this.building === k));
-    });
     this.goBtn.en(!this.waveActive && !this.over && !this.paused && !this.shopOpen && (this.testMode || this.wave < MAX_WAVE));
     this.shopBtn.en(!this.over);
     const t = this.selected, k = t?.k ?? this.building;
@@ -488,41 +441,116 @@ export class GameScene extends Phaser.Scene {
       if (k === 'bunker') {
         const crew = t?.passengers.filter((p): p is Tower => !!p) ?? [];
         title = `벙커  ${crew.length}/${BUNKER_CAPACITY} 주둔`;
-        msg = `보병 최대 4기 · 사거리 +${BUNKER_RANGE_BONUS}\n` + (crew.length ? crew.map(p => `${TOWER_DEFS[p.k].name} Lv.${p.lvl} · 스킬 ${p.skills.length}/2`).join('\n') : '현재 주둔 병력 없음\n빈 벙커는 공격하지 않습니다.\n[병력 관리]에서 탑승·구매');
+        msg = `보병 최대 4기 · 사거리 +${BUNKER_RANGE_BONUS}\n` + (crew.length ? crew.map(p => `${TOWER_DEFS[p.k].name} Lv.${p.lvl} · 스킬 ${p.skills.length}/2`).join('\n') : '현재 주둔 병력 없음\n빈 벙커는 공격하지 않습니다.\n명령 아이콘으로 탑승·구매');
       } else {
         msg = `공격 ${st.dmg.toFixed(0)} · 사거리 ${st.range.toFixed(0)}\n공격 속도 ${(1 / st.rate).toFixed(1)}/초\n자동 스킬 ${t?.skills.length ?? 0}/${SKILL_SLOTS}`;
-        msg += t?.skills.length ? '\n' + t.skills.map(s => `${SKILL_DEFS[s.key].name} ${s.cd > 0 ? Math.ceil(s.cd) + '초' : '준비'}`).join('\n') : '\n상점에서 스킬을 장착하세요.';
+        msg += t?.skills.length ? '\n' + t.skills.map(s => `${SKILL_DEFS[s.key].name} ${s.cd > 0 ? Math.ceil(s.cd) + '초' : '준비'}`).join('\n') : '\n명령 아이콘으로 스킬 장착';
         if (t?.host) title += ' / 탑승';
       }
     } else {
       title = '기지 사령부';
       msg = this.unloading
         ? `${TOWER_DEFS[this.unloading.k].name} 하차 대기\n${this.touchUI ? '빈 구역을 두 번 탭하세요.\n✕ 취소' : '빈 구역을 클릭하세요.\nESC 취소'} · 병력은 탑승 유지`
-        : `FRONTIER COMMAND\n${this.kb('[B] ')}상점 · 유닛 9종\n벙커 → 병력 관리 → 탑승\n스킬 장착 → 자동 사용`;
+        : `FRONTIER COMMAND\n아이콘 선택 → 유닛 배치\n유닛 선택 → 강화·스킬\n빈 땅 → 유닛 보급`;
     }
     const cache = title + msg;
     if (this.uiCache.info !== cache) {
       this.uiCache.info = cache;
       this.unitTitle.setText(title); this.info.setText(msg);
       this.unitImage.setTexture(k ? 'unit_' + k : 'portrait');
+      if (this.statusImage) {
+        this.statusImage.setVisible(!!k);
+        if (k) this.statusImage.setTexture('unit_' + k);
+        this.info.setX(k ? 302 : 224).setWordWrapWidth(k ? 238 : 316);
+      }
       const ps = this.portraitSize;
       if (k) this.unitImage.setDisplaySize(ps, ps); else this.unitImage.setDisplaySize(ps, ps * 104 / 88);
     }
-    this.upBtn.show(!!t); this.sellBtn.show(!!t); this.statusTxt.setVisible(!t);
-    this.cancelBtn.show(!t && !this.over && !!(this.building || this.unloading));
-    this.skillBtn.show(!!t && !this.over);
-    this.skillBtn.set(t?.k === 'bunker' ? '병력 관리' : '스킬 장착');
-    this.statusTxt.setText(this.unloading ? (this.touchUI ? '빈 구역 두 번 탭 하차' : '빈 구역 클릭 하차 / ESC 취소')
-      : this.testMode ? `시험 작전 / ${this.repeat}회차`
-      : this.building ? (this.touchUI ? '빈 구역 두 번 탭 배치' : '빈 구역 클릭 배치 / ESC 취소')
-      : this.paused ? '작전 일시정지' : this.waveActive ? '방어 시스템 가동 중' : this.kb('SPACE') ? '명령 대기 / SPACE 출격' : '명령 대기 / 웨이브 시작');
-    if (t) {
-      const occupied = t.k === 'bunker' && t.passengers.some(Boolean);
-      this.upBtn.set(t.k === 'bunker' ? `${this.kb('[U] ')}병력 관리 · 4칸` : t.lvl < 3 ? `${this.kb('[U] ')}강화  ${this.upgradeCost(t)} 미네랄` : '최대 강화 완료');
-      this.upBtn.en(!this.over && (t.k === 'bunker' || t.lvl < 3 && this.gold >= this.upgradeCost(t)));
-      this.sellBtn.set(occupied ? '병력 하차 후 회수' : `${this.kb('[S] ')}회수 +${this.sellValue(t)}`);
-      this.sellBtn.en(!this.over && !occupied);
+    this.shopBtn.set(t ? '선택 해제' + this.kb(' [ESC]') : '일괄 관리' + this.kb(' [B]'));
+    this.commandCard.update(this.commands());
+  }
+
+  private selectUnit(id: string): void {
+    if (this.over) return;
+    const unit = this.towers.find(t => t.id === id);
+    if (!unit) return;
+    this.selected = unit; this.building = null; this.unloading = null; this.hover = null;
+  }
+
+  private commands(): (UnitCommand | undefined)[] {
+    const cells: (UnitCommand | undefined)[] = Array(9);
+    const make = (id: string, title: string, texture: string, detail: string, run: () => void,
+      enabled = true, price?: number): UnitCommand => ({ id, title, texture, detail, run, enabled: !this.over && enabled, price });
+    const cancel = make('cancel', '선택 해제', 'cmd_cancel', '선택과 배치 명령을 취소하고 유닛 보급으로 돌아갑니다.', () => this.cancelCommand());
+    cancel.hotkey = this.kb('ESC');
+    if (this.unloading) { cells[8] = cancel; return cells; }
+    const t = this.selected;
+    if (!t) return TOWER_KEYS.map((key, i) => ({
+      ...make('build:' + key, TOWER_DEFS[key].name, 'unit_' + key, TOWER_DEFS[key].desc + '\n아이콘 선택 후 빈 구역에 배치하세요.',
+        () => this.chooseBuild(key), this.gold >= TOWER_DEFS[key].cost || this.building === key, TOWER_DEFS[key].cost),
+      active: this.building === key, hotkey: this.kb(String(i + 1)),
+    }));
+    if (t.k === 'bunker') {
+      t.passengers.forEach((crew, i) => {
+        cells[i] = crew ? make('crew:' + crew.id, `${TOWER_DEFS[crew.k].name} Lv.${crew.lvl}`, 'unit_' + crew.k,
+          '탑승 병력을 선택합니다. 다음 명령 칸에서 하차 없이 강화·스킬을 장착할 수 있습니다.', () => this.selectUnit(crew.id))
+          : make('empty:' + i, '빈 사격구', 'cmd_empty', '마린·파이어뱃 아이콘으로 병력을 구매하면 자동으로 탑승합니다.', () => {}, false);
+      });
+      const slot = t.passengers.findIndex(p => !p);
+      (['marine', 'firebat'] as const).forEach((key, i) => {
+        cells[4 + i] = make('recruit:' + key + ':' + t.id, TOWER_DEFS[key].name + ' 탑승', 'unit_' + key,
+          slot < 0 ? '사격구 4칸이 모두 사용 중입니다.' : '병력 1기를 구매해 이 벙커의 빈 사격구에 바로 배치합니다.',
+          () => this.recruit(t.id, slot, key), slot >= 0 && this.gold >= TOWER_DEFS[key].cost, TOWER_DEFS[key].cost);
+      });
+      const plan = planOrder(this.shopState().units, { type: 'upgrade' }, { bunkerId: t.id });
+      cells[6] = make('upgrade-crew:' + t.id, '병력 일괄 강화', 'cmd_upgrade',
+        `${plan.ids.length}기를 각 1단계 강화합니다. 최대 강화 병력은 제외하고, 총비용이 부족하면 전체 보류합니다.`,
+        () => this.applyOrder({ type: 'upgrade' }, { bunkerId: t.id }), !!plan.ids.length && this.gold >= plan.cost, plan.cost);
+      cells[7] = make('garrison:' + t.id, '주둔 상세 관리', 'cmd_manage', '병력 이동·하차와 벙커별 일괄 스킬을 관리합니다.', () => this.openShop('garrison'));
+    } else {
+      const cost = this.upgradeCost(t), max = t.lvl >= MAX_UNIT_LEVEL;
+      cells[0] = { ...make('upgrade:' + t.id, '일반 강화', 'cmd_upgrade', max ? '최대 Lv.3 강화가 완료되었습니다.'
+        : `Lv.${t.lvl} → Lv.${t.lvl + 1}\n공격력 ×1.6 · 기본 사거리 +8% · 공격 간격 감소`,
+        () => this.upgradeUnit(t.id), !max && this.gold >= cost, max ? undefined : cost), hotkey: this.kb('U'), badge: max ? 'MAX' : 'Lv' + t.lvl, active: max };
+      SKILL_KEYS.filter(key => SKILL_DEFS[key].unit === t.k).forEach((key, i) => {
+        const def = SKILL_DEFS[key], owned = t.skills.find(s => s.key === key);
+        cells[1 + i] = { ...make('skill:' + key + ':' + t.id, def.name, 'cmd_' + key,
+          (owned ? '장착 완료 · 적을 만나면 자동 사용\n' : '누르면 영구 장착 · 이후 자동 사용\n') + def.desc,
+          () => this.equipSkill(key, t.id), !owned && t.skills.length < SKILL_SLOTS && this.gold >= def.cost, owned ? undefined : def.cost),
+          hotkey: this.kb(i === 0 ? 'Z' : 'X'), active: !!owned, badge: owned ? owned.cd > 0 ? Math.ceil(owned.cd) + 's' : 'AUTO' : '',
+          progress: owned ? 1 - owned.cd / def.cooldown : undefined };
+      });
+      cells[3] = make('sell:' + t.id, '유닛 회수', 'cmd_sell', `투자한 미네랄의 70%인 ${this.sellValue(t)}을 돌려받습니다.`,
+        () => { if (this.selected?.id === t.id) this.sell(); });
+      cells[3].hotkey = this.kb('S');
+      cells[4] = make('manage', '부대 일괄 관리', 'cmd_manage', '전장과 모든 벙커의 병력을 함께 강화하거나 스킬을 일괄 장착합니다.', () => this.openShop('manage'));
+      if (t.host) {
+        const hostId = t.host.id;
+        cells[6] = make('host:' + hostId, '벙커로 돌아가기', 'unit_bunker', '이 병력이 탑승한 벙커를 선택합니다.', () => this.selectUnit(hostId));
+        cells[7] = make('unload:' + t.id, '하차', 'cmd_unload', '아이콘을 누르고 빈 구역을 지정하세요. 지정할 때까지 벙커에 남습니다.', () => this.beginUnload(t.id));
+      }
+      cells[8] = cancel;
     }
+    if (t.k === 'bunker') {
+      const occupied = t.passengers.some(Boolean);
+      cells[8] = make('sell:' + t.id, '벙커 회수', 'cmd_sell', occupied ? '병력이 탑승해 있습니다. 모두 하차한 뒤 회수할 수 있습니다.'
+        : `${this.sellValue(t)} 미네랄을 돌려받습니다.`, () => { if (this.selected?.id === t.id) this.sell(); }, !occupied);
+    }
+    return cells;
+  }
+
+  private describeCommand(command?: UnitCommand): void {
+    const t = this.selected;
+    this.commandTitle.setText(this.unloading ? '하차 위치 지정' : t ? TOWER_DEFS[t.k].name + ' 명령' : '유닛 보급 / 9종');
+    this.commandHint.setVisible(MOBILE_LAYOUT || !!command);
+    this.commandTip?.setVisible(!!command);
+    const detail = command ? `${command.title}${command.price !== undefined ? ' · ◆ ' + command.price : ''}${!command.enabled && !command.active ? ' · 사용 불가' : ''}\n${MOBILE_LAYOUT ? command.detail.replace(/\n/g, ' ').slice(0, 48) : command.detail}`
+      : this.unloading ? '빈 구역을 지정해 병력을 하차시키세요.\n취소하면 벙커에 그대로 남습니다.'
+      : t ? t.k === 'bunker' ? '병력 초상화를 누르면 해당 병력의 강화·스킬 명령으로 전환됩니다.'
+        : '강화·스킬 아이콘을 누르면 바로 적용됩니다.\n장착한 스킬은 자동으로 사용합니다.'
+      : this.building ? `${TOWER_DEFS[this.building].name} 배치 대기\n빈 구역을 지정하세요.\nESC 또는 우클릭으로 취소`
+      : '구매할 유닛 아이콘을 선택한 뒤 빈 구역에 배치하세요.\n\n유닛을 선택하면 해당 유닛의 강화·스킬 명령이 표시됩니다.';
+    this.commandHint.setText(detail);
   }
 
   // ---------- 입력 ----------
@@ -534,7 +562,11 @@ export class GameScene extends Phaser.Scene {
   private onKey(e: KeyboardEvent): void {
     if (e.repeat) return;
     if (this.shopOpen) { if (e.key === 'Escape' || e.key.toLowerCase() === 'b') this.shop.close(); return; }
-    if (e.key.toLowerCase() === 'b') { this.openShop(); return; }
+    if (e.key.toLowerCase() === 'b') { this.openShop(this.selected?.k === 'bunker' ? 'garrison' : this.selected ? 'skills' : 'manage'); return; }
+    if ((e.key.toLowerCase() === 'z' || e.key.toLowerCase() === 'x') && this.selected && this.selected.k !== 'bunker') {
+      const skills = SKILL_KEYS.filter(key => SKILL_DEFS[key].unit === this.selected!.k);
+      this.equipSkill(skills[e.key.toLowerCase() === 'z' ? 0 : 1]); return;
+    }
     if (e.key >= '1' && e.key <= '9') this.chooseBuild(TOWER_KEYS[+e.key - 1], true);
     else if (e.key === 'Escape') this.cancelCommand();
     else if (e.key === ' ') this.startWave();
@@ -543,21 +575,8 @@ export class GameScene extends Phaser.Scene {
     else if (e.key === 's' || e.key === 'S') this.sell();
   }
 
-  /** 건설 명령의 쪽을 바꾼다. 양 끝에서는 반대쪽 끝으로 돈다. */
-  private setBuildPage(page: number): void {
-    const pages = Math.ceil(TOWER_KEYS.length / BUILD_PAGE_SIZE);
-    this.buildPage = (page % pages + pages) % pages;
-    this.towerBtns.forEach((b, i) => b.show(Math.floor(i / BUILD_PAGE_SIZE) === this.buildPage));
-    const label = `${this.buildPage + 1} / ${pages}`;
-    this.buildPageTxt?.setText(label);
-    this.buildPageBtn?.set(`${label} ▸`);
-  }
-
   private chooseBuild(k: TowerKey, force = false): void {
     if (this.over) return;
-    // 단축키나 상점으로 고른 유닛이 보이도록 그 유닛이 있는 쪽으로 넘긴다.
-    const page = Math.floor(TOWER_KEYS.indexOf(k) / BUILD_PAGE_SIZE);
-    if (page !== this.buildPage) this.setBuildPage(page);
     this.building = (!force && this.building === k) ? null : k;
     this.selected = null; this.unloading = null;
   }
@@ -582,7 +601,6 @@ export class GameScene extends Phaser.Scene {
     if (this.unloading) { this.finishUnload(cell.c, cell.r); if (p.wasTouch) this.hover = null; return; }
     if (t) {
       this.selected = this.selected === t ? null : t; this.building = null;
-      if (this.selected?.k === 'bunker') this.openShop('garrison');
     }
     else if (this.building) { this.placeTower(cell.c, cell.r); if (p.wasTouch) this.hover = null; }
     else this.selected = null;
@@ -652,7 +670,7 @@ export class GameScene extends Phaser.Scene {
     this.gold -= d.cost;
     const t = this.createTower(k, c, r);
     this.floatText(t.x, t.y, d.name, '#c7dfaa');
-    if (k === 'bunker') { this.building = null; this.selected = t; this.openShop('garrison'); }
+    if (k === 'bunker') { this.building = null; this.selected = t; }
     else if (this.gold < d.cost) this.building = null;
   }
 
@@ -724,7 +742,7 @@ export class GameScene extends Phaser.Scene {
 
   private upgrade(): void {
     const t = this.selected;
-    if (!this.over && t?.k === 'bunker') { this.openShop('garrison'); return; }
+    if (!this.over && t?.k === 'bunker') { this.applyOrder({ type: 'upgrade' }, { bunkerId: t.id }); return; }
     if (t) this.upgradeUnit(t.id);
   }
 

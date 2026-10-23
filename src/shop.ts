@@ -42,7 +42,7 @@ export class SupplyShop {
     this.dialog.addEventListener('cancel', e => { e.preventDefault(); this.close(); });
     this.dialog.addEventListener('keydown', e => {
       e.stopPropagation();
-      if (e.key.toLowerCase() === 'b') { e.preventDefault(); this.close(); }
+      if (e.key === 'Escape' || e.key.toLowerCase() === 'b') { e.preventDefault(); this.close(); }
     });
     this.dialog.addEventListener('click', e => {
       e.stopPropagation();
