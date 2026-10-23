@@ -245,39 +245,51 @@ const cannonHead = `
 `;
 
 const dragoonBase = `
-  <ellipse cx="32" cy="47" rx="29" ry="13" fill="#000" opacity=".4"/>
-  <g fill="none" stroke-linejoin="round" stroke-linecap="round">
-    <path d="m24 27-9-9-9 11 3 17m30-19 10-9 10 11-4 16" stroke="#44351e" stroke-width="8"/>
-    <path d="m24 26-9-9-9 11 3 17m30-19 10-9 10 11-4 16" stroke="url(#gold)" stroke-width="5.5"/>
-    <path d="m24 37-9 4-5 15m30-19 10 4 4 15" stroke="#44351e" stroke-width="9"/>
-    <path d="m24 36-9 4-5 15m30-19 10 4 4 15" stroke="url(#gold)" stroke-width="6.5"/>
-    <path d="m14 18-6 10 2 10m40-20 7 10-3 10m-40 4-3 10m41-10 2 10" stroke="#ffe7a3" stroke-width="1"/>
+  <defs>
+    <linearGradient id="dragoonGold" x1="0" y1="0" x2=".7" y2="1"><stop stop-color="#fff0b6"/><stop offset=".22" stop-color="#d5bd68"/><stop offset=".5" stop-color="#a18a3d"/><stop offset=".8" stop-color="#685c2a"/><stop offset="1" stop-color="#302d1c"/></linearGradient>
+    <linearGradient id="dragoonSilver" x1="0" y1="0" x2=".5" y2="1"><stop stop-color="#e4e4d6"/><stop offset=".3" stop-color="#a4b0ad"/><stop offset=".6" stop-color="#667681"/><stop offset="1" stop-color="#2d3b4b"/></linearGradient>
+  </defs>
+  <ellipse cx="32" cy="52" rx="27" ry="10" fill="#000" opacity=".35"/>
+  <g stroke-linejoin="round">
+    <!-- High rear leg arches, with gold shells over dark articulated joints. -->
+    <path d="M23 28 14 24 7 16 4 21 6 32 11 34 14 28 24 33Zm18 0 9-4 7-8 3 5-2 11-5 2-3-6-10 5Z" fill="#1b2826" stroke="#111c1c" stroke-width="1.2"/>
+    <path d="M23 26C20 17 20 8 13 7 6 6 3 13 5 21l5 7 10 3Z" fill="url(#dragoonGold)" stroke="#433b25" stroke-width="1.2"/>
+    <path d="M41 26C44 17 44 8 51 7c7-1 10 6 8 14l-5 7-10 3Z" fill="url(#dragoonGold)" stroke="#433b25" stroke-width="1.2"/>
+    <path d="M7 11q4-5 8 0l4 12M57 11q-4-5-8 0l-4 12" fill="none" stroke="#fff1b9" stroke-width="1"/>
+    <path d="M5 15 4 5 7 2l2 12Zm50-1 2-12 3 3-1 10Z" fill="#272d25" stroke="#111e1d" stroke-width=".9"/>
+    <path d="m12 15 6 2-2 9-6-4Zm40 0-6 2 2 9 6-4Z" fill="#42472d" stroke="#c0ad67" stroke-width=".7"/>
+    <path d="m13 17 3 1-1 6m36-7-3 1 1 6" fill="none" stroke="#b9ad79" stroke-width=".7"/>
+    <path d="M5 26 10 28l-1 6-5 3-2-3Zm54 0-5 2 1 6 5 3 2-3Z" fill="#192a28" stroke="#72817b" stroke-width=".6"/>
+    <!-- Long front limbs: rounded hip armour, bent knees and narrow black feet. -->
+    <path d="M24 30 16 37 10 51 9 60l4 2 5-8 2-10 9-8Zm16 0 8 7 6 14 1 9-4 2-5-8-2-10-9-8Z" fill="#182927" stroke="#0e1c1b" stroke-width="1.2"/>
+    <path d="M25 29Q14 27 10 39l2 7 10-3 7-8Z" fill="url(#dragoonGold)" stroke="#51462a" stroke-width="1"/>
+    <path d="M39 29q11-2 15 10l-2 7-10-3-7-8Z" fill="url(#dragoonGold)" stroke="#51462a" stroke-width="1"/>
+    <path d="M14 37q2-5 8-5m28 5q-2-5-8-5" fill="none" stroke="#ffedac" stroke-width="1.1"/>
+    <path d="m13 40 6-3 2 4-5 3Zm38 0-6-3-2 4 5 3Z" fill="#978447" stroke="#b6ad78" stroke-width=".5"/>
+    <path d="m12 44 5 1-2 8-5-1Zm40 0-5 1 2 8 5-1Z" fill="#3b4b3b" stroke="#9a9e79" stroke-width=".65"/>
+    <path d="m12 48 3 1m-4 2 3 1m38-4-3 1m4 2-3 1" stroke="#182724" stroke-width="1.2"/>
+    <path d="m10 53 5 2-1 6-4 2-3-4Zm44 0-5 2 1 6 4 2 3-4Z" fill="#1a2928" stroke="#091c1c" stroke-width=".9"/>
+    <path d="m10 55 2 1-1 4m43-5-2 1 1 4" fill="none" stroke="#667972" stroke-width=".8"/>
+    <!-- Silver central carapace, gold vertical crest and underslung abdomen. -->
+    <path d="M28 36h8l2 8-5 6-5-5-2-5Z" fill="url(#dragoonSilver)" stroke="#344543" stroke-width=".8"/>
+    <path d="m29 41 6-1 1 4-4 3-3-2Z" fill="url(#dragoonGold)" stroke="#6b633a" stroke-width=".5"/>
+    <path d="M19 19 26 15h12l7 4-2 15-11 9-11-9Z" fill="url(#dragoonSilver)" stroke="#283946" stroke-width="1.2"/>
+    <path d="M21 21 26 18h12l5 3-2 11-9 7-9-7Z" fill="#3c4d5b" stroke="#c7d0c6" stroke-width=".7"/>
+    <path d="m22 24 5 2-1 8-4-4Zm20 0-5 2 1 8 4-4Z" fill="#8d9b9e"/>
+    <path d="M28 24h8l-1 10-3 3-3-3Z" fill="url(#dragoonGold)" stroke="#625e39" stroke-width=".7"/>
+    <path d="m31 25 2 1-1 3 2 1-3 1 1 3" fill="none" stroke="#fff0a5" stroke-width="1.1"/>
+    <path d="M27 19v-5l3-2h4l3 2v5Z" fill="url(#dragoonSilver)" stroke="#253b43" stroke-width=".8"/>
+    <path d="M30 14v4m4-4v4" stroke="#344c58" stroke-width="1"/>
+    <path d="m20 26-4-1m28 1 4-1" stroke="#c6d0c3" stroke-width="1.6"/>
+    <g fill="#d2d6b7" stroke="#556352" stroke-width=".4"><circle cx="24" cy="21" r=".65"/><circle cx="40" cy="21" r=".65"/><circle cx="25" cy="33" r=".65"/><circle cx="39" cy="33" r=".65"/></g>
   </g>
-  <g fill="#b88d3f" stroke="#5c4420" stroke-width=".8">
-    <path d="m4 43 6-3 4 6-6 4-5-1Zm46 1 5-4 6 5 1 4-8 2ZM4 55l8-4 6 4-3 5-11 1Zm44 0 5-4 9 5-1 5-12-1Z"/>
-  </g>
-  <g fill="#8b6b31" stroke="#e9ca7e" stroke-width=".7">
-    <circle cx="15" cy="18" r="3"/><circle cx="49" cy="18" r="3"/><circle cx="15" cy="41" r="3.5"/><circle cx="49" cy="41" r="3.5"/>
-  </g>
-  <path d="M19 26 31 19 44 26 44 39 32 47 19 39Z" fill="url(#goldDark)" stroke="#58431f"/>
-  <path d="m24 38 8 4 8-4v4l-8 5-8-5Z" fill="#304f6c"/>
-  <path d="m28 43 4 2 4-2" stroke="#77d8f4" stroke-width="1.5"/>
 `;
 const dragoonHead = `
-  <ellipse cx="32" cy="29" rx="18" ry="14" fill="#1e3e56" stroke="#51401e" stroke-width="1.2"/>
-  <path d="M15 30C12 19 20 11 31 10 44 10 52 20 49 31L39 38 23 38Z" fill="url(#gold)" stroke="#735827" stroke-width="1.2"/>
-  <path d="M16 25Q21 13 31 13L27 29 19 34Z" fill="#e8cb7e"/>
-  <path d="M33 12q12 1 15 13l-7 9-5-5Z" fill="#b99343"/>
-  <path d="M31 11 27 28 32 34 37 28 34 11Z" fill="#2d4c68" stroke="#7baab4" stroke-width=".65"/>
-  <path d="m31 15-2 10 3 5 3-5-2-10Z" fill="url(#blue)"/>
-  <path d="M18 31 25 27 32 34 39 27 47 31 42 40 32 45 22 40Z" fill="url(#goldDark)" stroke="#614b23"/>
-  <path d="m19 30 6-3 5 5-7 5Zm16 2 4-5 7 3-6 7Z" fill="url(#gold)"/>
-  <ellipse cx="33" cy="35" rx="9" ry="8" fill="#173653" stroke="#d7c07b" stroke-width="1.3"/>
-  <ellipse cx="33" cy="35" rx="7" ry="6" fill="url(#blue)"/>
-  <ellipse cx="33" cy="35" rx="12" ry="10" fill="url(#energy)" opacity=".45"/>
-  <path d="M19 22q3-6 7-7m13 1 5 6" stroke="#fff0b2" stroke-width="1" fill="none"/>
-  <path d="m21 35 4 5m16-5-4 5" stroke="#f0d382" stroke-width="1.3"/>
+  <ellipse cx="32" cy="20" rx="5" ry="3.8" fill="#1b303f" stroke="#b6c6c1" stroke-width=".8"/>
+  <ellipse cx="32" cy="20" rx="3.2" ry="2.4" fill="#2c6799" stroke="#72b4dc" stroke-width=".5"/>
+  <path d="M30 20h4" stroke="#c6f6ff" stroke-width=".8"/>
 `;
+export const DRAGOON_EMITTER = { x: 0, y: -12 };
 
 // The powered suit stays planted; only the rifle and gripping hands track targets.
 const marineBase = `

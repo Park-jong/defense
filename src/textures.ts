@@ -31,7 +31,7 @@ export function makeTextures(scene: Phaser.Scene): void {
     g.fillStyle(0xffe6a3).fillEllipse(12, 6, 8, 5);
     g.fillStyle(0xffffff).fillEllipse(14, 6, 4, 3);
   });
-  for (const [key, radius] of [['frost', 6], ['sniper', 8]] as const) {
+  for (const [key, radius] of [['frost', 6]] as const) {
     const size = radius * 4, c = size / 2;
     tex('shot_' + key, size, size, g => {
       for (let r = radius * 2; r > 0; r -= 2) g.fillStyle(0x449eff, .04 + (1 - r / (radius * 2)) * .09).fillCircle(c, c, r);
@@ -41,6 +41,24 @@ export function makeTextures(scene: Phaser.Scene): void {
       g.lineStyle(1, 0xd8ffff, .8).strokeCircle(c, c, radius + 1);
     });
   }
+  tex('dragoon_charge', 48, 48, g => {
+    for (let r = 22; r > 2; r -= 2) g.fillStyle(0x398dff, .035 + (1 - r / 22) * .06).fillCircle(24, 24, r);
+    g.lineStyle(1.2, 0x6aceff, .8).lineBetween(11, 15, 17, 11).lineBetween(17, 11, 21, 16)
+      .lineBetween(29, 12, 36, 18).lineBetween(36, 18, 31, 23).lineBetween(14, 29, 20, 35).lineBetween(20, 35, 25, 30);
+    g.fillStyle(0x377ee9, .7).fillCircle(24, 24, 10);
+    g.fillStyle(0x8de5ff).fillCircle(24, 24, 6);
+    g.fillStyle(0xf0ffff).fillCircle(24, 24, 3.5);
+  });
+  tex('shot_sniper', 48, 32, g => {
+    g.fillStyle(0x3d8fff, .18).fillTriangle(1, 16, 25, 6, 25, 26);
+    g.fillStyle(0x83dfff, .45).fillTriangle(7, 16, 24, 12, 24, 20);
+    for (let r = 15; r > 2; r -= 2) g.fillStyle(0x398dff, .035 + (1 - r / 15) * .07).fillCircle(25, 16, r);
+    g.fillStyle(0x356fdf, .85).fillCircle(25, 16, 8);
+    g.fillStyle(0x6bd6ff).fillCircle(25, 16, 5.5);
+    g.fillStyle(0xf1ffff).fillCircle(26, 15, 3.5);
+    g.lineStyle(1, 0xc0f4ff, .9).lineBetween(15, 9, 20, 6).lineBetween(20, 6, 23, 10)
+      .lineBetween(30, 7, 35, 12).lineBetween(35, 12, 31, 17).lineBetween(18, 23, 24, 26).lineBetween(24, 26, 28, 22);
+  });
   tex('shot_marine', 18, 6, g => {
     g.fillStyle(0xffd571, .25).fillEllipse(8, 3, 16, 6);
     g.fillStyle(0xffedac).fillRect(4, 2, 10, 2);
