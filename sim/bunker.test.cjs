@@ -488,3 +488,52 @@ test('테스트 모드는 50스테이지를 반복하며 일반 모드의 최종
     assert.equal(s.over, false); assert.equal(s.waveActive, false);
   }
 });
+
+test('야마토는 앞의 약한 적보다 사거리 안의 보스를 우선하고 죽거나 범위 밖인 보스는 제외한다', () => {
+  const s = setup(), t = place(s, 'cruiser'), front = enemy(t.x + 30, t.y), boss = enemy(t.x + 150, t.y);
+  front.hp = 50; boss.type = 'boss'; boss.hp = 5000;
+  const tank = enemy(t.x + 100, t.y), dead = enemy(t.x + 60, t.y), outside = enemy(t.x + s.stats(t).range + 1, t.y);
+  tank.hp = 100000; dead.type = outside.type = 'boss'; dead.dead = true;
+  s.enemies = [front, tank, boss, dead, outside];
+  const hits = []; s.damageNumbers = { hit: (target, amount, kind) => hits.push({ target, amount, kind }) };
+  s.autoSkill(t, 'yamato', front);
+  assert.equal(boss.hp, 5000 - 864); assert.equal(front.hp, 50); assert.equal(tank.hp, 100000);
+  assert.equal(dead.hp, 10000); assert.equal(outside.hp, 10000);
+  assert.deepEqual(hits, [{ target: boss, amount: 864, kind: 'skill' }]);
+});
+
+test('보스가 없으면 야마토는 남은 체력이 가장 높은 적을 골라 강화·버프·취약 보정을 반영한다', () => {
+  const s = setup(), t = place(s, 'cruiser'); assert.equal(s.upgradeUnit(t.id), true);
+  t.buffs.push({ left: 6, haste: 1.3, power: 1.3 });
+  const front = enemy(t.x + 30, t.y), tough = enemy(t.x + 80, t.y), outside = enemy(t.x + s.stats(t).range + 1, t.y);
+  front.hp = 1000; tough.hp = 20000; tough.vulnerableT = 2; outside.type = 'boss';
+  s.enemies = [front, tough, outside];
+  const damage = s.stats(t).dmg * 12 * 1.35; s.autoSkill(t, 'yamato', front);
+  assert.equal(tough.hp, 20000 - damage); assert.equal(front.hp, 1000); assert.equal(outside.hp, 10000);
+});
+
+test('융단 폭격은 세 지점만 폭격하고 반경 경계·중첩 범위·사거리 밖 주변 피해를 계산한다', () => {
+  const s = setup(), t = place(s, 'cruiser'), offsets = [40, 110, 180, 220, 240, 251];
+  s.enemies = offsets.map(x => enemy(t.x + x, t.y));
+  const rings = [], hits = []; s.skillRing = (x, y, radius) => rings.push({ x, y, radius });
+  s.damageNumbers = { hit: (target, amount, kind) => hits.push({ target, amount, kind }) };
+  s.autoSkill(t, 'bombard', s.enemies[0]);
+  assert.deepEqual(rings.map(r => [r.x - t.x, r.radius]), [[40, 70], [110, 70], [180, 70]]);
+  assert.deepEqual(s.enemies.map(e => 10000 - e.hp), [432, 648, 432, 216, 216, 0]);
+  assert.equal(hits.length, 9); assert.ok(hits.every(h => h.amount === 216 && h.kind === 'skill'));
+});
+
+test('배틀크루저는 구매한 스킬을 재사용 시간에 맞춰 자동 반복하고 기본 공격도 함께 유지한다', () => {
+  const s = setup(), t = place(s, 'cruiser'), target = enemy(t.x + 100, t.y);
+  target.hp = 1000000; target.type = 'boss'; s.enemies = [target];
+  assert.equal(s.equipSkill('yamato', t.id), true); assert.equal(s.equipSkill('bombard', t.id), true);
+  assert.equal(s.gold, 2000 - 300 - 230 - 200);
+  const casts = { yamato: 0, bombard: 0 }, auto = s.autoSkill.bind(s); let shots = 0;
+  s.autoSkill = (unit, key, enemy) => { casts[key]++; auto(unit, key, enemy); };
+  // Ignore projectile travel in this fixed-target test; keep actual attack and skill timers.
+  s.fire = (_unit, enemy, stats) => { shots++; s.damageEnemy(enemy, stats.dmg); };
+  for (let frame = 0; frame < 30 * 60; frame++) s.towerAct(t, 1 / 60);
+  assert.deepEqual(casts, { yamato: 3, bombard: 3 }); assert.ok(shots >= 36 && shots <= 38);
+  assert.equal(1000000 - target.hp, shots * 72 + 3 * 864 + 3 * 216);
+  assert.equal(t.skills.length, 2); assert.equal(s.gold, 2000 - 300 - 230 - 200);
+});

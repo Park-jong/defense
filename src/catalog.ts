@@ -20,8 +20,8 @@ export const SKILL_DEFS = {
   ignite: { name: '네이팜 탄두', unit: 'firebat', cost: 100, cooldown: 10, color: 0xf17d5e, icon: '▲', desc: '적 최대 3기에게 6초간 매초 공격력 150% 화상 피해.' },
   storm: { name: '사이오닉 폭주', unit: 'templar', cost: 170, cooldown: 12, color: 0x67caff, icon: 'ϟ', desc: '표적 위치 반경 85에 4초간 전기장을 방출. 0.5초마다 공격력 90% 피해.' },
   warp: { name: '에너지 공명', unit: 'templar', cost: 140, cooldown: 15, color: 0x9cefff, icon: '◉', desc: '자신과 반경 150의 아군에게 6초간 공격력 30%, 공격 속도 30% 증가.' },
-  yamato: { name: '야마토 포', unit: 'cruiser', cost: 230, cooldown: 16, color: 0xffb681, icon: '⊕', desc: '표적 하나에게 공격력 800%의 압축 에너지 포격.' },
-  bombard: { name: '융단 폭격', unit: 'cruiser', cost: 200, cooldown: 13, color: 0xff8d78, icon: '⋮', desc: '최대 3기의 적 위치에 각각 반경 55, 공격력 220% 범위 폭격.' },
+  yamato: { name: '야마토 포', unit: 'cruiser', cost: 230, cooldown: 12, color: 0xffb681, icon: '⊕', desc: '사거리 안의 보스를 우선해 공격력 1200% 포격. 보스가 없으면 현재 체력이 가장 높은 적을 공격합니다.' },
+  bombard: { name: '융단 폭격', unit: 'cruiser', cost: 200, cooldown: 10, color: 0xff8d78, icon: '⋮', desc: '최대 3기의 적 위치에 각각 반경 70, 공격력 300% 범위 폭격.' },
 } satisfies Record<string, SkillDef>;
 
 export type SkillKey = keyof typeof SKILL_DEFS;

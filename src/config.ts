@@ -73,7 +73,7 @@ export const TOWER_DEFS = {
   marine: { name: '마린', faction: 'terran', role: '보병 / 속사', cost: 65, range: 140, dmg: 8, rate: .22, color: 0x7897b8, proj: 0xffeb9c, barrel: 17, desc: '가우스 소총을 연사하는 보병. 전투 자극제로 화력을 끌어올립니다.' },
   firebat: { name: '파이어뱃', faction: 'terran', role: '화염 / 범위', cost: 110, range: 88, dmg: 14, rate: .4, splash: 32, color: 0xc54437, proj: 0xff9a45, barrel: 28, desc: '붉은 중장갑과 연료통을 갖춘 화염 보병. 양팔의 화염방사기를 겨눠 몰려오는 적을 태웁니다.' },
   templar: { name: '아칸', faction: 'protoss', role: '에너지 / 범위 공격', cost: 190, range: 160, dmg: 22, rate: 1.2, color: 0x54bdff, proj: 0x9cefff, barrel: 12, splash: 48, desc: '푸른 에너지에 둘러싸인 사이오닉 전사. 플라즈마를 방출해 반경 48의 적을 함께 타격합니다.' },
-  cruiser: { name: '배틀크루저', faction: 'terran', role: '중화력 / 범위', cost: 300, range: 195, dmg: 46, rate: 1.1, splash: 38, color: 0xa2b4c2, proj: 0xff8a76, barrel: 24, desc: '방어 구역에 정박하는 전투순양함. 야마토 포와 융단 폭격을 사용합니다.' },
+  cruiser: { name: '배틀크루저', faction: 'terran', role: '중화력 / 범위', cost: 300, range: 230, dmg: 72, rate: .8, splash: 55, color: 0xa2b4c2, proj: 0xff8a76, barrel: 24, desc: '장거리 레이저 포격으로 밀집한 적을 제압하는 전투순양함. 야마토 포는 보스를 우선 공격하며, 융단 폭격으로 전선을 정리합니다.' },
   bunker: { name: '벙커', faction: 'terran', role: '주둔 / 보병 4기', cost: 40, range: 0, dmg: 0, rate: 1, color: 0x8f9d76, proj: 0xffe8a3, barrel: 0, desc: '빈 벙커는 공격하지 않습니다. 마린·파이어뱃 최대 4기 탑승, 각 병력의 사거리 +24. 스킬도 자동 사용합니다.' },
 } satisfies Record<string, TowerDef>;
 

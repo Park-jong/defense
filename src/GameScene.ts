@@ -1107,16 +1107,20 @@ export class GameScene extends Phaser.Scene {
         this.skillRing(t.x, t.y, 150, d.color);
         break;
       case 'yamato': {
-        const angle = Math.atan2(target.y - t.y, target.x - t.x), reach = 29 * (UNIT_WORLD_SCALE.cruiser ?? 1);
+        const victim = nearby.reduce((best, e) => {
+          if ((e.type === 'boss') !== (best.type === 'boss')) return e.type === 'boss' ? e : best;
+          return e.hp > best.hp ? e : best;
+        }, target);
+        const angle = Math.atan2(victim.y - t.y, victim.x - t.x), reach = 29 * (UNIT_WORLD_SCALE.cruiser ?? 1);
         const bow = { x: t.x + Math.cos(angle) * reach, y: t.y + Math.sin(angle) * reach };
         const core = this.add.circle(bow.x, bow.y, 6, 0xffda8a, .85).setStrokeStyle(2, 0xfff2c8).setDepth(12);
         this.tweens.add({ targets: core, scale: 2.5, alpha: 0, duration: 360, onComplete: () => core.destroy() });
-        this.skillBeam(bow, target, d.color, 9); this.skillRing(target.x, target.y, 55, d.color);
-        this.damageEnemy(target, st.dmg * 8, 'skill'); this.fxBoom.explode(30, target.x, target.y);
+        this.skillBeam(bow, victim, d.color, 9); this.skillRing(victim.x, victim.y, 55, d.color);
+        this.damageEnemy(victim, st.dmg * 12, 'skill'); this.fxBoom.explode(30, victim.x, victim.y);
         break;
       }
       case 'bombard':
-        for (const e of nearby.slice(0, 3)) area(e.x, e.y, 55, 2.2);
+        for (const e of nearby.slice(0, 3)) area(e.x, e.y, 70, 3);
         break;
     }
   }
