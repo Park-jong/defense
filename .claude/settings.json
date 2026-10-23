@@ -6,10 +6,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/inject-agent-summary.cjs\"",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/inject-agent-summary.js\"",
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell",
+        "hooks": [{ "type": "command", "command": "node \"$(git rev-parse --show-toplevel)/.claude/hooks/git-workflow.cjs\" before", "timeout": 90 }]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [{ "type": "command", "command": "node \"$(git rev-parse --show-toplevel)/.claude/hooks/git-workflow.cjs\" finish", "timeout": 30 }]
       }
     ]
   }

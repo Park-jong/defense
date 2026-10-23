@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "test:git-hooks": "node --test sim/git-workflow.test.cjs",
+    "test:bunker": "node --test sim/bunker.test.cjs",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },

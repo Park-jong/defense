@@ -20,3 +20,6 @@ Thumbs.db
 # 개인 로컬 설정과 에이전트 요약 산출물만 제외한다.
 .claude/settings.local.json
 agent-summaries/
+
+# Claude Code가 만드는 개인 worktree
+.claude/worktrees/
