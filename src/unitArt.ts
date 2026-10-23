@@ -376,26 +376,71 @@ const marineHead = `
     <path d="M25 36h3m-3 2h3m-3 2h3M45 37h6m-6 2h6m-5 2h4" stroke="#9ba694" stroke-width=".9"/>
   </g>
 `;
+// Offsets from the weapon pivot, matching the two nozzle openings in firebatHead.
+export const FIREBAT_MUZZLES = [{ x: 28, y: -11 }, { x: 28, y: 11 }];
+
 const firebatBase = `
-  <ellipse cx="32" cy="53" rx="24" ry="8" fill="#000" opacity=".4"/>
-  <path d="m20 35-5 18-5 3v5h17l5-20 5 20h17v-5l-5-3-5-18Z" fill="#6c3c2d" stroke="#2b2422" stroke-width="1.4"/>
-  <path d="m20 39-3 12 10 2 3-12m5 0 3 12 10-2-4-12" fill="url(#red)"/>
-  <path d="M17 20 32 15 47 20 46 40 32 48 18 40Z" fill="url(#red)" stroke="#452e25" stroke-width="1.3"/>
-  <path d="M22 24v14m20-14v14" stroke="#252d2a" stroke-width="5"/>
-  <path d="M22 24v9m20-9v9" stroke="#d2a666" stroke-width="2.5"/>
-  <path d="m27 32 5-3 6 3-6 9Z" fill="#d5c28a" stroke="#71502d"/>
-  <path d="m29 33 3-2 3 2-3 5Z" fill="#272c26"/>
-  <path d="M11 24v19m42-19v19" stroke="#2c3029" stroke-width="9"/>
-  <path d="M11 25v13m42-13v13" stroke="#a86c3f" stroke-width="6"/>
+  <defs>
+    <linearGradient id="firebatArmor" x1="0" y1="0" x2=".6" y2="1"><stop stop-color="#f2927b"/><stop offset=".2" stop-color="#c63f35"/><stop offset=".55" stop-color="#8d2428"/><stop offset="1" stop-color="#381e25"/></linearGradient>
+    <linearGradient id="firebatMetal" x1="0" y1="0" x2=".4" y2="1"><stop stop-color="#c7c9ba"/><stop offset=".35" stop-color="#7c8580"/><stop offset="1" stop-color="#303b3d"/></linearGradient>
+    <linearGradient id="firebatFuel" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#242a28"/><stop offset=".35" stop-color="#a28b54"/><stop offset=".6" stop-color="#786944"/><stop offset="1" stop-color="#252c2c"/></linearGradient>
+  </defs>
+  <ellipse cx="31" cy="57" rx="26" ry="6" fill="#000" opacity=".4"/>
+  <g stroke-linejoin="round">
+    <!-- Twin fuel cylinders and heavy hoses rise behind the armoured collar. -->
+    <path d="M15 22V9l5-6h22l6 6v15Z" fill="#141d23" stroke="#070e14" stroke-width="1.2"/>
+    <rect x="17" y="4" width="10" height="23" rx="4" fill="url(#firebatFuel)" stroke="#111c1d"/>
+    <rect x="37" y="4" width="10" height="23" rx="4" fill="url(#firebatFuel)" stroke="#111c1d"/>
+    <path d="M19 8h6m14 0h6M18 18h8m12 0h8" stroke="#c0b283" stroke-width="1.4"/>
+    <path d="M18 13Q6 8 6 26m39-13q12-5 12 13" fill="none" stroke="#0a1115" stroke-width="5"/>
+    <path d="M17 13Q7 10 7 24m38-11q10-3 11 11" fill="none" stroke="#626d63" stroke-width="1" stroke-dasharray="1 2"/>
+    <!-- Thick red greaves, black joints and broad metal boots. -->
+    <path d="M18 34h12l1 9-4 16H12l1-12Zm15 0h12l5 13 1 12H36l-4-16Z" fill="#141c23" stroke="#080f16" stroke-width="1.2"/>
+    <path d="m18 37 10 1-3 10-10-1Zm17 1 9-1 4 10-10 2Z" fill="url(#firebatArmor)" stroke="#ed8671" stroke-width=".6"/>
+    <path d="M15 45h11l2 10-3 4H12l-1-5Zm23 0h10l5 10-3 4H37l-2-6Z" fill="url(#firebatArmor)" stroke="#151d24"/>
+    <path d="M15 48h9m-10 3h10m15-3h9m-8 3h10" stroke="#68252a" stroke-width="1.8"/>
+    <path d="M12 55h12l4 4v3H9v-4Zm25 0h13l5 3v4H35v-3Z" fill="url(#firebatMetal)" stroke="#111a20"/>
+    <path d="M12 59h13m12 0h15m-36-2v4m5-4v4m20-4v4m5-4v4" stroke="#2e3839" stroke-width=".9"/>
+    <!-- Compact torso and huge rounded shoulder armour identify the SC1 suit. -->
+    <path d="M17 20 27 15h10l10 6-2 18-9 7h-9l-10-7Z" fill="url(#firebatArmor)" stroke="#121820" stroke-width="1.2"/>
+    <path d="m21 23 9-3 11 4-2 8-8 4-9-4Z" fill="url(#firebatArmor)" stroke="#ec8d72" stroke-width=".7"/>
+    <path d="M22 30h18m-16 4h14m-12 4h10" stroke="#372029" stroke-width="2"/>
+    <path d="m27 24 4-2 5 3-4 6-5-3Z" fill="#2c3131" stroke="#c6ad69" stroke-width=".6"/>
+    <path d="m31 24-2 4 3-1 1 2 1-3Z" fill="#f3bc55"/>
+    <path d="M21 16Q15 8 8 11 1 13 2 25l5 7 13-3 5-9Zm19 0q6-8 13-5 8 4 7 14l-6 7-13-3-5-9Z" fill="url(#firebatArmor)" stroke="#101820" stroke-width="1.2"/>
+    <path d="M4 21q1-10 8-9l8 5m20 0 8-5q7-1 9 9" fill="none" stroke="#f7a282" stroke-width=".9"/>
+    <g fill="#1a2528" stroke="url(#firebatMetal)" stroke-width="1.4"><ellipse cx="12" cy="22" rx="5" ry="5.5"/><ellipse cx="50" cy="22" rx="5" ry="5.5"/></g>
+    <path d="M9 20h6m-6 2h6m-5 2h4m30-4h6m-6 2h6m-5 2h4" stroke="#89918a" stroke-width=".8"/>
+    <path d="M5 31 12 29l9 7-3 8-11-3-4-5Zm40 4 8-6 7 3 1 6-9 6-9-3Z" fill="url(#firebatArmor)" stroke="#151c23"/>
+    <!-- Recessed amber visor and black respirator remain fixed with the body. -->
+    <path d="M22 18V12q1-9 10-9 9 1 10 9v7l-5 7H27Z" fill="#20272b" stroke="#0d141b" stroke-width="1.2"/>
+    <path d="M24 13q1-8 8-8t8 8l-4 4h-9Z" fill="url(#firebatArmor)" stroke="#da8c76" stroke-width=".7"/>
+    <path d="m25 14 7-2 7 2-2 5-5 2-6-3Z" fill="#0a161c" stroke="#c4b28e" stroke-width=".7"/>
+    <path d="m27 15 5-1 5 1-2 2-4 1-4-1Z" fill="#efb34c"/><path d="m28 15 3-.5" stroke="#fff2a0" stroke-width=".8"/>
+    <path d="m27 20 5-2 5 2-1 5-4 3-5-3Z" fill="url(#firebatMetal)" stroke="#152028" stroke-width=".7"/>
+    <path d="M29 21h6m-6 2h6m-5 2h4" stroke="#111c21" stroke-width="1"/>
+    <g fill="#a0a399"><circle cx="7" cy="28" r=".7"/><circle cx="18" cy="17" r=".7"/><circle cx="44" cy="17" r=".7"/><circle cx="55" cy="28" r=".7"/></g>
+  </g>
 `;
 const firebatHead = `
-  <path d="M22 15Q23 6 32 6q10 0 11 9v14l-10 6-11-6Z" fill="url(#red)" stroke="#4e3025"/>
-  <path d="m24 17 8-4 9 4-1 7-8 3-8-3Z" fill="#1b2829" stroke="#e0a676" stroke-width="1"/>
-  <path d="m26 18 6-2 7 2-1 3-6 2-6-2Z" fill="#ffd477"/>
-  <path d="m27 28 5-2 6 2-1 5-5 2-5-2Z" fill="#33413a"/>
-  <path d="m10 29 7-3 37 7v8l-7 4-37-8Zm4 13 7-3 35 9v7l-7 3-35-8Z" fill="url(#gun)" stroke="#3b3226" stroke-width="1"/>
-  <path d="m45 32 10 2v8l-10 3Zm2 15 11 2v8l-11 3Z" fill="#72523a" stroke="#d2a46a" stroke-width=".8"/>
-  <path d="m51 36 4 1v3l-4 1m2 10 5 1v3l-5 1" stroke="#ffb85c" stroke-width="2"/>
+  <defs>
+    <linearGradient id="firebatGauntlet" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ed937a"/><stop offset=".25" stop-color="#c33c32"/><stop offset=".7" stop-color="#7c262b"/><stop offset="1" stop-color="#2b2027"/></linearGradient>
+    <linearGradient id="firebatNozzle" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c6c9b4"/><stop offset=".35" stop-color="#6b7773"/><stop offset="1" stop-color="#1b282c"/></linearGradient>
+  </defs>
+  <g stroke-linejoin="round">
+    <!-- Two separate cylindrical gauntlets point along +X, rotating without the suit. -->
+    <path d="m17 32 7-5 11-5 7 4-10 8-8 5-7-2Zm1 3 8 1 13 5-2 9-14-6-8-6Z" fill="url(#firebatGauntlet)" stroke="#101b22" stroke-width="1"/>
+    <path d="m24 31 11-6m-10 16 9 4" stroke="#e69a7d" stroke-width=".8"/>
+    <path d="M36 18 41 13 49 14 54 19v6l-6 5-10-2-4-5Zm-2 22 5-5 10 1 5 5v6l-6 5-12-2-4-5Z" fill="url(#firebatGauntlet)" stroke="#101b22" stroke-width="1.1"/>
+    <path d="m39 17 8 1m-10 3 10 1m-10 17 10 1m-11 3 11 1" stroke="#ed9b78" stroke-width=".65"/>
+    <path d="M42 15v13m-3 9v13" stroke="#541f26" stroke-width="2"/>
+    <path d="M46 16h5v12h-5Zm0 22h5v12h-5Z" fill="url(#firebatNozzle)" stroke="#1a2427" stroke-width=".6"/>
+    <path d="M46 18h11l3 2v3l-3 2H46Zm0 22h11l3 2v3l-3 2H46Z" fill="url(#firebatNozzle)" stroke="#101c22" stroke-width=".8"/>
+    <path d="M49 19v5m4-5v5m-4 17v5m4-5v5" stroke="#212c30" stroke-width="1.4"/>
+    <path d="M57 19h3v5h-3Zm0 22h3v5h-3Z" fill="#080f15" stroke="#8d9383" stroke-width=".5"/>
+    <path d="M58 20v2m0 20v2" stroke="#ffb247" stroke-width="1.4"/>
+    <path d="M45 26h8m-8 22h8" stroke="#aa823d" stroke-width="1.3"/><circle cx="54" cy="26" r="1" fill="#ffb957"/><circle cx="54" cy="48" r="1" fill="#ffb957"/>
+  </g>
 `;
 const archonBase = `
   <ellipse cx="32" cy="57" rx="22" ry="5" fill="#08182e" opacity=".6"/>

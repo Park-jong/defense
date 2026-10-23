@@ -64,11 +64,26 @@ export function makeTextures(scene: Phaser.Scene): void {
     g.fillStyle(0xffedac).fillRect(4, 2, 10, 2);
     g.fillStyle(0xffffff).fillRect(12, 2, 5, 2);
   });
+  tex('firebat_flame', 68, 32, g => {
+    // A narrow jet at the nozzle opens into a ragged, white-hot flame front.
+    g.fillStyle(0xff5227, .16).fillEllipse(42, 16, 52, 32);
+    g.fillStyle(0xff6427, .8).fillPoints([{ x: 0, y: 14 }, { x: 20, y: 11 }, { x: 35, y: 7 },
+      { x: 44, y: 9 }, { x: 48, y: 1 }, { x: 53, y: 7 }, { x: 62, y: 5 }, { x: 59, y: 12 },
+      { x: 68, y: 16 }, { x: 61, y: 21 }, { x: 64, y: 27 }, { x: 54, y: 25 }, { x: 50, y: 31 },
+      { x: 43, y: 24 }, { x: 33, y: 25 }, { x: 20, y: 20 }, { x: 0, y: 18 }], true);
+    g.fillStyle(0xffc34f, .95).fillPoints([{ x: 0, y: 15 }, { x: 24, y: 12 }, { x: 40, y: 9 },
+      { x: 47, y: 6 }, { x: 51, y: 10 }, { x: 60, y: 10 }, { x: 64, y: 16 }, { x: 58, y: 23 },
+      { x: 50, y: 22 }, { x: 46, y: 26 }, { x: 37, y: 22 }, { x: 23, y: 19 }, { x: 0, y: 17 }], true);
+    g.fillStyle(0xfff4b7).fillTriangle(1, 16, 48, 11, 48, 22);
+    g.fillStyle(0xffffff, .95).fillEllipse(48, 16, 23, 13);
+    g.fillStyle(0xfffbda).fillCircle(57, 16, 4);
+  });
   tex('shot_firebat', 30, 24, g => {
     g.fillStyle(0xff5b29, .12).fillEllipse(15, 12, 30, 24);
     g.fillStyle(0xff813a, .55).fillEllipse(16, 12, 24, 18);
     g.fillStyle(0xffc15a, .85).fillEllipse(20, 12, 16, 12);
-    g.fillStyle(0xffe4a1).fillEllipse(23, 12, 9, 7);
+    g.fillStyle(0xffefb0).fillEllipse(23, 12, 9, 7);
+    g.fillStyle(0xfffbe0).fillEllipse(24, 12, 5, 4);
   });
   tex('shot_templar', 56, 48, g => {
     g.fillStyle(0x286dff, .18).fillTriangle(0, 24, 29, 7, 29, 41);
