@@ -16,7 +16,9 @@ export function mkBtn(scene: Phaser.Scene, x: number, y: number, w: number, h: n
     .setInteractive({ useHandCursor: true });
   const tx = scene.add.text(x + w / 2, y + (icon ? h - 23 : h / 2), label,
     { fontFamily: FONT, fontSize: size + 'px', color: '#c5ccb7', align: 'center', lineSpacing: 4 }).setOrigin(.5).setDepth(32);
-  const art = icon ? scene.add.image(x + w / 2, y + 28, 'unit_' + icon).setScale(.82).setDepth(31) : null;
+  const art = icon ? scene.add.image(x + w / 2, y + 28, 'unit_' + icon).setDepth(31) : null;
+  // 낮은 버튼(모바일 패널)에서는 아래 이름표와 겹치지 않도록 그림을 줄인다.
+  art?.setScale(Math.min(.82, (h - 40) / art.height));
   let active = false, hover = false, visible = true;
   const paint = () => {
     frame.clear();

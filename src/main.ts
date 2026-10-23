@@ -1,14 +1,20 @@
 import Phaser from 'phaser';
-import { H, W } from './config';
+import { GAME_W, H, useMobileLayout } from './config';
 import { GameScene } from './GameScene';
 import { setupRotateHint } from './mobile';
+
+// 가로로 긴 터치 화면(휴대폰)은 맵 오른쪽에 패널을 둔 모바일 배치를 쓴다. ?layout=mobile|desktop으로 강제할 수 있다.
+const layout = new URLSearchParams(location.search).get('layout');
+const phoneLike = window.matchMedia('(pointer: coarse)').matches
+  && Math.max(innerWidth, innerHeight) / Math.min(innerWidth, innerHeight) >= 1.6;
+if (layout === 'mobile' || (layout !== 'desktop' && phoneLike)) useMobileLayout();
 
 setupRotateHint();
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
-  width: W,
+  width: GAME_W,
   height: H,
   backgroundColor: '#101512',
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },

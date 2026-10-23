@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import {
-  CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE, COLS, CONSOLE_Y, ENEMY_DEFS, EnemyKey, FINAL_BOSS_HP_MULT, FONT, H, MAP_H, MAP_Y, MAX_CATCHUP_SEC, MAX_WAVE, ROWS, STEP_SEC, T, TEST_GOLD, TOWER_DEFS, TOWER_KEYS, TowerKey, W, WP, pathCells,
+  CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE, COLS, CONSOLE_Y, ENEMY_DEFS, EnemyKey, FINAL_BOSS_HP_MULT, FONT, GAME_W, H, MAP_H, MAP_Y, MAX_CATCHUP_SEC, MAX_WAVE, MOBILE_LAYOUT, ROWS, SIDE_W, STEP_SEC, T, TEST_GOLD, TOWER_DEFS, TOWER_KEYS, TowerKey, W, WP, pathCells,
 } from './config';
 import { drawMap, makeTextures } from './textures';
 import { Btn, mkBtn } from './ui';
@@ -83,6 +83,9 @@ export class GameScene extends Phaser.Scene {
   private unitTitle!: Phaser.GameObjects.Text;
   private unitImage!: Phaser.GameObjects.Image;
   private miniGfx!: Phaser.GameObjects.Graphics;
+  /** 배치마다 다른 초상화 크기와 기지 내구도 막대 위치. */
+  private portraitSize = 88;
+  private lifeMeter = { x: 832, y: 31, w: 54 };
   private pauseTxt!: Phaser.GameObjects.Text;
   private towerBtns: Btn[] = [];
   private goBtn!: Btn;
@@ -155,6 +158,85 @@ export class GameScene extends Phaser.Scene {
 
   // ---------- UI ----------
   private buildUI(): void {
+    if (MOBILE_LAYOUT) this.buildMobileUI(); else this.buildDesktopUI();
+  }
+
+  /** 지원하는 기기에서만 전체화면 버튼을 만든다. 브라우저는 전체화면 요청을 사용자 제스처(pointerup) 안에서만 허용한다. */
+  private addFullscreenButton(x: number, y: number, w: number, h: number, size: number): boolean {
+    if (!this.touchUI || !this.scale.fullscreen.available) return false;
+    mkBtn(this, x, y, w, h, '⛶ 전체화면', () => {}, size);
+    this.add.zone(x, y, w, h).setOrigin(0).setDepth(34).setInteractive().on('pointerup', () => {
+      if (this.scale.isFullscreen) { this.scale.stopFullscreen(); return; }
+      this.scale.startFullscreen();
+      (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape').catch(() => {});
+    });
+    return true;
+  }
+
+  /** 휴대폰 가로 화면용: 맵 오른쪽 SIDE_W 패널에 상황판·유닛 정보·건설 명령을 크게 세로로 쌓는다. */
+  private buildMobileUI(): void {
+    const x0 = W, pw = SIDE_W, right = x0 + pw, L = x0 + 20;
+    const g = this.add.graphics().setDepth(25);
+    g.fillStyle(0x111915).fillRect(x0, 0, pw, H);
+    g.fillStyle(0x626751).fillRect(x0, 0, 2, H);
+    g.fillStyle(0x060c08).fillRect(x0 + 2, 0, 5, H);
+    const box = (top: number, h: number) => {
+      g.fillStyle(0x1b2320).fillRect(x0 + 10, top, pw - 18, h);
+      g.lineStyle(1, 0x596150).strokeRect(x0 + 10, top, pw - 18, h);
+    };
+    const text = (x: number, top: number, value: string, size: number, color: string) =>
+      this.add.text(x, top, value, { fontFamily: FONT, fontSize: size + 'px', color }).setDepth(30);
+    this.portraitSize = 60;
+    this.lifeMeter = { x: right - 86, y: 68, w: 66 };
+
+    // 상황판: 웨이브 · 미네랄 · 기지 내구도
+    box(8, 72);
+    this.hud = text(L, 14, '', 18, '#cbd5b8').setFontFamily('monospace');
+    if (!this.addFullscreenButton(right - 104, 12, 86, 26, 11)) text(right - 20, 18, 'FRONTIER', 12, '#8a967b').setOrigin(1, 0).setLetterSpacing(2);
+    g.fillStyle(0x5dacc0).fillTriangle(L + 6, 46, L, 55, L + 6, 64).fillTriangle(L + 8, 46, L + 14, 55, L + 8, 64);
+    this.mineralTxt = text(L + 22, 43, '', 19, '#a6d7e1').setFontFamily('monospace');
+    this.lifeTxt = text(right - 20, 43, '', 18, '#b7dc8e').setFontFamily('monospace').setOrigin(1, 0);
+    this.miniGfx = this.add.graphics().setDepth(29);
+
+    // 유닛 정보
+    box(88, 150);
+    this.unitTitle = text(L, 96, '기지 사령부', 15, '#c9d7b2').setFontStyle('bold');
+    this.skillBtn = mkBtn(this, right - 104, 93, 86, 28, '스킬 장착', () => this.openShop(this.selected?.k === 'bunker' ? 'garrison' : 'skills'), 12);
+    this.skillBtn.show(false);
+    this.add.rectangle(L, 128, 64, 64, 0x0a1710).setOrigin(0).setStrokeStyle(1, 0x52634b).setDepth(27);
+    this.unitImage = this.add.image(L + 32, 160, 'portrait').setDisplaySize(60, 71).setDepth(28);
+    this.info = text(L + 76, 126, '', 13, '#a5b897').setLineSpacing(4).setWordWrapWidth(right - 20 - (L + 76));
+
+    // 강화 · 회수 · 취소 (같은 줄)
+    this.upBtn = mkBtn(this, x0 + 10, 246, 176, 40, '', () => this.upgrade(), 13);
+    this.sellBtn = mkBtn(this, x0 + 192, 246, 118, 40, '', () => this.sell(), 13);
+    this.cancelBtn = mkBtn(this, x0 + 192, 246, 118, 40, `✕ 취소${this.kb(' [ESC]')}`, () => this.cancelCommand(), 13);
+    this.upBtn.show(false); this.sellBtn.show(false); this.cancelBtn.show(false);
+    this.statusTxt = text(L, 257, '', 13, '#849a76');
+
+    // 건설 명령
+    this.shopBtn = mkBtn(this, x0 + 10, 294, pw - 18, 34, `보급 상점 · 유닛 9종 · 스킬${this.kb(' [B]')}`, () => this.openShop(), 13);
+    this.towerBtns = TOWER_KEYS.slice(0, 4).map((k, i) => {
+      const d = TOWER_DEFS[k];
+      return mkBtn(this, x0 + 10 + (i % 2) * 153, 334 + Math.floor(i / 2) * 80, 149, 76, `${d.name} · ${d.cost}`, () => this.chooseBuild(k), 12, k);
+    });
+    this.goBtn = mkBtn(this, x0 + 10, 498, 160, 66, '▶  웨이브 시작', () => this.startWave(), 15);
+    this.goBtn.act(true);
+    this.spdBtn = mkBtn(this, x0 + 176, 498, 66, 66, '배속 ×1', () => {
+      this.speed = this.speed % 3 + 1; this.spdBtn.set('배속 ×' + this.speed);
+    }, 12);
+    this.pauseBtn = mkBtn(this, x0 + 248, 498, 62, 66, `정지${this.kb(' [P]')}`, () => this.togglePause(), 13);
+
+    this.add.text(W - 8, H - 6, `FRONTIER  /  v${__APP_VERSION__}`, { fontFamily: 'monospace', fontSize: '10px', color: '#616f5b' })
+      .setOrigin(1, 1).setDepth(30).setAlpha(.8);
+    this.pauseTxt = this.add.text(W / 2, MAP_Y + MAP_H / 2, this.touchUI ? '전술 일시정지\n정지 버튼으로 작전 재개' : '전술 일시정지\n[ P ] 작전 재개', {
+      fontFamily: FONT, fontSize: '28px', align: 'center', lineSpacing: 18, color: '#c5e49e',
+      backgroundColor: '#0b1715ee', padding: { x: 42, y: 28 }, stroke: '#253a25', strokeThickness: 1,
+    }).setOrigin(.5).setDepth(40).setVisible(false);
+  }
+
+  /** 데스크톱용: 상단 상황판 + 맵 + 하단 콘솔(전술 지도 · 유닛 정보 · 건설 명령). */
+  private buildDesktopUI(): void {
     const y = CONSOLE_Y;
     const metal = this.add.graphics().setDepth(25);
     const panel = (x: number, top: number, w: number, h: number) => {
@@ -187,15 +269,7 @@ export class GameScene extends Phaser.Scene {
     metal.fillStyle(0x5dacc0).fillTriangle(587, 27, 580, 36, 587, 44).fillTriangle(589, 27, 596, 36, 589, 44);
     text(742, 10, 'BASE INTEGRITY', 9, '#87977a').setLetterSpacing(1);
     this.lifeTxt = text(742, 26, '', 17, '#b7dc8e').setFontFamily('monospace');
-    if (this.touchUI && this.scale.fullscreen.available) {
-      mkBtn(this, 878, 12, 66, 32, '⛶ 전체화면', () => {}, 9);
-      // 브라우저는 전체화면 요청을 사용자 제스처(pointerup) 안에서만 허용한다.
-      this.add.zone(878, 12, 66, 32).setOrigin(0).setDepth(34).setInteractive().on('pointerup', () => {
-        if (this.scale.isFullscreen) { this.scale.stopFullscreen(); return; }
-        this.scale.startFullscreen();
-        (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape').catch(() => {});
-      });
-    } else {
+    if (!this.addFullscreenButton(878, 12, 66, 32, 9)) {
       text(903, 16, 'SOLO', 9, '#a5ba8d').setLetterSpacing(1);
       text(901, 33, '● LIVE', 8, '#8eb967');
     }
@@ -256,7 +330,7 @@ export class GameScene extends Phaser.Scene {
       this.mineralTxt.setText(this.gold.toLocaleString());
       this.lifeTxt.setText(`${Math.max(0, this.lives)} / 20`);
       this.lifeTxt.setColor(this.lives <= 5 ? '#e29a7f' : '#b7dc8e');
-      this.goBtn.set(this.over ? '작전 종료' : this.waveActive ? `교전 중 · 남은 적 ${remaining}` : `▶  웨이브 시작${this.kb('  [SPACE]')}`);
+      this.goBtn.set(this.over ? '작전 종료' : this.waveActive ? `${MOBILE_LAYOUT ? '교전' : '교전 중'} · 남은 적 ${remaining}` : `▶  웨이브 시작${this.kb('  [SPACE]')}`);
     }
     TOWER_KEYS.slice(0, 4).forEach((k, i) => {
       this.towerBtns[i].act(this.building === k);
@@ -289,7 +363,8 @@ export class GameScene extends Phaser.Scene {
       this.uiCache.info = cache;
       this.unitTitle.setText(title); this.info.setText(msg);
       this.unitImage.setTexture(k ? 'unit_' + k : 'portrait');
-      if (k) this.unitImage.setDisplaySize(88, 88); else this.unitImage.setDisplaySize(88, 104);
+      const ps = this.portraitSize;
+      if (k) this.unitImage.setDisplaySize(ps, ps); else this.unitImage.setDisplaySize(ps, ps * 104 / 88);
     }
     this.upBtn.show(!!t); this.sellBtn.show(!!t); this.statusTxt.setVisible(!t);
     this.cancelBtn.show(!t && !this.over && !!(this.building || this.unloading));
@@ -298,7 +373,7 @@ export class GameScene extends Phaser.Scene {
     this.statusTxt.setText(this.unloading ? (this.touchUI ? '빈 구역 두 번 탭 하차' : '빈 구역 클릭 하차 / ESC 취소')
       : this.testMode ? `시험 작전 / ${this.repeat}회차`
       : this.building ? (this.touchUI ? '빈 구역 두 번 탭 배치' : '빈 구역 클릭 배치 / ESC 취소')
-      : this.paused ? '작전 일시정지' : this.waveActive ? '방어 시스템 가동 중' : this.touchUI ? '명령 대기 / 웨이브 시작' : '명령 대기 / SPACE 출격');
+      : this.paused ? '작전 일시정지' : this.waveActive ? '방어 시스템 가동 중' : this.kb('SPACE') ? '명령 대기 / SPACE 출격' : '명령 대기 / 웨이브 시작');
     if (t) {
       const occupied = t.k === 'bunker' && t.passengers.some(Boolean);
       this.upBtn.set(t.k === 'bunker' ? `${this.kb('[U] ')}병력 관리 · 4칸` : t.lvl < 3 ? `${this.kb('[U] ')}강화  ${this.upgradeCost(t)} 미네랄` : '최대 강화 완료');
@@ -309,8 +384,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ---------- 입력 ----------
-  /** 키보드 단축키 안내. 터치 기기에서는 보여 줄 키가 없으므로 비운다. */
-  private kb(hint: string): string { return this.touchUI ? '' : hint; }
+  /** 키보드 단축키 안내. 터치 기기와 좁은 모바일 패널에서는 비운다. */
+  private kb(hint: string): string { return this.touchUI || MOBILE_LAYOUT ? '' : hint; }
 
   private cancelCommand(): void { this.building = null; this.selected = null; this.unloading = null; this.hover = null; }
 
@@ -977,21 +1052,23 @@ export class GameScene extends Phaser.Scene {
     }
     const mini = this.miniGfx;
     mini.clear();
-    for (const t of this.towers) if (!t.host) mini.fillStyle(t === this.selected || t === this.selected?.host ? 0xe0f7ad : 0x9bd76f).fillRect(25 + t.c * 8 + 2, CONSOLE_Y + 53 + t.r * 8 + 2, 4, 4);
-    for (const e of this.enemies) {
+    // 모바일 배치는 전장이 이미 크게 보이므로 전술 지도를 그리지 않는다.
+    if (!MOBILE_LAYOUT) for (const t of this.towers) if (!t.host) mini.fillStyle(t === this.selected || t === this.selected?.host ? 0xe0f7ad : 0x9bd76f).fillRect(25 + t.c * 8 + 2, CONSOLE_Y + 53 + t.r * 8 + 2, 4, 4);
+    if (!MOBILE_LAYOUT) for (const e of this.enemies) {
       if (!e.dead && e.x >= 0 && e.x < W) mini.fillStyle(e.type === 'boss' ? 0xea85d8 : 0xe49674)
         .fillCircle(25 + e.x / W * 160, CONSOLE_Y + 53 + (e.y - MAP_Y) / MAP_H * 96, e.type === 'boss' ? 3 : 1.8);
     }
     // A small base-integrity meter beneath the top resource readout.
-    mini.fillStyle(0x0b120e).fillRect(832, 31, 54, 9);
-    mini.fillStyle(this.lives <= 5 ? 0xcf8067 : 0x9dc278).fillRect(834, 33, 50 * Math.max(0, this.lives) / 20, 5);
+    const m = this.lifeMeter;
+    mini.fillStyle(0x0b120e).fillRect(m.x, m.y, m.w, 9);
+    mini.fillStyle(this.lives <= 5 ? 0xcf8067 : 0x9dc278).fillRect(m.x + 2, m.y + 2, (m.w - 4) * Math.max(0, this.lives) / 20, 5);
   }
 
   private endGame(win: boolean): void {
     if (this.over) return;
     this.over = true;
     this.pauseTxt.setVisible(false);
-    this.add.rectangle(0, 0, W, H, 0x030906, .82).setOrigin(0).setDepth(50);
+    this.add.rectangle(0, 0, GAME_W, H, 0x030906, .82).setOrigin(0).setDepth(50);
     this.add.rectangle(W / 2, 330, 580, 280, 0x18221c).setStrokeStyle(2, 0x738361).setDepth(51);
     this.add.rectangle(W / 2, 330, 568, 268).setStrokeStyle(1, 0x354530).setDepth(51);
     this.add.text(W / 2, 226, win ? 'MISSION COMPLETE' : 'SIGNAL LOST', { fontFamily: 'monospace', fontSize: '12px', color: '#94a680' }).setLetterSpacing(3).setOrigin(.5).setDepth(52);

@@ -2,10 +2,17 @@ export const T = 48;
 export const COLS = 20;
 export const ROWS = 12;
 export const MAP_H = ROWS * T;
-export const MAP_Y = 56;
-export const CONSOLE_Y = MAP_Y + MAP_H;
+/** 맵의 가로 크기. 데스크톱에서는 캔버스 너비와 같고, 모바일에서는 오른쪽에 SIDE_W 패널이 붙는다. */
 export const W = COLS * T;
-export const H = 856;
+/** 모바일 가로 배치에서 맵 오른쪽에 붙는 지휘 패널의 너비. */
+export const SIDE_W = 320;
+// 배치 값은 게임 생성 전에 useMobileLayout()으로 한 번만 바뀐다 (ES 모듈의 live binding으로 모든 곳에 반영).
+export let MOBILE_LAYOUT = false;
+export let MAP_Y = 56;
+export let CONSOLE_Y = MAP_Y + MAP_H;
+/** 캔버스 크기. 데스크톱 960×856(상단바 + 맵 + 하단 콘솔), 모바일 1280×576(맵 + 오른쪽 패널). */
+export let GAME_W = W;
+export let H = 856;
 export const MAX_WAVE = 30;
 /** 게임 로직 고정 스텝(초). 실제 경과 시간을 이 단위로 나눠 진행한다. */
 export const STEP_SEC = 1 / 60;
@@ -22,8 +29,18 @@ export const FONT = '"Malgun Gothic", system-ui, sans-serif';
 
 export interface Point { x: number; y: number }
 
-export const WP: Point[] = ([[-1, 2], [16, 2], [16, 5], [3, 5], [3, 9], [20, 9]] as const)
-  .map(([c, r]) => ({ x: (c + .5) * T, y: MAP_Y + (r + .5) * T }));
+const WP_CELLS = [[-1, 2], [16, 2], [16, 5], [3, 5], [3, 9], [20, 9]] as const;
+export const WP: Point[] = WP_CELLS.map(([c, r]) => ({ x: (c + .5) * T, y: MAP_Y + (r + .5) * T }));
+
+/** 가로로 긴 터치 화면용 배치: 상단바·하단 콘솔 대신 맵 오른쪽에 세로 패널을 둔다. */
+export function useMobileLayout(): void {
+  MOBILE_LAYOUT = true;
+  MAP_Y = 0;
+  CONSOLE_Y = MAP_H;
+  GAME_W = W + SIDE_W;
+  H = MAP_H;
+  WP_CELLS.forEach(([, r], i) => { WP[i].y = MAP_Y + (r + .5) * T; });
+}
 
 export const pathCells = new Set<string>();
 for (let i = 0; i < WP.length - 1; i++) {
