@@ -413,3 +413,22 @@ test('연사 숫자는 서로 다른 위치에서 떠오르고 최대 160개를 
   assert.equal(views.length, 160); assert.equal(numbers.active.length, 100);
   numbers.destroy(); assert.ok(views.every(v => v.destroyed)); assert.equal(numbers.active.length, 0);
 });
+
+test('솟은 콘솔 장갑 위에서는 건설·맵 입력을 막고 가운데 열린 맵은 고밀도 화면에서도 사용할 수 있다', () => {
+  const config = load('./config'), originalScale = config.RENDER_SCALE;
+  try {
+    for (const scale of [1, 2]) {
+      config.setRenderScale(scale);
+      const s = setup(), gold = s.gold;
+      const pointer = x => ({ x: x * scale, y: (config.CONSOLE_Y - 12) * scale, wasTouch: false });
+      s.building = 'marine';
+      for (const x of [100, 800]) {
+        assert.equal(s.inMapView(pointer(x)), false); s.onMapClick(pointer(x));
+      }
+      assert.equal(s.towers.length, 0); assert.equal(s.gold, gold);
+      assert.equal(s.inMapView(pointer(408)), true); s.onMapClick(pointer(408));
+      assert.equal(s.towers.length, 1); assert.equal(s.towers[0].c, 8); assert.equal(s.towers[0].r, 11);
+      assert.equal(s.gold, gold - TOWER_DEFS.marine.cost);
+    }
+  } finally { config.setRenderScale(originalScale); }
+});

@@ -8,6 +8,7 @@ import { DRAGOON_EMITTER, FIREBAT_MUZZLES, loadUnitArt, SIEGE_MUZZLE, TURRET_LAU
 import { EquippedSkill, SKILL_DEFS, SKILL_KEYS, SKILL_SLOTS, SkillKey, UnitBuff } from './catalog';
 import { CommandCard, UnitCommand } from './commandCard';
 import { loadCommandIcons } from './commandIcons';
+import { addConsoleChrome, CONSOLE_RISE, consoleContains, loadConsoleChrome } from './consoleChrome';
 import { DamageKind, DamageNumbers } from './damageNumbers';
 import { ShopState, SupplyShop } from './shop';
 import { MAX_UNIT_LEVEL, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
@@ -113,7 +114,7 @@ export class GameScene extends Phaser.Scene {
 
   constructor() { super('game'); }
 
-  preload(): void { loadUnitArt(this); loadCommandIcons(this); }
+  preload(): void { loadUnitArt(this); loadCommandIcons(this); if (!MOBILE_LAYOUT) loadConsoleChrome(this); }
 
   // ---------- 생성 ----------
   create(): void {
@@ -199,6 +200,7 @@ export class GameScene extends Phaser.Scene {
   /** 포인터(캔버스 픽셀)가 맵 영역 위에 있는가. */
   private inMapView(p: { x: number; y: number }): boolean {
     const x = p.x / RENDER_SCALE, y = p.y / RENDER_SCALE;
+    if (!MOBILE_LAYOUT && consoleContains(x, y - CONSOLE_Y + CONSOLE_RISE)) return false;
     return x >= 0 && x < W && y >= MAP_Y && y < MAP_Y + MAP_H;
   }
 
@@ -363,14 +365,7 @@ export class GameScene extends Phaser.Scene {
     const text = (x: number, top: number, value: string, size = 12, color = '#a0ad92') =>
       this.add.text(x, top, value, { fontFamily: FONT, fontSize: size + 'px', color }).setDepth(30);
     panel(0, 0, W, MAP_Y);
-    metal.fillStyle(0x111915).fillRect(0, y, W, H - y);
-    metal.fillStyle(0x626751).fillRect(0, y, W, 2);
-    metal.fillStyle(0x060c08).fillRect(0, y + 3, W, 5);
-    for (let x = 8; x < W; x += 18) metal.fillStyle(0x363e30).fillRect(x, y + 4, 10, 2);
-    panel(8, y + 12, 194, 184);
-    panel(208, y + 12, 350, 184);
-    panel(564, y + 12, 144, 184);
-    panel(714, y + 12, 238, 184);
+    addConsoleChrome(this, y);
     text(21, 10, 'FRONTIER', 21, '#d2d7be').setFontStyle('bold').setLetterSpacing(3);
     text(23, 36, '기지 방어   /   SECTOR 07', 9, '#8a967b').setLetterSpacing(1);
     text(316, 10, 'OPERATION', 8, '#77876d').setLetterSpacing(2);
@@ -384,8 +379,8 @@ export class GameScene extends Phaser.Scene {
       text(903, 16, 'SOLO', 9, '#a5ba8d').setLetterSpacing(1);
       text(901, 33, '● LIVE', 8, '#8eb967');
     }
-    text(24, y + 169, '전술 지도', 11, '#b7c2a2');
-    text(140, y + 171, 'F-07', 9, '#72866a').setFontFamily('monospace');
+    text(24, y + 181, '전술 지도', 11, '#b7c2a2');
+    text(140, y + 183, 'F-07', 9, '#72866a').setFontFamily('monospace');
     this.add.rectangle(24, y + 50, 162, 108, 0x0a1711).setOrigin(0).setStrokeStyle(1, 0x556447).setDepth(27);
     const mini = this.add.graphics().setDepth(28);
     for (const cell of pathCells) {
@@ -395,25 +390,25 @@ export class GameScene extends Phaser.Scene {
     mini.lineStyle(1, 0x7a9663, .5).strokeRect(27, y + 51, 156, 102);
     for (let yy = y + 51; yy < y + 156; yy += 3) mini.fillStyle(0x000000, .15).fillRect(25, yy, 160, 1);
     this.miniGfx = this.add.graphics().setDepth(29);
-    this.unitTitle = text(224, y + 26, '기지 사령부', 14, '#c9d7b2').setFontStyle('bold');
-    this.statusImage = this.add.image(254, y + 105, 'unit_marine').setDisplaySize(64, 64).setTint(0x75df8a).setAlpha(.65).setDepth(28).setVisible(false);
-    this.info = text(302, y + 53, '', 11, '#a5b897').setLineSpacing(7).setWordWrapWidth(238);
-    this.portraitSize = 96;
-    text(582, y + 26, 'COM LINK', 10, '#9db88c').setFontFamily('monospace').setLetterSpacing(1);
-    this.add.rectangle(582, y + 49, 108, 114, 0x0a1710).setOrigin(0).setStrokeStyle(1, 0x52634b).setDepth(27);
-    this.unitImage = this.add.image(636, y + 106, 'portrait').setDisplaySize(96, 113).setDepth(28);
-    text(592, y + 172, '● ONLINE', 10, '#8bad76').setFontFamily('monospace');
+    this.unitTitle = text(226, y + 50, '기지 사령부', 13, '#c9d7b2').setFontStyle('bold');
+    this.statusImage = this.add.image(254, y + 120, 'unit_marine').setDisplaySize(64, 64).setTint(0x75df8a).setAlpha(.65).setDepth(28).setVisible(false);
+    this.info = text(302, y + 76, '', 11, '#a5b897').setLineSpacing(5).setWordWrapWidth(238);
+    this.portraitSize = 78;
+    text(587, y + 59, 'COM LINK', 8, '#b2bea8').setFontFamily('monospace').setLetterSpacing(1);
+    this.add.rectangle(582, y + 82, 108, 94, 0x0a1710).setOrigin(0).setStrokeStyle(1, 0x52634b).setDepth(27);
+    this.unitImage = this.add.image(636, y + 129, 'portrait').setDisplaySize(78, 92).setDepth(28);
+    text(595, y + 185, '● ONLINE', 9, '#9cbd85').setFontFamily('monospace');
     this.commandTitle = text(728, y + 26, '', 10, '#cedfb1').setFontStyle('bold');
     this.commandTip = this.add.rectangle(648, y - 122, 304, 114, 0x0a1710, .97).setOrigin(0).setStrokeStyle(1, 0x8aab69).setDepth(34).setVisible(false);
     this.commandHint = text(660, y - 110, '', 11, '#c0d5a7').setLineSpacing(4).setWordWrapWidth(278).setDepth(35).setVisible(false);
     this.shopBtn = mkBtn(this, 836, y + 21, 102, 22, '', () => this.selected ? this.cancelCommand() : this.openShop('manage'), 9);
     this.commandCard = new CommandCard(this, 728, y + 49, 210, 132, command => this.describeCommand(command));
-    this.goBtn = mkBtn(this, 24, y + 20, 162, 26, `▶  웨이브 시작${this.kb('  [SPACE]')}`, () => this.startWave(), 11);
+    this.goBtn = mkBtn(this, 24, y + 12, 162, 26, `▶  웨이브 시작${this.kb('  [SPACE]')}`, () => this.startWave(), 11);
     this.goBtn.act(true);
-    this.spdBtn = mkBtn(this, 224, y + 163, 154, 25, '배속 ×1', () => {
+    this.spdBtn = mkBtn(this, 224, y + 172, 154, 25, '배속 ×1', () => {
       this.speed = this.speed % 3 + 1; this.spdBtn.set('배속 ×' + this.speed);
     }, 11);
-    this.pauseBtn = mkBtn(this, 384, y + 163, 158, 25, `정지${this.kb(' [P]')}`, () => this.togglePause(), 11);
+    this.pauseBtn = mkBtn(this, 384, y + 172, 158, 25, `정지${this.kb(' [P]')}`, () => this.togglePause(), 11);
     text(16, H - 17, this.touchUI
       ? '유닛 선택 → 명령 아이콘    /    빈 땅 → 유닛 보급    /    건설은 같은 칸을 두 번 탭    /    스킬 자동 사용'
       : '1–9 유닛 보급    /    U 강화    /    Z·X 스킬 장착    /    S 회수    /    ESC 선택 해제    /    B 상세 관리', 9, '#7d8b73');
