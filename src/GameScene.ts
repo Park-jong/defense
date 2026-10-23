@@ -38,6 +38,9 @@ interface Projectile {
 interface Cell { c: number; r: number }
 interface SkillField { x: number; y: number; radius: number; left: number; tick: number; dmg: number; color: number }
 const DRAGOON_CHARGE_TIME = .18;
+/** 이 depth 이상은 UI로 보고 uiCam만, 미만은 맵으로 보고 mapCam만 그린다. */
+const UI_DEPTH = 25;
+const MAX_MAP_ZOOM = 2.5;
 
 export class GameScene extends Phaser.Scene {
   private gold = 150;
@@ -72,6 +75,16 @@ export class GameScene extends Phaser.Scene {
   private cancelBtn!: Btn;
   private skillBtn!: Btn;
   private uiCache: { hud?: string; info?: string } = {};
+  /** 맵 영역 전용 카메라(확대·이동·흔들림)와 전체 화면 UI 카메라. */
+  private mapCam!: Phaser.Cameras.Scene2D.Camera;
+  private uiCam!: Phaser.Cameras.Scene2D.Camera;
+  private mapZoom = 1;
+  private mapCx = W / 2;
+  private mapCy = MAP_Y + MAP_H / 2;
+  /** 맵에서 시작된 포인터 입력(탭/드래그 구분용), 두 손가락 제스처 여부, 핀치 직전 거리·중점. */
+  private mapDown: { id: number; dragged: boolean } | null = null;
+  private gesture = false;
+  private pinch = { d: 0, x: 0, y: 0 };
 
   private gfx!: Phaser.GameObjects.Graphics;
   private fxBoom!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -110,7 +123,12 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     makeTextures(this);
     // 캔버스는 RENDER_SCALE배 픽셀이므로 카메라를 같은 배율로 확대해 게임 좌표(GAME_W×H)를 화면에 꽉 채운다.
-    this.cameras.main.setZoom(RENDER_SCALE).centerOn(GAME_W / 2, H / 2);
+    // 기본 카메라는 맵 영역만 담당(mapCam)하고, 그 위에 전체 화면 uiCam을 얹어 UI를 그린다.
+    const rs = RENDER_SCALE;
+    this.mapCam = this.cameras.main.setViewport(0, MAP_Y * rs, W * rs, MAP_H * rs);
+    this.uiCam = this.cameras.add(0, 0, GAME_W * rs, H * rs).setZoom(rs).centerOn(GAME_W / 2, H / 2);
+    this.mapDown = null; this.gesture = false; this.pinch = { d: 0, x: 0, y: 0 };
+    this.setMapView(1, W / 2, MAP_Y + MAP_H / 2);
     drawMap(this, COLS, ROWS);
 
     // scene.restart() 시 인스턴스가 재사용되므로 상태를 초기화한다.
@@ -140,6 +158,12 @@ export class GameScene extends Phaser.Scene {
     this.fxPlace = emitter(0xffffff, 90, 350);
 
     this.buildUI();
+    this.buildZoomUI();
+    // 매 프레임 렌더 직전에 depth로 카메라를 나눈다 (새로 생긴 오브젝트 포함).
+    const split = () => this.splitCameras();
+    this.events.on(Phaser.Scenes.Events.POST_UPDATE, split);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.POST_UPDATE, split));
+    this.splitCameras();
     this.shop = new SupplyShop({
       state: () => ({ gold: this.gold, selectedId: this.selected?.id ?? null,
         units: this.towers.map(t => ({ id: t.id, k: t.k, lvl: t.lvl, skills: t.skills, c: t.c, r: t.r,
@@ -154,14 +178,12 @@ export class GameScene extends Phaser.Scene {
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.shop.destroy());
 
-    this.input.on('pointermove', (p: Phaser.Input.Pointer) => { this.hover = this.cellAt(p); });
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.onMapClick(p));
-    // 건설 명령 영역을 좌우로 40px 넘게 밀면 쪽을 넘긴다. 포인터의 down/up 좌표는 캔버스 픽셀이라 게임 좌표로 나눈다.
-    this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
-      const k = RENDER_SCALE, a = this.buildArea;
-      const downX = p.downX / k, downY = p.downY / k, dx = (p.upX - p.downX) / k, dy = (p.upY - p.downY) / k;
-      const inside = downX >= a.x && downX <= a.x + a.w && downY >= a.y && downY <= a.y + a.h;
-      if (inside && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) this.setBuildPage(this.buildPage + (dx < 0 ? 1 : -1));
+    const im = this.input.manager; if (im.pointersTotal < 3) this.input.addPointer(3 - im.pointersTotal); // 마우스 포함 3개여야 pointer1·pointer2 둘 다 추적
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => this.onPointerMove(p));
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => this.onPointerDown(p, over));
+    this.input.on('pointerup', (p: Phaser.Input.Pointer) => this.onPointerUp(p));
+    this.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
+      if (this.inMapView(p)) this.zoomMap(this.mapZoom * (dy < 0 ? 1.15 : 1 / 1.15), p.x, p.y);
     });
     this.input.mouse?.disableContextMenu();
     this.input.keyboard?.addCapture('SPACE');
@@ -169,10 +191,98 @@ export class GameScene extends Phaser.Scene {
   }
 
   private cellAt(p: Phaser.Input.Pointer): Cell | null {
-    // 카메라 줌이 있으므로 화면 좌표(p.x)가 아니라 게임 세계 좌표로 칸을 찾는다.
-    const x = p.worldX, y = p.worldY;
+    // 맵 카메라 줌·스크롤이 있으므로 화면 좌표(p.x)가 아니라 mapCam 기준 세계 좌표로 칸을 찾는다.
+    if (!this.inMapView(p)) return null;
+    const { x, y } = this.mapPoint(p.x, p.y);
     if (y < MAP_Y || y >= CONSOLE_Y || x < 0 || x >= W) return null;
     return { c: Math.floor(x / T), r: Math.floor((y - MAP_Y) / T) };
+  }
+
+  // ---------- 맵 확대·이동 ----------
+  /** 포인터(캔버스 픽셀)가 맵 영역 위에 있는가. */
+  private inMapView(p: { x: number; y: number }): boolean {
+    const x = p.x / RENDER_SCALE, y = p.y / RENDER_SCALE;
+    return x >= 0 && x < W && y >= MAP_Y && y < MAP_Y + MAP_H;
+  }
+
+  /** 캔버스 픽셀 좌표 → mapCam 기준 게임 세계 좌표. */
+  private mapPoint(sx: number, sy: number): { x: number; y: number } {
+    const k = RENDER_SCALE * this.mapZoom;
+    return { x: this.mapCx + (sx - W * RENDER_SCALE / 2) / k, y: this.mapCy + (sy - (MAP_Y + MAP_H / 2) * RENDER_SCALE) / k };
+  }
+
+  /** 줌과 시점 중심을 정하고 맵 경계 밖이 보이지 않게 제한한다. */
+  private setMapView(zoom: number, cx: number, cy: number): void {
+    const z = Phaser.Math.Clamp(zoom, 1, MAX_MAP_ZOOM), hw = W / 2 / z, hh = MAP_H / 2 / z;
+    this.mapZoom = z;
+    this.mapCx = Phaser.Math.Clamp(cx, hw, W - hw); this.mapCy = Phaser.Math.Clamp(cy, MAP_Y + hh, MAP_Y + MAP_H - hh);
+    this.mapCam.setZoom(RENDER_SCALE * z).centerOn(this.mapCx, this.mapCy);
+  }
+
+  /** (fx,fy) 화면 지점 아래의 세계 좌표가 (tx,ty) 화면 지점에 오도록 확대한다 (핀치 중점 이동 포함). */
+  private zoomMap(zoom: number, fx: number, fy: number, tx = fx, ty = fy): void {
+    const wp = this.mapPoint(fx, fy), z = Phaser.Math.Clamp(zoom, 1, MAX_MAP_ZOOM), k = RENDER_SCALE * z;
+    this.setMapView(z, wp.x - (tx - W * RENDER_SCALE / 2) / k, wp.y - (ty - (MAP_Y + MAP_H / 2) * RENDER_SCALE) / k);
+  }
+
+  /** 화면 전체가 흔들리도록 두 카메라에 shake를 건다. flash는 겹쳐 밝아지지 않게 uiCam에만 쓴다. */
+  private shakeAll(ms: number, power: number): void { this.mapCam.shake(ms, power); this.uiCam.shake(ms, power); }
+
+  private zoomStep(f: number): void {
+    this.zoomMap(this.mapZoom * f, W * RENDER_SCALE / 2, (MAP_Y + MAP_H / 2) * RENDER_SCALE);
+  }
+
+  /** 맵 오른쪽 위 모서리의 [+] [−] [⟲] 버튼. 손가락 기기에서는 더 크게. */
+  private buildZoomUI(): void {
+    const big = this.touchUI || MOBILE_LAYOUT, s = big ? 40 : 28, x = W - s - 8;
+    const items: [string, () => void][] = [['+', () => this.zoomStep(1.4)], ['−', () => this.zoomStep(1 / 1.4)], ['⟲', () => this.setMapView(1, W / 2, MAP_Y + MAP_H / 2)]];
+    items.forEach(([label, cb], i) => mkBtn(this, x, MAP_Y + 8 + i * (s + 4), s, s, label, cb, big ? 20 : 15));
+  }
+
+  /** depth로 렌더 카메라를 나눈다. cameraFilter는 '이 카메라는 그리지 않음' 비트마스크다. */
+  private splitCameras(): void {
+    const hideFromUi = this.uiCam.id, hideFromMap = this.mapCam.id;
+    for (const o of this.children.list as unknown as { depth: number; cameraFilter: number }[]) o.cameraFilter = o.depth >= UI_DEPTH ? hideFromMap : hideFromUi;
+  }
+
+  private onPointerDown(p: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]): void {
+    if (p.rightButtonDown()) { this.cancelCommand(); return; }
+    // 두 번째 손가락이 닿으면 핀치 시작: 탭·드래그 처리를 모두 접는다.
+    if (this.input.pointer1.isDown && this.input.pointer2?.isDown) { this.gesture = true; this.mapDown = null; return; }
+    this.mapDown = !over.length && this.inMapView(p) ? { id: p.id, dragged: false } : null;
+  }
+
+  private onPointerMove(p: Phaser.Input.Pointer): void {
+    // 터치에는 호버가 없다: 손가락이 움직여도 미리보기 칸은 탭으로만 바뀐다.
+    if (!p.wasTouch) this.hover = this.cellAt(p);
+    const a = this.input.pointer1, b = this.input.pointer2;
+    if (b && a.isDown && b.isDown) {
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, d = Phaser.Math.Distance.Between(a.x, a.y, b.x, b.y);
+      this.gesture = true; this.mapDown = null;
+      if (this.pinch.d > 0 && this.inMapView({ x: mx, y: my })) this.zoomMap(this.mapZoom * d / this.pinch.d, this.pinch.x, this.pinch.y, mx, my);
+      this.pinch = { d, x: mx, y: my };
+      return;
+    }
+    this.pinch.d = 0;
+    const md = this.mapDown;
+    if (!md || md.id !== p.id || !p.isDown || this.gesture) return;
+    if (!md.dragged) { if (p.getDistance() > 10 * RENDER_SCALE) md.dragged = true; } // 일정 거리 이상 움직이면 탭이 아니라 드래그
+    else if (this.mapZoom > 1) {
+      const k = RENDER_SCALE * this.mapZoom;
+      this.setMapView(this.mapZoom, this.mapCx - (p.x - p.prevPosition.x) / k, this.mapCy - (p.y - p.prevPosition.y) / k);
+    }
+  }
+
+  private onPointerUp(p: Phaser.Input.Pointer): void {
+    const md = this.mapDown;
+    this.mapDown = null;
+    if (!this.gesture && md && md.id === p.id && !md.dragged && p.button === 0) this.onMapClick(p);
+    if (![this.input.pointer1, this.input.pointer2].some(q => q && q !== p && q.isDown)) { this.gesture = false; this.pinch.d = 0; }
+    // 건설 명령 영역을 좌우로 40px 넘게 밀면 쪽을 넘긴다. 포인터의 down/up 좌표는 캔버스 픽셀이라 게임 좌표로 나눈다.
+    const k = RENDER_SCALE, ar = this.buildArea;
+    const downX = p.downX / k, downY = p.downY / k, dx = (p.upX - p.downX) / k, dy = (p.upY - p.downY) / k;
+    const inside = downX >= ar.x && downX <= ar.x + ar.w && downY >= ar.y && downY <= ar.y + ar.h;
+    if (inside && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) this.setBuildPage(this.buildPage + (dx < 0 ? 1 : -1));
   }
 
   // ---------- UI ----------
@@ -460,7 +570,6 @@ export class GameScene extends Phaser.Scene {
 
   private onMapClick(p: Phaser.Input.Pointer): void {
     if (this.over || this.shopOpen) return;
-    if (p.rightButtonDown()) { this.cancelCommand(); return; }
     const cell = this.cellAt(p);
     if (!cell) return;
     const t = this.towers.find(t => !t.host && t.c === cell.c && t.r === cell.r);
@@ -654,7 +763,7 @@ export class GameScene extends Phaser.Scene {
     this.gold += e.reward;
     this.fxDie.explode(e.type === 'boss' ? 40 : 10, e.x, e.y);
     this.floatText(e.x, e.y, '+' + e.reward, '#ffd54f');
-    if (e.type === 'boss') this.cameras.main.shake(300, .01);
+    if (e.type === 'boss') this.shakeAll(300, .01);
     this.tweens.add({ targets: e.sprite, scale: 0, alpha: 0, duration: 150, onComplete: () => e.sprite.destroy() });
   }
 
@@ -722,8 +831,8 @@ export class GameScene extends Phaser.Scene {
       if (e.seg >= WP.length) {
         e.dead = true; e.sprite.destroy();
         if (e.type === 'boss') { this.bossLeaked = true; this.lives = 0; } else this.lives--;
-        this.cameras.main.shake(150, .006);
-        this.cameras.main.flash(120, 255, 60, 60);
+        this.shakeAll(150, .006);
+        this.uiCam.flash(120, 255, 60, 60);
       }
     }
 

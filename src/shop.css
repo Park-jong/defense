@@ -86,3 +86,57 @@
 @media(max-width:800px) { .shop-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .shop-tabs>span,.shop-filter>span { display:none; } .shop-header { padding:18px; gap:14px; } .shop-tabs { padding:10px 18px; } .shop-content { padding:15px 18px; } .shop-footer { padding:12px 18px; } .shop-wallet strong { font-size:20px; } }
 @media(max-width:480px) { .supply-shop { width:calc(100vw - 16px); max-height:calc(100dvh - 16px); } .shop-header h2 { font-size:20px; } .shop-header h2 small { display:none; } .shop-eyebrow { font-size:8px; letter-spacing:1px; } .shop-grid { gap:8px; } .shop-card { padding:10px; } .shop-card h3 { font-size:14px; } .shop-card-top { flex-wrap:wrap; } .shop-card>p { font-size:10px; min-height:68px; } .focused-skills { grid-template-columns:1fr; } .shop-footer>span { font-size:8px; } .shop-wallet strong { font-size:17px; } .shop-tabs button { padding:9px 12px; } .shop-tabs button small { margin-left:6px; } }
 @media(max-width:480px) { .shop-notice { height:76px; } }
+/* 가로 휴대폰(낮은 화면): 창을 화면 안에 맞추고 머리글·탭·카드를 줄여 카드를 가로로 더 많이 보여준다. 내용 영역만 스크롤. */
+@media(max-height:520px) {
+  .supply-shop { width:calc(100dvw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)); max-width:none; height:calc(100dvh - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); max-height:none; box-shadow:0 0 0 3px #1d2820,0 10px 40px #000c; }
+  .shop-header { padding:6px 14px; gap:10px; }
+  .shop-eyebrow { font-size:8px; letter-spacing:1px; }
+  .shop-header h2 { font-size:17px; margin:2px 0 0; }
+  .shop-header h2 small { margin-left:8px; padding:2px 6px; font-size:9px; }
+  .shop-wallet span { font-size:9px; margin-bottom:2px; }
+  .shop-wallet strong { font-size:16px; }
+  .supply-shop .shop-close { width:36px; height:36px; font-size:22px; }
+  .shop-tabs { padding:5px 14px; gap:6px; }
+  .shop-tabs button { padding:8px 14px; font-size:12px; min-height:36px; }
+  .shop-tabs button small { margin-left:8px; }
+  .shop-tabs>span,.shop-filter>span { display:none; }
+  .shop-content { padding:8px 14px 10px; }
+  .shop-filter { margin-bottom:8px; }
+  .shop-filter button { min-height:34px; padding:6px 12px; font-size:11px; }
+  .shop-grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+  .focused-skills { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .shop-card { padding:8px; }
+  .shop-card-top { font-size:8px; }
+  .shop-unit-art { height:62px; margin:3px 0; }
+  .shop-unit-art img { width:58px; height:58px; }
+  .shop-unit-art>span { display:none; }
+  .shop-card h3 { font-size:13px; margin:2px 0 4px; }
+  .shop-card>p { font-size:10px; line-height:1.45; min-height:0; margin:0 0 6px; }
+  .shop-stats { padding:5px 0; margin:auto 0 6px; }
+  .shop-stats dd { font-size:13px; margin-top:2px; }
+  .shop-unit-skills { margin:0 0 6px; }
+  .shop-card-note { margin:0 0 6px; }
+  .supply-shop .shop-purchase { min-height:36px; }
+  .shop-roster { padding-bottom:8px; margin-bottom:8px; }
+  .shop-roster button { min-height:34px; padding:6px 10px; }
+  .shop-skill-context { margin-bottom:8px; min-height:0; }
+  .shop-skill-art { height:56px; }
+  .shop-skill-art>span { font-size:34px; }
+  .shop-skill-meta { padding:6px 0; margin:auto 0 8px; }
+  .shop-notice { height:auto; min-height:36px; padding:8px 10px; margin:0 0 8px; }
+  .shop-footer { padding:5px 14px; gap:10px; }
+  .shop-footer button { min-height:36px; padding:6px 12px; }
+  .bunker-slots { grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+  .bunker-slot { padding:8px; gap:5px; }
+  .bunker-slot h3 { font-size:13px; }
+  .bunker-slot p { font-size:9px; line-height:1.45; margin:0 0 3px; }
+  .bunker-crew-art { width:44px; height:44px; }
+  .bunker-crew-skills { min-height:0; gap:3px; font-size:9px; }
+  .bunker-slot button { min-height:36px; padding:5px; }
+  .bunker-vacancy { height:44px; font-size:26px; }
+  .bunker-board-label { margin-top:3px; gap:4px; }
+  .bunker-board-label select { min-height:36px; }
+  .bunker-empty { margin:0 auto 8px; }
+  .bunker-empty h3 { font-size:15px; margin:4px 0; }
+  .bunker-empty p { font-size:11px; line-height:1.5; }
+}
