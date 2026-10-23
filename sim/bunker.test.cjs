@@ -24,6 +24,7 @@ function load(name) {
 }
 const { GameScene } = load('./GameScene');
 const { TOWER_DEFS, pathCells } = load('./config');
+const { DamageNumbers } = load('./damageNumbers');
 
 function sprite(x = 0, y = 0) {
   return {
@@ -344,4 +345,71 @@ test('선택 변경 후 스킬 단축키는 현재 유닛에 적용되고 중복
   s.gold = 1000; s.commands()[0].run(); s.commands()[0].run();
   assert.equal(s.commands()[0].enabled, false); assert.equal(s.commands()[0].badge, 'MAX');
   s.over = true; assert.ok(s.commands().filter(Boolean).every(c => !c.enabled));
+});
+
+test('피해 숫자는 취약 보정을 반영하고 무효 피해는 건너뛰며 처치하는 마지막 피해도 남긴다', () => {
+  const s = setup(), target = enemy(120, 180), events = [];
+  s.damageNumbers = { hit: (_e, amount, kind) => events.push(['hit', amount, kind]), flush: () => events.push(['flush']) };
+  target.vulnerableT = 3;
+  s.damageEnemy(target, 10); assert.equal(target.hp, 10000 - 13.5);
+  for (const dmg of [0, -1, NaN, Infinity]) s.damageEnemy(target, dmg);
+  assert.deepEqual(events, [['hit', 13.5, 'normal']]);
+  target.hp = 5; target.sprite = sprite(); target.reward = 7; s.fxDie = { explode() {} };
+  const gold = s.gold; s.damageEnemy(target, 10, 'skill');
+  assert.deepEqual(events.slice(1), [['hit', 13.5, 'skill'], ['flush']]);
+  assert.equal(target.dead, true); assert.equal(s.gold, gold + 7);
+  s.damageEnemy(target, 100); assert.equal(events.length, 3);
+});
+
+test('범위 공격은 피격한 적마다 숫자를 보내고 자동 스킬은 스킬 피해로 구분한다', () => {
+  const s = setup(), a = enemy(120, 180), b = enemy(140, 180), outside = enemy(160, 180), hits = [];
+  s.enemies = [a, b, outside];
+  s.damageNumbers = { hit: (target, amount, kind) => hits.push({ target, amount, kind }) };
+  s.hit({ tgt: a, k: 'firebat', st: { dmg: 14, splash: 32 } });
+  assert.deepEqual(hits.map(h => [h.amount, h.kind]), [[14, 'normal'], [14, 'normal']]);
+  assert.equal(a.hp, 9986); assert.equal(b.hp, 9986); assert.equal(outside.hp, 10000);
+  const m = place(s, 'marine'); s.autoSkill(m, 'burst', a);
+  assert.equal(hits.at(-1).kind, 'skill'); assert.equal(hits.at(-1).amount, TOWER_DEFS.marine.dmg * 4.5);
+});
+
+function damageRenderer() {
+  const views = [];
+  const numbers = new DamageNumbers({
+    cache: { bitmapFont: { exists: () => true } },
+    add: { bitmapText: () => {
+      const view = Object.assign(sprite(), {
+        setText(text) { this.text = text; return this; },
+        setFontSize(size) { this.size = size; return this; },
+        setTint(color) { this.color = color; return this; },
+        setAlpha(alpha) { this.alpha = alpha; return this; },
+        setActive(active) { this.active = active; return this; },
+      });
+      views.push(view); return view;
+    } },
+  });
+  return { numbers, views };
+}
+
+test('화상 숫자는 짧게 합산하고 직격이나 처치 전에 남은 피해를 빠짐없이 표시한다', () => {
+  const { numbers, views } = damageRenderer(), target = { x: 120, y: 180, r: 12 };
+  for (let i = 0; i < 12; i++) numbers.hit(target, .5, 'burn');
+  assert.equal(views.length, 0); numbers.update(.21);
+  assert.equal(views.length, 1); assert.equal(views[0].text, '6');
+  numbers.hit(target, 2, 'burn'); numbers.hit(target, 8);
+  assert.deepEqual(views.map(v => v.text), ['6', '2', '8']);
+  numbers.hit(target, 3, 'burn'); numbers.flush(target);
+  assert.equal(views.at(-1).text, '3'); numbers.flush(target); assert.equal(views.length, 4);
+});
+
+test('연사 숫자는 서로 다른 위치에서 떠오르고 최대 160개를 재사용하며 정지·만료·장면 종료를 처리한다', () => {
+  const { numbers, views } = damageRenderer(), target = { x: 120, y: 180, r: 12 };
+  for (let i = 0; i < 240; i++) numbers.hit(target, 10 + i);
+  assert.equal(views.length, 160); assert.equal(numbers.active.length, 160);
+  assert.ok(new Set(views.map(v => v.x + '/' + v.y)).size > 1);
+  const before = views[0].y; numbers.update(.1); assert.ok(views[0].y < before);
+  const after = views[0].y; numbers.update(0); assert.equal(views[0].y, after);
+  numbers.update(2); assert.ok(views.every(v => !v.visible && !v.active));
+  for (let i = 0; i < 100; i++) numbers.hit(target, 1);
+  assert.equal(views.length, 160); assert.equal(numbers.active.length, 100);
+  numbers.destroy(); assert.ok(views.every(v => v.destroyed)); assert.equal(numbers.active.length, 0);
 });

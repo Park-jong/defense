@@ -8,6 +8,7 @@ import { DRAGOON_EMITTER, FIREBAT_MUZZLES, loadUnitArt, SIEGE_MUZZLE, TURRET_LAU
 import { EquippedSkill, SKILL_DEFS, SKILL_KEYS, SKILL_SLOTS, SkillKey, UnitBuff } from './catalog';
 import { CommandCard, UnitCommand } from './commandCard';
 import { loadCommandIcons } from './commandIcons';
+import { DamageKind, DamageNumbers } from './damageNumbers';
 import { ShopState, SupplyShop } from './shop';
 import { MAX_UNIT_LEVEL, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
 import { BUNKER_BARREL_LENGTH, BUNKER_CAPACITY, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
@@ -71,6 +72,7 @@ export class GameScene extends Phaser.Scene {
   private shopOpen = false;
   private shopInputEnabled = true;
   private fields: SkillField[] = [];
+  private damageNumbers?: DamageNumbers;
   private shopBtn!: Btn;
   private uiCache: { hud?: string; info?: string } = {};
   /** 맵 영역 전용 카메라(확대·이동·흔들림)와 전체 화면 UI 카메라. */
@@ -140,6 +142,8 @@ export class GameScene extends Phaser.Scene {
     this.touchUI = window.matchMedia('(pointer: coarse)').matches;
     this.uiCache = {};
     this.fields = []; this.shopOpen = false;
+    this.damageNumbers = new DamageNumbers(this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.damageNumbers?.destroy());
 
     this.gfx = this.add.graphics().setDepth(10);
     const emitter = (tint: number, speed: number, life: number) => this.add.particles(0, 0, 'spark', {
@@ -801,10 +805,11 @@ export class GameScene extends Phaser.Scene {
 
   private killEnemy(e: Enemy): void {
     if (e.dead) return;
+    this.damageNumbers?.flush(e);
     e.dead = true;
     this.gold += e.reward;
     this.fxDie.explode(e.type === 'boss' ? 40 : 10, e.x, e.y);
-    this.floatText(e.x, e.y, '+' + e.reward, '#ffd54f');
+    this.floatText(e.x + 8, e.y + 10, '+' + e.reward, '#ffd54f');
     if (e.type === 'boss') this.shakeAll(300, .01);
     this.tweens.add({ targets: e.sprite, scale: 0, alpha: 0, duration: 150, onComplete: () => e.sprite.destroy() });
   }
@@ -833,6 +838,7 @@ export class GameScene extends Phaser.Scene {
         this.stepAcc -= STEP_SEC;
       }
     } else this.stepAcc = 0;
+    this.damageNumbers?.update(this.paused || this.shopOpen ? 0 : Math.min(.05, elapsed));
     this.refreshUI();
     this.drawOverlay();
   }
@@ -850,7 +856,7 @@ export class GameScene extends Phaser.Scene {
       if (e.dead) continue;
       e.vulnerableT = Math.max(0, e.vulnerableT - dt);
       if (e.burnT > 0) {
-        this.damageEnemy(e, e.burnDps * Math.min(dt, e.burnT));
+        this.damageEnemy(e, e.burnDps * Math.min(dt, e.burnT), 'burn');
         e.burnT = Math.max(0, e.burnT - dt);
         if (e.dead) continue;
       }
@@ -884,7 +890,7 @@ export class GameScene extends Phaser.Scene {
       field.left -= dt; field.tick -= dt;
       if (field.tick <= 0) {
         field.tick += .5;
-        for (const e of this.enemies) if (!e.dead && Math.hypot(e.x - field.x, e.y - field.y) <= field.radius) this.damageEnemy(e, field.dmg);
+        for (const e of this.enemies) if (!e.dead && Math.hypot(e.x - field.x, e.y - field.y) <= field.radius) this.damageEnemy(e, field.dmg, 'skill');
       }
     }
     this.fields = this.fields.filter(f => f.left > 0);
@@ -1015,9 +1021,11 @@ export class GameScene extends Phaser.Scene {
     return best;
   }
 
-  private damageEnemy(e: Enemy, dmg: number): void {
-    if (e.dead) return;
-    e.hp -= dmg * (e.vulnerableT > 0 ? 1.35 : 1);
+  private damageEnemy(e: Enemy, dmg: number, kind: DamageKind = 'normal'): void {
+    if (e.dead || !Number.isFinite(dmg) || dmg <= 0) return;
+    const amount = dmg * (e.vulnerableT > 0 ? 1.35 : 1);
+    e.hp -= amount;
+    this.damageNumbers?.hit(e, amount, kind);
     if (e.hp <= 0) this.killEnemy(e);
   }
 
@@ -1064,13 +1072,13 @@ export class GameScene extends Phaser.Scene {
       this.skillRing(x, y, radius, d.color);
       for (const e of this.enemies) {
         if (e.dead || Math.hypot(e.x - x, e.y - y) > radius) continue;
-        status?.(e); this.damageEnemy(e, st.dmg * factor);
+        status?.(e); this.damageEnemy(e, st.dmg * factor, 'skill');
       }
     };
     this.floatText(t.x, t.y - 12, d.name, '#' + d.color.toString(16).padStart(6, '0'));
     switch (key) {
       case 'barrage':
-        for (const e of nearby.slice(0, 4)) { this.skillBeam(t, e, d.color); this.damageEnemy(e, st.dmg * 2); }
+        for (const e of nearby.slice(0, 4)) { this.skillBeam(t, e, d.color); this.damageEnemy(e, st.dmg * 2, 'skill'); }
         break;
       case 'overdrive': t.buffs.push({ left: 4, haste: 2, power: 1 }); this.skillRing(t.x, t.y, 35, d.color); break;
       case 'siege': area(target.x, target.y, 90, 3.2); this.fxBoom.explode(24, target.x, target.y); break;
@@ -1079,15 +1087,15 @@ export class GameScene extends Phaser.Scene {
       case 'nova': area(t.x, t.y, 135, 5, e => { e.slow = Math.min(e.slow, .35); e.slowT = Math.max(e.slowT, 4); }); break;
       case 'plasma':
         this.skillBeam({ x: t.x + DRAGOON_EMITTER.x, y: t.y + DRAGOON_EMITTER.y }, target, d.color, 4);
-        this.damageEnemy(target, st.dmg * 2); target.vulnerableT = 5;
+        this.damageEnemy(target, st.dmg * 2, 'skill'); target.vulnerableT = 5;
         break;
       case 'chain': {
         let previous = { x: t.x + DRAGOON_EMITTER.x, y: t.y + DRAGOON_EMITTER.y };
-        nearby.slice(0, 5).forEach((e, i) => { this.skillBeam(previous, e, d.color, 2); this.damageEnemy(e, st.dmg * 1.8 * (1 - .12 * i)); previous = e; });
+        nearby.slice(0, 5).forEach((e, i) => { this.skillBeam(previous, e, d.color, 2); this.damageEnemy(e, st.dmg * 1.8 * (1 - .12 * i), 'skill'); previous = e; });
         break;
       }
       case 'stim': t.buffs.push({ left: 6, haste: 1.8, power: 1 }); this.skillRing(t.x, t.y, 35, d.color); break;
-      case 'burst': this.skillBeam(t, target, d.color, 3); this.damageEnemy(target, st.dmg * 4.5); break;
+      case 'burst': this.skillBeam(t, target, d.color, 3); this.damageEnemy(target, st.dmg * 4.5, 'skill'); break;
       case 'inferno': area(target.x, target.y, 70, 2.5, e => burn(e, 1, 4)); this.fxBoom.explode(20, target.x, target.y); break;
       case 'ignite':
         for (const e of nearby.slice(0, 3)) { burn(e, 1.5, 6); this.skillBeam(t, e, d.color); }
@@ -1109,7 +1117,7 @@ export class GameScene extends Phaser.Scene {
         const core = this.add.circle(bow.x, bow.y, 6, 0xffda8a, .85).setStrokeStyle(2, 0xfff2c8).setDepth(12);
         this.tweens.add({ targets: core, scale: 2.5, alpha: 0, duration: 360, onComplete: () => core.destroy() });
         this.skillBeam(bow, target, d.color, 9); this.skillRing(target.x, target.y, 55, d.color);
-        this.damageEnemy(target, st.dmg * 8); this.fxBoom.explode(30, target.x, target.y);
+        this.damageEnemy(target, st.dmg * 8, 'skill'); this.fxBoom.explode(30, target.x, target.y);
         break;
       }
       case 'bombard':
