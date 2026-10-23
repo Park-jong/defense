@@ -6,7 +6,8 @@ import { drawMap, makeTextures } from './textures';
 import { Btn, mkBtn } from './ui';
 import { DRAGOON_EMITTER, FIREBAT_MUZZLES, loadUnitArt, SIEGE_MUZZLE, TURRET_LAUNCH_PORTS, UNIT_WORLD_SCALE } from './unitArt';
 import { EquippedSkill, SKILL_DEFS, SKILL_SLOTS, SkillKey, UnitBuff } from './catalog';
-import { SupplyShop } from './shop';
+import { ShopState, SupplyShop } from './shop';
+import { MAX_UNIT_LEVEL, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
 import { BUNKER_BARREL_LENGTH, BUNKER_CAPACITY, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
 
 /** 건설 명령 한 쪽에 보이는 유닛 수. */
@@ -165,12 +166,12 @@ export class GameScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.POST_UPDATE, split));
     this.splitCameras();
     this.shop = new SupplyShop({
-      state: () => ({ gold: this.gold, selectedId: this.selected?.id ?? null,
-        units: this.towers.map(t => ({ id: t.id, k: t.k, lvl: t.lvl, skills: t.skills, c: t.c, r: t.r,
-          hostId: t.host?.id, passengers: t.passengers.map(p => p?.id ?? null) })) }),
+      state: () => this.shopState(),
       select: id => { this.selected = this.towers.find(t => t.id === id) ?? null; this.building = null; this.unloading = null; },
       choose: k => this.chooseBuild(k, true),
-      equip: k => this.equipSkill(k),
+      equip: (k, id) => this.equipSkill(k, id),
+      upgrade: id => this.upgradeUnit(id),
+      order: (order, scope) => this.applyOrder(order, scope),
       recruit: (id, slot, key) => this.recruit(id, slot, key),
       board: (id, slot, unitId) => this.board(id, slot, unitId),
       unload: id => this.beginUnload(id),
@@ -588,7 +589,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ---------- 타워 ----------
-  private openShop(tab: 'units' | 'skills' | 'garrison' = 'units'): void {
+  private shopState(): ShopState {
+    return { gold: this.gold, selectedId: this.selected?.id ?? null,
+      units: this.towers.map(t => ({ id: t.id, k: t.k, lvl: t.lvl, skills: t.skills, c: t.c, r: t.r,
+        hostId: t.host?.id, passengers: t.passengers.map(p => p?.id ?? null) })) };
+  }
+
+  private openShop(tab: 'units' | 'skills' | 'garrison' | 'manage' = 'units'): void {
     if (this.over || this.shopOpen) return;
     this.shopOpen = true; this.hover = null;
     this.shopInputEnabled = this.input.enabled;
@@ -596,13 +603,24 @@ export class GameScene extends Phaser.Scene {
     this.shop.open(tab);
   }
 
-  private equipSkill(key: SkillKey): boolean {
-    const t = this.selected, skill = SKILL_DEFS[key];
-    if (this.over || !t || skill.unit !== t.k || this.gold < skill.cost || t.skills.length >= SKILL_SLOTS || t.skills.some(s => s.key === key)) return false;
+  private equipSkill(key: SkillKey, id?: string): boolean {
+    const t = id === undefined ? this.selected : this.towers.find(t => t.id === id), skill = SKILL_DEFS[key];
+    if (this.over || !t || !skill || skill.unit !== t.k || this.gold < skill.cost || t.skills.length >= SKILL_SLOTS || t.skills.some(s => s.key === key)) return false;
     this.gold -= skill.cost; t.spent += skill.cost;
     t.skills.push({ key, cd: 0 });
     this.fxPlace.explode(10, t.x, t.y);
     return true;
+  }
+
+  private applyOrder(order: UnitOrder, scope: UnitScope = {}): OrderResult {
+    if (this.over || scope.bunkerId !== undefined && !this.towers.some(t => t.id === scope.bunkerId && t.k === 'bunker')) return { count: 0, cost: 0 };
+    const plan = planOrder(this.shopState().units, order, scope);
+    if (!plan.ids.length || this.gold < plan.cost) return { count: 0, cost: 0 };
+    for (const id of plan.ids) {
+      if (order.type === 'upgrade') this.upgradeUnit(id);
+      else this.equipSkill(order.key, id);
+    }
+    return { count: plan.ids.length, cost: plan.cost };
   }
 
   private stats(t: Tower): TowerStats {
@@ -618,7 +636,7 @@ export class GameScene extends Phaser.Scene {
       slow: d.slow ? Math.max(.2, d.slow - .08 * l) : 0,
     };
   }
-  private upgradeCost(t: Tower): number { return Math.round(TOWER_DEFS[t.k].cost * .8 * t.lvl); }
+  private upgradeCost(t: Tower): number { return unitUpgradeCost(t); }
   private sellValue(t: Tower): number { return Math.round(t.spent * .7); }
 
   private cellFree(c: number, r: number): boolean {
@@ -707,12 +725,18 @@ export class GameScene extends Phaser.Scene {
   private upgrade(): void {
     const t = this.selected;
     if (!this.over && t?.k === 'bunker') { this.openShop('garrison'); return; }
-    if (this.over || !t || t.lvl >= 3 || this.gold < this.upgradeCost(t)) return;
+    if (t) this.upgradeUnit(t.id);
+  }
+
+  private upgradeUnit(id: string): boolean {
+    const t = this.towers.find(t => t.id === id);
+    if (this.over || !t || t.k === 'bunker' || t.lvl >= MAX_UNIT_LEVEL || this.gold < this.upgradeCost(t)) return false;
     const c = this.upgradeCost(t);
     this.gold -= c; t.spent += c; t.lvl++;
     const scale = UNIT_WORLD_SCALE[t.k] ?? 1;
-    this.tweens.add({ targets: [t.base, t.barrel], scale: { from: scale * 1.3, to: scale }, duration: 250, ease: 'Back.Out' });
+    if (!t.host) this.tweens.add({ targets: [t.base, t.barrel], scale: { from: scale * 1.3, to: scale }, duration: 250, ease: 'Back.Out' });
     this.fxPlace.explode(12, t.x, t.y);
+    return true;
   }
 
   private sell(): void {

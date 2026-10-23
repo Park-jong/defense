@@ -195,3 +195,100 @@ test('작전 종료 뒤에는 구매·탑승·하차·강화·회수로 상태�
   s.selected = m; s.upgrade(); s.sell();
   assert.equal(m.lvl, 1); assert.equal(s.gold, gold); assert.equal(s.towers.length, 3);
 });
+
+test('주둔 병력은 ID로 직접 강화·스킬 장착해도 선택한 벙커와 숨김 상태를 유지한다', () => {
+  const s = setup(), b = place(s, 'bunker'); s.recruit(b.id, 0, 'marine');
+  const m = b.passengers[0], gold = s.gold; m.cd = .15;
+  assert.equal(s.upgradeUnit(m.id), true); assert.equal(s.equipSkill('stim', m.id), true);
+  assert.equal(s.gold, gold - 52 - 75); assert.equal(m.spent, 65 + 52 + 75);
+  assert.equal(m.lvl, 2); assert.equal(m.cd, .15); assert.equal(s.selected, b);
+  assert.equal(m.host, b); assert.equal(m.base.visible, false); assert.equal(m.barrel.visible, false);
+  assert.equal(s.upgradeUnit('missing'), false); assert.equal(s.upgradeUnit(b.id), false);
+  assert.equal(s.equipSkill('inferno', m.id), false);
+});
+
+test('벙커 일괄 강화는 각 병력의 다음 단계 비용을 합산하고 최대 강화·다른 벙커·전장 병력을 제외한다', () => {
+  const s = setup(10000), b = place(s, 'bunker');
+  s.recruit(b.id, 0, 'marine'); s.recruit(b.id, 1, 'marine'); s.recruit(b.id, 2, 'firebat');
+  const [a, m, f] = b.passengers;
+  s.upgradeUnit(m.id); s.upgradeUnit(f.id); s.upgradeUnit(f.id);
+  const other = place(s, 'bunker', 10, 1); s.recruit(other.id, 0, 'marine');
+  const outside = place(s, 'marine', 8, 1), gold = s.gold;
+  assert.deepEqual(s.applyOrder({ type: 'upgrade' }, { bunkerId: b.id }), { count: 2, cost: 156 });
+  assert.equal(s.gold, gold - 156); assert.deepEqual([a.lvl, m.lvl, f.lvl], [2, 3, 3]);
+  assert.equal(outside.lvl, 1); assert.equal(other.passengers[0].lvl, 1);
+  assert.equal(a.host, b); assert.equal(a.base.visible, false);
+  assert.deepEqual(s.applyOrder({ type: 'upgrade' }, { bunkerId: b.id }), { count: 1, cost: 104 });
+  assert.deepEqual(s.applyOrder({ type: 'upgrade' }, { bunkerId: b.id }), { count: 0, cost: 0 });
+});
+
+test('전체 부대의 동종 일괄 강화는 여러 벙커의 탑승 병력과 전장 병력을 함께 포함한다', () => {
+  const s = setup(), a = place(s, 'bunker'), b = place(s, 'bunker', 10, 1);
+  s.recruit(a.id, 0, 'marine'); s.recruit(b.id, 0, 'marine'); s.recruit(b.id, 1, 'firebat');
+  const outside = place(s, 'marine', 8, 1), tank = place(s, 'cannon', 9, 1), gold = s.gold;
+  assert.deepEqual(s.applyOrder({ type: 'upgrade' }, { kind: 'marine' }), { count: 3, cost: 156 });
+  assert.equal(s.gold, gold - 156);
+  for (const m of [a.passengers[0], b.passengers[0], outside]) assert.equal(m.lvl, 2);
+  assert.equal(tank.lvl, 1); assert.equal(b.passengers[1].lvl, 1); assert.equal(a.lvl, 1);
+  assert.deepEqual(s.applyOrder({ type: 'upgrade' }), { count: 5, cost: 480 });
+  assert.equal(tank.lvl, 2); assert.equal(b.passengers[1].lvl, 2);
+});
+
+test('일괄 스킬은 전용 병력에만 적용하고 이미 장착한 스킬과 재사용 시간을 보존한다', () => {
+  const s = setup(), a = place(s, 'bunker'), b = place(s, 'bunker', 10, 1);
+  s.recruit(a.id, 0, 'marine'); s.recruit(a.id, 1, 'marine'); s.recruit(a.id, 2, 'firebat');
+  s.recruit(b.id, 0, 'marine'); const outside = place(s, 'marine', 8, 1);
+  const [m, n, f] = a.passengers; s.equipSkill('stim', m.id); m.skills[0].cd = 7;
+  const gold = s.gold;
+  assert.deepEqual(s.applyOrder({ type: 'skill', key: 'stim' }, { bunkerId: a.id }), { count: 1, cost: 75 });
+  assert.equal(s.gold, gold - 75); assert.equal(m.skills[0].cd, 7); assert.equal(n.skills[0].cd, 0);
+  assert.equal(f.skills.length, 0); assert.equal(outside.skills.length, 0); assert.equal(b.passengers[0].skills.length, 0);
+  assert.deepEqual(s.applyOrder({ type: 'skill', key: 'stim' }), { count: 2, cost: 150 });
+  assert.deepEqual(s.applyOrder({ type: 'skill', key: 'burst' }, { kind: 'marine' }), { count: 4, cost: 340 });
+  assert.deepEqual(s.applyOrder({ type: 'skill', key: 'stim' }), { count: 0, cost: 0 });
+  assert.equal(m.skills.length, 2); assert.equal(m.skills[0].cd, 7);
+});
+
+test('일괄 강화 총액이 부족하면 한 기도 강화하지 않고 정확한 총액이면 모두 강화한다', () => {
+  const s = setup(), b = place(s, 'bunker'); s.recruit(b.id, 0, 'marine'); s.recruit(b.id, 1, 'firebat');
+  const [m, f] = b.passengers, spent = [m.spent, f.spent]; s.gold = 139;
+  assert.deepEqual(s.applyOrder({ type: 'upgrade' }, { bunkerId: b.id }), { count: 0, cost: 0 });
+  assert.equal(s.gold, 139); assert.deepEqual([m.lvl, f.lvl], [1, 1]); assert.deepEqual([m.spent, f.spent], spent);
+  s.gold = 140;
+  assert.deepEqual(s.applyOrder({ type: 'upgrade' }, { bunkerId: b.id }), { count: 2, cost: 140 });
+  assert.equal(s.gold, 0); assert.deepEqual([m.lvl, f.lvl], [2, 2]);
+});
+
+test('일괄 스킬 총액이 부족하면 부분 장착과 부분 차감 없이 보류한다', () => {
+  const s = setup(), b = place(s, 'bunker'); s.recruit(b.id, 0, 'marine'); s.recruit(b.id, 1, 'marine');
+  s.gold = 149;
+  assert.deepEqual(s.applyOrder({ type: 'skill', key: 'stim' }), { count: 0, cost: 0 });
+  assert.equal(s.gold, 149); assert.ok(b.passengers.filter(Boolean).every(p => !p.skills.length && p.spent === 65));
+  s.gold = 150;
+  assert.deepEqual(s.applyOrder({ type: 'skill', key: 'stim' }), { count: 2, cost: 150 });
+  assert.equal(s.gold, 0); assert.ok(b.passengers.filter(Boolean).every(p => p.skills.length === 1 && p.spent === 140));
+});
+
+test('일괄 적용한 강화·스킬의 비용과 병력 ID는 하차·환급까지 유지된다', () => {
+  const s = setup(), b = place(s, 'bunker'); s.recruit(b.id, 0, 'marine'); const m = b.passengers[0], id = m.id;
+  s.applyOrder({ type: 'upgrade' }); s.applyOrder({ type: 'skill', key: 'burst' });
+  const spent = 65 + 52 + 85; assert.equal(m.spent, spent);
+  s.beginUnload(m.id); s.finishUnload(8, 1);
+  assert.equal(m.id, id); assert.equal(m.lvl, 2); assert.equal(m.skills[0].key, 'burst');
+  assert.equal(m.base.visible, true); assert.equal(b.passengers[0], null);
+  const gold = s.gold; s.sell(); assert.equal(s.gold, gold + Math.round(spent * .7));
+});
+
+test('잘못된 벙커 범위와 작전 종료 후에는 일괄 명령이 어떤 병력도 바꾸지 않는다', () => {
+  const s = setup(), b = place(s, 'bunker'), m = place(s, 'marine', 8, 1), gold = s.gold;
+  for (const bunkerId of ['missing', m.id, '']) {
+    assert.deepEqual(s.applyOrder({ type: 'upgrade' }, { bunkerId }), { count: 0, cost: 0 });
+    assert.deepEqual(s.applyOrder({ type: 'skill', key: 'stim' }, { bunkerId }), { count: 0, cost: 0 });
+  }
+  assert.deepEqual(s.applyOrder({ type: 'upgrade' }, { kind: 'bunker' }), { count: 0, cost: 0 });
+  s.over = true;
+  assert.equal(s.upgradeUnit(m.id), false); assert.equal(s.equipSkill('stim', m.id), false);
+  assert.deepEqual(s.applyOrder({ type: 'upgrade' }), { count: 0, cost: 0 });
+  assert.deepEqual(s.applyOrder({ type: 'skill', key: 'stim' }), { count: 0, cost: 0 });
+  assert.equal(s.gold, gold); assert.equal(m.lvl, 1); assert.equal(m.skills.length, 0); assert.equal(b.lvl, 1);
+});

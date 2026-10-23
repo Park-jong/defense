@@ -81,6 +81,20 @@
 .bunker-empty { max-width:400px; margin:8px auto 20px; text-align:center; }
 .bunker-empty h3 { color:#d7e6bf; font-size:18px; }
 .bunker-empty p { font-size:12px; color:#9cad8d; line-height:1.8; }
+.shop-batch { padding:16px; margin-bottom:18px; border:1px solid #667b50; background:linear-gradient(135deg,#28372a,#16221b); }
+.shop-batch-header { display:flex; align-items:center; gap:16px; margin-bottom:12px; }
+.shop-batch h3,.shop-batch h4 { margin:0; color:#d7e9bd; font-size:14px; }
+.shop-batch p { margin:7px 0 0; color:#9eb48d; font-size:10px; line-height:1.7; }
+.shop-batch-header>.shop-purchase { flex:0 0 250px; width:auto; min-height:44px; padding:8px; }
+.shop-batch-groups { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.shop-batch-group { min-width:0; padding:12px; border:1px solid #425b3a; background:#111f18; display:flex; flex-direction:column; gap:8px; }
+.shop-batch-group header { display:flex; align-items:center; gap:10px; }
+.shop-batch-group h4 { font-size:12px; }
+.shop-batch-group .shop-purchase { min-height:40px; padding:8px 4px; }
+.shop-batch-empty { padding:10px 0; }
+.shop-skill-context>.shop-purchase { width:auto; min-width:170px; margin-left:auto; padding:10px; }
+@media(max-width:800px) { .shop-batch-header { flex-wrap:wrap; } .shop-batch-header>.shop-purchase { flex:1 0 100%; } }
+@media(max-width:480px) { .shop-batch { padding:12px; } .shop-batch-groups { grid-template-columns:1fr; } .shop-skill-context { flex-wrap:wrap; } .shop-skill-context>.shop-purchase { width:100%; } }
 @media(max-width:800px) { .bunker-slots { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:480px) { .shop-tabs { gap:5px; } .shop-tabs button { flex:1; padding:9px 5px!important; font-size:11px; } .shop-tabs button small { display:none; } .bunker-slots { grid-template-columns:1fr; } .bunker-slot { padding:16px; } }
 @media(max-width:800px) { .shop-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .shop-tabs>span,.shop-filter>span { display:none; } .shop-header { padding:18px; gap:14px; } .shop-tabs { padding:10px 18px; } .shop-content { padding:15px 18px; } .shop-footer { padding:12px 18px; } .shop-wallet strong { font-size:20px; } }
