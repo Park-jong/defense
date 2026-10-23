@@ -26,11 +26,19 @@ const glyphs: Record<string, string> = {
   bombard: '<path d="m13 14 9-3 6 20-9 3Zm23 4 9-3 6 20-9 3Z" fill="#c58b67"/><path d="m17 40 4 4-7 10m26-11 4 4-7 9m-8-20 3 6"/>',
 };
 
+const urls = new Map<string, string>();
+
+/** The command panel and DOM garrison share the same icon artwork. */
+export function commandIconUrl(key: string): string {
+  if (urls.has(key)) return urls.get(key)!;
+  const color = SKILL_KEYS.includes(key as typeof SKILL_KEYS[number])
+    ? '#' + SKILL_DEFS[key as typeof SKILL_KEYS[number]].color.toString(16).padStart(6, '0') : '#b9d39a';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><defs><radialGradient id="bg"><stop stop-color="${color}" stop-opacity=".23"/><stop offset="1" stop-color="#07100e"/></radialGradient></defs><rect x="1" y="1" width="62" height="62" rx="3" fill="url(#bg)"/><g stroke="${color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" fill="none">${glyphs[key] ?? glyphs.empty}</g></svg>`;
+  const url = 'data:image/svg+xml;base64,' + btoa(svg);
+  urls.set(key, url);
+  return url;
+}
+
 export function loadCommandIcons(scene: Phaser.Scene): void {
-  for (const [key, glyph] of Object.entries(glyphs)) {
-    const color = SKILL_KEYS.includes(key as typeof SKILL_KEYS[number])
-      ? '#' + SKILL_DEFS[key as typeof SKILL_KEYS[number]].color.toString(16).padStart(6, '0') : '#b9d39a';
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><defs><radialGradient id="bg"><stop stop-color="${color}" stop-opacity=".23"/><stop offset="1" stop-color="#07100e"/></radialGradient></defs><rect x="1" y="1" width="62" height="62" rx="3" fill="url(#bg)"/><g stroke="${color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" fill="none">${glyph}</g></svg>`;
-    scene.load.svg('cmd_' + key, 'data:image/svg+xml;base64,' + btoa(svg));
-  }
+  for (const key of Object.keys(glyphs)) scene.load.svg('cmd_' + key, commandIconUrl(key));
 }

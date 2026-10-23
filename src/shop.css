@@ -178,3 +178,78 @@
   .bunker-empty h3 { font-size:14px; margin:4px 0; }
   .bunker-empty p { font-size:11px; line-height:1.5; }
 }
+
+/* 벙커 지휘판: 사격구별 초상화와 즉시 명령, 전체 명령, 전장 보병 순서. */
+.garrison-console { display:grid; gap:12px; }
+.garrison-bunkers { display:flex; gap:6px; overflow-x:auto; padding:2px; scrollbar-width:thin; }
+.garrison-bunkers button { display:flex; align-items:center; gap:8px; flex-shrink:0; min-height:52px; padding:3px 10px 3px 4px; text-align:left; }
+.garrison-bunkers img { object-fit:contain; }
+.garrison-bunkers span { font-size:12px; font-weight:700; }
+.garrison-bunkers small { display:block; margin-top:4px; font-size:9px; font-weight:400; color:#9caf8f; }
+.garrison-bunkers .is-active { border-color:#afd077; background:#30422a; box-shadow:inset 0 -2px #89b75e; }
+.garrison-notice { min-height:30px; margin:0; padding:7px 10px; color:#b7ce9d; background:#1a2a1d; border-left:2px solid #8dae67; font-size:11px; line-height:1.5; }
+.garrison-slots { gap:10px; }
+.garrison-slot { gap:8px; padding:10px; border-color:#44533f; background:linear-gradient(145deg,#223129,#111d18); }
+.garrison-slot.is-selected { border-color:#b6d783; box-shadow:inset 0 2px #a3cd68,0 0 14px #95bb4c12; }
+.garrison-slot .bunker-slot-header { font:9px 'Malgun Gothic',system-ui,sans-serif; }
+.garrison-slot .garrison-portrait { display:grid; grid-template-columns:64px minmax(0,1fr); grid-template-rows:1fr 1fr; gap:3px 5px; align-items:center; width:100%; min-height:76px; padding:4px; text-align:left; background:radial-gradient(ellipse at 20% 50%,#4b64482b,transparent 80%),#0c1712; border-color:#3f5342; }
+.garrison-portrait img { grid-row:1 / 3; width:64px; height:64px; object-fit:contain; filter:drop-shadow(0 3px 4px #0008); }
+.garrison-portrait strong { align-self:end; font-size:12px; line-height:1.5; color:#d9e8c9; overflow-wrap:anywhere; }
+.garrison-portrait small { align-self:start; font-size:9px; color:#a0b88c; line-height:1.6; }
+.garrison-slot .garrison-portrait.is-active { border-color:#9cbe73; }
+.garrison-commands,.garrison-recruits { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; }
+.garrison-recruits { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.supply-shop .garrison-action { display:flex; position:relative; flex-direction:column; align-items:center; justify-content:center; gap:4px; min-width:0; min-height:84px; padding:5px 2px; background:linear-gradient(#26382c,#16251b); border-color:#61784e; text-align:center; }
+.garrison-action img { width:34px; height:34px; object-fit:contain; }
+.garrison-action>span { font-size:10px; line-height:1.4; word-break:keep-all; }
+.garrison-action>small { font-size:9px; line-height:1.4; color:#a9d7d9; }
+.supply-shop .garrison-action.is-equipped:disabled { opacity:1; border-color:#8eac60; background:linear-gradient(#30422a,#1d301f); }
+.garrison-action.is-equipped>small { color:#b6d58f; }
+.garrison-check { position:absolute; right:4px; top:2px; font:12px monospace; color:#d8fba8; }
+.garrison-slot .garrison-unload { display:flex; align-items:center; justify-content:center; gap:5px; min-height:32px; margin-top:auto; padding:3px; font-size:10px; border-color:#3c5147; background:#15231d; }
+.garrison-unload small { font-size:9px; color:#8fa58d; }
+.garrison-unload img { width:22px; height:22px; }
+.garrison-slot .garrison-vacancy-hint { display:grid; place-items:center; min-height:32px; margin:auto 0 0; font-size:9px; line-height:1.6; text-align:center; color:#869d7a; }
+.garrison-batch,.garrison-transfer { min-width:0; padding:10px; background:#14231a; border:1px solid #40583c; }
+.garrison-batch header,.garrison-transfer header { display:flex; flex-wrap:wrap; align-items:center; gap:5px 12px; margin-bottom:8px; }
+.garrison-batch h3,.garrison-transfer h3 { margin:0; font-size:12px; color:#cee1b4; }
+.garrison-batch header>span,.garrison-transfer header>span { font-size:9px; color:#90a580; }
+.garrison-batch-actions { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; }
+.garrison-batch .garrison-action { display:grid; grid-template-columns:34px minmax(0,1fr); grid-template-rows:1fr 1fr; gap:2px 5px; min-height:56px; padding:5px; text-align:left; }
+.garrison-batch .garrison-action img { grid-row:1 / 3; }
+.garrison-batch .garrison-action>span { align-self:end; }
+.garrison-batch .garrison-action>small { align-self:start; font-size:8px; }
+.garrison-available { display:flex; gap:6px; overflow-x:auto; padding:2px; scrollbar-width:thin; }
+.garrison-available .garrison-action { flex:0 0 118px; min-height:92px; }
+.garrison-transfer>p { margin:0; font-size:10px; color:#90a580; line-height:1.7; }
+@media(max-width:700px) {
+  .garrison-slots { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .garrison-batch-actions { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+@media(max-width:480px) {
+  .garrison-console { gap:8px; }
+  .garrison-notice { font-size:10px; }
+  .garrison-slots { gap:6px; }
+  .garrison-slot { padding:7px; gap:6px; }
+  .garrison-slot .garrison-portrait { grid-template-columns:1fr; grid-template-rows:auto auto auto; text-align:center; gap:2px; }
+  .garrison-portrait img { grid-row:auto; justify-self:center; width:56px; height:56px; }
+  .garrison-portrait strong,.garrison-portrait small { align-self:auto; }
+  .garrison-commands { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .garrison-commands .garrison-action:first-child { grid-column:1 / -1; flex-direction:row; min-height:44px; gap:6px; }
+  .garrison-batch-actions { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .garrison-batch-actions>.garrison-action:first-child { grid-column:1 / -1; }
+}
+@media(max-height:520px) and (min-width:701px) {
+  .garrison-console { gap:7px; }
+  .garrison-bunkers button { min-height:42px; }
+  .garrison-bunkers img { width:36px; height:36px; }
+  .garrison-slot { padding:7px; gap:5px; }
+  .garrison-slot .garrison-portrait { grid-template-columns:48px minmax(0,1fr); min-height:58px; }
+  .garrison-portrait img { width:48px; height:48px; }
+  .garrison-portrait strong { font-size:11px; }
+  .garrison-action img { width:28px; height:28px; }
+  .garrison-commands .garrison-action,.garrison-recruits .garrison-action { min-height:76px; }
+  .garrison-action>span { font-size:9px; }
+  .garrison-batch,.garrison-transfer { padding:7px; }
+  .garrison-batch .garrison-action { grid-template-columns:28px minmax(0,1fr); }
+}
