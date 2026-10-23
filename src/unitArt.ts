@@ -214,27 +214,68 @@ const templarHead = `
   <circle cx="8" cy="33" r="8" fill="url(#energy)"/><circle cx="55" cy="33" r="8" fill="url(#energy)"/>
   <path d="m5 31 3 2-2 4 5-3m41-2 4 2-2 4 5-5" fill="none" stroke="#d8bfff" stroke-width="1.2"/>
 `;
+// The cruiser is one complete turning hull; only its ground shadow stays fixed.
 const cruiserBase = `
-  <ellipse cx="32" cy="51" rx="29" ry="10" fill="#000" opacity=".4"/>
-  <path d="M5 27 16 18 40 15 58 27 60 38 41 49 15 44 4 36Z" fill="#253c46" stroke="#172d33" stroke-width="1.2"/>
-  <path d="M5 27 16 18 40 15 58 27 41 38 15 35Z" fill="url(#steel)" stroke="#a2b6b6" stroke-width=".7"/>
-  <path d="M15 35 41 38 58 27 60 38 41 49 15 44Z" fill="#3c5964"/>
-  <path d="M7 21 15 16 23 20 21 39 12 43 5 37Zm1 20 10-5 8 5-3 13-10 4-8-7Z" fill="url(#gun)" stroke="#2b4248" stroke-width="1"/>
-  <path d="m8 27 8-5v10l-8 5m1 10 10-5v7l-9 5" fill="#102c43" stroke="#5f9bb2" stroke-width=".7"/>
-  <path d="m8 30 6-3m-4 22 6-3" stroke="#77dcff" stroke-width="3"/>
-  <path d="m21 21 6-3 6 3-6 3Zm7 22 5-3 7 3-5 3Z" fill="url(#red)"/>
-  <path d="m46 32 10-6m-10 12 11-6m-11 12 11-6" stroke="#b6c5ba" stroke-width="1"/>
+  <ellipse cx="32" cy="45" rx="29" ry="12" fill="#000" opacity=".2"/>
+  <ellipse cx="32" cy="45" rx="23" ry="8" fill="#000" opacity=".16"/>
 `;
 const cruiserHead = `
-  <path d="M20 24 29 15 46 18 61 29 61 36 46 43 29 36 20 32Z" fill="url(#steel)" stroke="#243e42" stroke-width="1"/>
-  <path d="M29 15 46 18 61 29 46 32 27 26Z" fill="#a8b8b3"/>
-  <path d="m27 21 6-3 10 3-6 4Z" fill="#2f6679" stroke="#aedbe2" stroke-width=".7"/>
-  <path d="m32 20 6 2m-3-2 6 2" stroke="#8ee6f9" stroke-width="1"/>
-  <path d="m41 29 19 1v6l-14 5-7-5Z" fill="#334e56"/>
-  <path d="m48 31 12 1v3l-11 4Z" fill="#172b34"/>
-  <path d="m52 33 7 .5v1l-7 2Z" fill="#ff967c"/>
-  <path d="M29 17V8m0 0 5 3m-10 9v-6" stroke="#c0cabc" stroke-width="1.2"/>
-  <circle cx="29" cy="8" r="1.3" fill="#ff8872"/>
+  <defs>
+    <linearGradient id="bcHull" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#bac2c7"/><stop offset=".18" stop-color="#87949e"/><stop offset=".5" stop-color="#53616d"/><stop offset="1" stop-color="#303b46"/></linearGradient>
+    <linearGradient id="bcEdge" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#d4d9da"/><stop offset=".4" stop-color="#657581"/><stop offset="1" stop-color="#23313c"/></linearGradient>
+    <linearGradient id="bcPlate" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c57967"/><stop offset=".3" stop-color="#9c4d43"/><stop offset="1" stop-color="#592e2c"/></linearGradient>
+    <radialGradient id="bcEngine"><stop stop-color="#fff7cc"/><stop offset=".25" stop-color="#ffd98b"/><stop offset=".65" stop-color="#f79947"/><stop offset="1" stop-color="#dc6933" stop-opacity="0"/></radialGradient>
+  </defs>
+  <g stroke-linejoin="round">
+    <!-- Open central neck, exposed reactor piping and longitudinal girders. -->
+    <path d="M22 23H49V41H22Z" fill="#101b24" stroke="#17222c" stroke-width="1.5"/>
+    <path d="M22 25H49M22 39H49" fill="none" stroke="#82909a" stroke-width="1.7"/>
+    <path d="M25 27H48M25 37H48" stroke="#c69c64" stroke-width=".65"/>
+    <path d="M28 27v10m5-10v10m5-10v10m5-10v10" stroke="#3a4b58" stroke-width="3.2"/>
+    <path d="M27 28v6m5-6v6m5-6v6m5-6v6" stroke="#8a98a1" stroke-width=".85"/>
+    <path d="M29 30H45V34H29Z" fill="#080f18"/>
+    <!-- Swept aft braces leave space between the engine pods and central hull. -->
+    <path d="M13 12 24 13 30 22 24 26 11 20ZM11 44 24 38 30 42 24 51 13 52Z" fill="url(#bcHull)" stroke="#17232e" stroke-width="1.1"/>
+    <path d="m16 14 6 1 5 7-4 2-9-6Zm-2 32 9-5 4 2-5 6-6 1Z" fill="#495865" stroke="#b6bec0" stroke-width=".6"/>
+    <path d="m16 15 5 1 3 4-6-1Zm2 31 6-3-3 5-5 1Z" fill="url(#bcPlate)"/>
+    <!-- Parallel, cylindrical engine nacelles with armoured collars. -->
+    <path d="M4 8 9 6 31 7 36 10V16L30 18 9 17 4 15ZM4 49 9 47 31 46 36 49V55L30 58 9 58 4 55Z" fill="#1c2833" stroke="#0e1721" stroke-width="1.2"/>
+    <path d="M6 8H28L34 10V14L28 16H6ZM6 49 28 48 34 50V53L28 56H6Z" fill="url(#bcEdge)" stroke="#9da8ad" stroke-width=".45"/>
+    <path d="M8 8v8m5-8v8m15-8v8M8 49v7m5-8v8m15-8v8" stroke="#243642" stroke-width="2"/>
+    <path d="M15 8H25V10H15ZM15 48H25V50H15Z" fill="url(#bcPlate)"/>
+    <path d="M15 12H25M15 53H25" stroke="#d2d5cf" stroke-width=".6"/>
+    <path d="M31 10h3v4h-3Zm0 40h3v3h-3Z" fill="#233440" stroke="#9aa6a9" stroke-width=".5"/>
+    <ellipse cx="5" cy="12" rx="3" ry="5" fill="url(#bcEngine)"/><ellipse cx="5" cy="53" rx="3" ry="5" fill="url(#bcEngine)"/>
+    <path d="M5 9v6M5 50v6" stroke="#ffd58d" stroke-width="1.4"/>
+    <!-- Bulky aft reactor deck and raised command bridge. -->
+    <path d="M5 25 11 20 23 20 28 25V40L23 45H11L5 40Z" fill="url(#bcHull)" stroke="#101c27" stroke-width="1.4"/>
+    <path d="M9 24 13 22H22L25 26V38L21 42H12L9 38Z" fill="#4c5a66" stroke="#b3bfc1" stroke-width=".7"/>
+    <path d="M11 26 15 24H22L23 27V36L20 39H12Z" fill="url(#bcEdge)" stroke="#293b47" stroke-width=".65"/>
+    <path d="M13 27H22M13 31H22M13 35H21" stroke="#21313e" stroke-width="1.5"/>
+    <path d="M14 26h5m-5 4h5m-5 4h5" stroke="#c0cbc7" stroke-width=".55"/>
+    <path d="M8 21 12 19H19V22L12 25H8ZM8 42h4l7 2v3h-8l-3-2Z" fill="url(#bcPlate)" stroke="#35414b" stroke-width=".65"/>
+    <path d="M22 24v16" stroke="#ddba72" stroke-width=".75"/>
+    <ellipse cx="5" cy="33" rx="3.5" ry="7" fill="url(#bcEngine)"/><path d="M4.5 28v10" stroke="#ffe3a0" stroke-width="1.4"/>
+    <path d="M12 21 15 17 22 18 24 23 19 26 12 25Z" fill="url(#bcHull)" stroke="#22333e" stroke-width=".7"/>
+    <path d="m15 20 4-1 3 2-3 1-4-1Z" fill="#ffc98b" stroke="#e9e1bc" stroke-width=".35"/>
+    <path d="M16 18V13m0 1 3 1" stroke="#b8c5c6" stroke-width=".65"/>
+    <!-- The signature broad hammerhead bow, not a pointed fighter nose. -->
+    <path d="M47 13 54 9 59 11 61 24 58 29 49 27 44 22ZM44 42 49 37 58 35 61 40 59 53 54 55 47 51Z" fill="url(#bcHull)" stroke="#15222e" stroke-width="1.2"/>
+    <path d="m48 15 6-3 3 1 2 10-4 2-7-3Zm0 28 7-4 4 2-2 10-3 1-6-3Z" fill="url(#bcPlate)" stroke="#d0a090" stroke-width=".45"/>
+    <path d="m49 17 6-2m-6 5 7-2m-7 26 7-2m-7 5 6-2" stroke="#592f31" stroke-width="1"/>
+    <path d="M44 25 49 22 59 25 62 29V36L58 40 49 42 44 39Z" fill="url(#bcHull)" stroke="#142430" stroke-width="1.25"/>
+    <path d="M46 27 50 25 59 28V31H47ZM47 35H60L57 38 50 40 46 37Z" fill="#71828c" stroke="#b0bec0" stroke-width=".45"/>
+    <path d="M47 31H61V35H47Z" fill="#1a2935" stroke="#899b9e" stroke-width=".55"/>
+    <path d="M52 32H61M51 34H60" stroke="#d2a76a" stroke-width=".5"/>
+    <path d="M59 30H63V35H59Z" fill="#273b49" stroke="#b4c3c3" stroke-width=".5"/>
+    <path d="M61 31V34" stroke="#ffcc8d" stroke-width="1.1"/>
+    <!-- Small batteries sit along both rails, with barrels facing the bow. -->
+    <g fill="#5f737e" stroke="#172c39" stroke-width=".55">
+      <path d="m29 23 2-2 3 1v3l-2 1-3-1Zm8 0 2-2 3 1v3l-2 1-3-1Zm-8 17 3-2 2 1v3l-3 1-2-1Zm8 0 3-2 2 1v3l-3 1-2-1Z"/>
+    </g>
+    <path d="M32 23h4m4 0h4m-12 17h4m4 0h4" stroke="#bac8c7" stroke-width="1"/>
+    <g fill="#e4c997"><circle cx="11" cy="26" r=".55"/><circle cx="11" cy="39" r=".55"/><circle cx="25" cy="27" r=".55"/><circle cx="25" cy="38" r=".55"/><circle cx="57" cy="12" r=".65"/><circle cx="57" cy="52" r=".65"/></g>
+  </g>
 `;
 
 const layers: Record<TowerKey, { base: string; head: string }> = {
@@ -247,6 +288,8 @@ const layers: Record<TowerKey, { base: string; head: string }> = {
   templar: { base: templarBase, head: templarHead },
   cruiser: { base: cruiserBase, head: cruiserHead },
 };
+
+export const UNIT_WORLD_SCALE: Partial<Record<TowerKey, number>> = { cruiser: 1.3 };
 
 export function unitImageUrl(key: TowerKey): string {
   const art = layers[key];

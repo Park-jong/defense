@@ -4,7 +4,7 @@ import {
 } from './config';
 import { drawMap, makeTextures } from './textures';
 import { Btn, mkBtn } from './ui';
-import { loadUnitArt } from './unitArt';
+import { loadUnitArt, UNIT_WORLD_SCALE } from './unitArt';
 import { EquippedSkill, SKILL_DEFS, SKILL_SLOTS, SkillKey, UnitBuff } from './catalog';
 import { SupplyShop } from './shop';
 
@@ -344,7 +344,9 @@ export class GameScene extends Phaser.Scene {
     const x = (c + .5) * T, y = MAP_Y + (r + .5) * T;
     const base = this.add.image(x, y, 'base_' + k).setDepth(5);
     const barrel = this.add.image(x, y, 'barrel_' + k).setOrigin(.5).setDepth(6);
-    this.tweens.add({ targets: [base, barrel], scale: { from: 0, to: 1 }, duration: 220, ease: 'Back.Out' });
+    const scale = UNIT_WORLD_SCALE[k] ?? 1;
+    this.tweens.add({ targets: [base, barrel], scale: { from: 0, to: scale }, duration: 220, ease: 'Back.Out' });
+    if (k === 'cruiser') this.tweens.add({ targets: barrel, y: y - 2, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
     if (k === 'frost') this.tweens.add({ targets: barrel, alpha: { from: .72, to: 1 }, duration: 1100, yoyo: true, repeat: -1 });
     this.fxPlace.explode(8, x, y);
     this.towers.push({ k, c, r, x, y, lvl: 1, cd: 0, spent: d.cost, base, barrel, skills: [], buffs: [] });
@@ -357,7 +359,8 @@ export class GameScene extends Phaser.Scene {
     if (this.over || !t || t.lvl >= 3 || this.gold < this.upgradeCost(t)) return;
     const c = this.upgradeCost(t);
     this.gold -= c; t.spent += c; t.lvl++;
-    this.tweens.add({ targets: [t.base, t.barrel], scale: { from: 1.3, to: 1 }, duration: 250, ease: 'Back.Out' });
+    const scale = UNIT_WORLD_SCALE[t.k] ?? 1;
+    this.tweens.add({ targets: [t.base, t.barrel], scale: { from: scale * 1.3, to: scale }, duration: 250, ease: 'Back.Out' });
     this.fxPlace.explode(12, t.x, t.y);
   }
 
@@ -516,6 +519,7 @@ export class GameScene extends Phaser.Scene {
       if (skill.cd > 0) continue;
       if (best.dead) best = this.findTarget(t);
       if (!best) break;
+      t.barrel.rotation = Math.atan2(best.y - t.y, best.x - t.x);
       this.autoSkill(t, skill.key, best);
       skill.cd = SKILL_DEFS[skill.key].cooldown;
     }
@@ -527,7 +531,7 @@ export class GameScene extends Phaser.Scene {
     t.cd = st.rate;
     const d = TOWER_DEFS[t.k];
     const angle = Math.atan2(best.y - t.y, best.x - t.x);
-    const reach = t.k === 'cannon' ? 25 : t.k === 'arrow' ? 15 : 8;
+    const reach = t.k === 'cruiser' ? 29 * (UNIT_WORLD_SCALE.cruiser ?? 1) : t.k === 'cannon' ? 25 : t.k === 'arrow' ? 15 : 8;
     const muzzleX = t.x + Math.cos(angle) * reach, muzzleY = t.y + Math.sin(angle) * reach;
     const s = this.add.image(muzzleX, muzzleY, 'shot_' + t.k).setDepth(9).setRotation(angle);
     this.projs.push({ s, x: muzzleX, y: muzzleY, tgt: best, k: t.k, st });
@@ -537,6 +541,8 @@ export class GameScene extends Phaser.Scene {
       this.tweens.add({ targets: t.barrel, x: t.x - Math.cos(angle) * 4, y: t.y - Math.sin(angle) * 4, duration: 70, yoyo: true });
     } else if (t.k === 'frost' || t.k === 'sniper' || t.k === 'templar') {
       this.tweens.add({ targets: t.barrel, scale: { from: 1.1, to: 1 }, duration: 220 });
+    } else if (t.k === 'cruiser') {
+      this.tweens.add({ targets: t.barrel, alpha: { from: .88, to: 1 }, duration: 140 });
     } else {
       this.tweens.add({ targets: t.barrel, scale: { from: .94, to: 1 }, duration: 100 });
     }
@@ -621,10 +627,15 @@ export class GameScene extends Phaser.Scene {
         }
         this.skillRing(t.x, t.y, 150, d.color);
         break;
-      case 'yamato':
-        this.skillBeam(t, target, d.color, 9); this.skillRing(target.x, target.y, 55, d.color);
+      case 'yamato': {
+        const angle = Math.atan2(target.y - t.y, target.x - t.x), reach = 29 * (UNIT_WORLD_SCALE.cruiser ?? 1);
+        const bow = { x: t.x + Math.cos(angle) * reach, y: t.y + Math.sin(angle) * reach };
+        const core = this.add.circle(bow.x, bow.y, 6, 0xffda8a, .85).setStrokeStyle(2, 0xfff2c8).setDepth(12);
+        this.tweens.add({ targets: core, scale: 2.5, alpha: 0, duration: 360, onComplete: () => core.destroy() });
+        this.skillBeam(bow, target, d.color, 9); this.skillRing(target.x, target.y, 55, d.color);
         this.damageEnemy(target, st.dmg * 8); this.fxBoom.explode(30, target.x, target.y);
         break;
+      }
       case 'bombard':
         for (const e of nearby.slice(0, 3)) area(e.x, e.y, 55, 2.2);
         break;
