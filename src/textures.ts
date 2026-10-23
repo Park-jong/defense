@@ -25,6 +25,33 @@ export function makeTextures(scene: Phaser.Scene): void {
     g.fillStyle(0xc25b43).fillTriangle(17, 3, 22, 5, 17, 7);
     g.fillStyle(0x81927d).fillTriangle(10, 3, 8, 0, 14, 3).fillTriangle(10, 7, 8, 10, 14, 7);
   });
+  tex('siege_muzzle', 64, 44, g => {
+    g.fillStyle(0xff6b29, .16).fillEllipse(29, 22, 62, 42);
+    g.fillStyle(0xd35e28, .5).fillCircle(24, 21, 18).fillCircle(40, 23, 16).fillCircle(31, 14, 12);
+    g.fillStyle(0xff7c30, .9).fillTriangle(0, 21, 32, 12, 32, 33);
+    g.fillCircle(24, 21, 14).fillCircle(38, 22, 13).fillCircle(31, 13, 9).fillCircle(30, 31, 9).fillCircle(48, 24, 7);
+    g.fillStyle(0xffce6e).fillEllipse(28, 22, 39, 22);
+    g.fillStyle(0xffefba).fillTriangle(0, 20, 46, 22, 0, 24);
+    g.fillStyle(0xffffff).fillEllipse(23, 22, 25, 12);
+  });
+  tex('siege_smoke', 48, 48, g => {
+    g.fillStyle(0x302b2d, .13).fillCircle(24, 24, 23);
+    g.fillStyle(0x54474a, .35).fillCircle(18, 24, 16).fillCircle(30, 23, 13).fillCircle(24, 14, 12);
+    g.fillStyle(0x8b7163, .24).fillCircle(19, 20, 12).fillCircle(30, 27, 10);
+    g.fillStyle(0xbb9671, .16).fillCircle(21, 15, 7);
+  });
+  tex('siege_blast', 72, 72, g => {
+    for (let r = 35; r > 4; r -= 3) g.fillStyle(0xff6827, .025 + (1 - r / 35) * .08).fillCircle(36, 36, r);
+    g.fillStyle(0xff7a2f, .75).fillCircle(36, 36, 21);
+    g.fillStyle(0xffbd5e, .9).fillCircle(31, 34, 14).fillCircle(42, 39, 12);
+    g.fillStyle(0xffe9b2).fillCircle(35, 35, 11);
+    g.fillStyle(0xfffcdf).fillCircle(34, 33, 6);
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4;
+      g.lineStyle(1.4, 0xffc275, .85).lineBetween(36 + Math.cos(a) * 24, 36 + Math.sin(a) * 24,
+        36 + Math.cos(a) * 32, 36 + Math.sin(a) * 32);
+    }
+  });
   tex('shot_cannon', 18, 12, g => {
     g.fillStyle(0xff923e, .15).fillEllipse(8, 6, 17, 12);
     g.fillStyle(0xff923e, .4).fillEllipse(10, 6, 12, 8);

@@ -4,7 +4,7 @@ import {
 } from './config';
 import { drawMap, makeTextures } from './textures';
 import { Btn, mkBtn } from './ui';
-import { DRAGOON_EMITTER, FIREBAT_MUZZLES, loadUnitArt, TURRET_LAUNCH_PORTS, UNIT_WORLD_SCALE } from './unitArt';
+import { DRAGOON_EMITTER, FIREBAT_MUZZLES, loadUnitArt, SIEGE_MUZZLE, TURRET_LAUNCH_PORTS, UNIT_WORLD_SCALE } from './unitArt';
 import { EquippedSkill, SKILL_DEFS, SKILL_SLOTS, SkillKey, UnitBuff } from './catalog';
 import { SupplyShop } from './shop';
 import { BUNKER_BARREL_LENGTH, BUNKER_CAPACITY, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
@@ -634,7 +634,7 @@ export class GameScene extends Phaser.Scene {
   private fire(t: Tower, best: Enemy, st: TowerStats): void {
     const d = TOWER_DEFS[t.k];
     const angle = Math.atan2(best.y - t.y, best.x - t.x);
-    const reach = t.host ? BUNKER_BARREL_LENGTH : t.k === 'cruiser' ? 29 * (UNIT_WORLD_SCALE.cruiser ?? 1) : t.k === 'cannon' ? 31 * (UNIT_WORLD_SCALE.cannon ?? 1) : t.k === 'marine' ? 31 : t.k === 'firebat' ? FIREBAT_MUZZLES[0].x : t.k === 'arrow' ? 15 : 8;
+    const reach = t.host ? BUNKER_BARREL_LENGTH : t.k === 'cruiser' ? 29 * (UNIT_WORLD_SCALE.cruiser ?? 1) : t.k === 'cannon' ? SIEGE_MUZZLE.x * (UNIT_WORLD_SCALE.cannon ?? 1) : t.k === 'marine' ? 31 : t.k === 'firebat' ? FIREBAT_MUZZLES[0].x : t.k === 'arrow' ? 15 : 8;
     const port = t.k === 'arrow' ? TURRET_LAUNCH_PORTS[t.shotPort++ % TURRET_LAUNCH_PORTS.length] : null;
     const muzzleX = t.k === 'templar' ? t.x + 18 : t.k === 'sniper' ? t.x + DRAGOON_EMITTER.x : port ? t.x + port.x * Math.cos(angle) - port.y * Math.sin(angle) : t.k === 'frost' ? t.x : t.x + Math.cos(angle) * reach;
     const muzzleY = t.k === 'templar' ? t.y - 8 : t.k === 'sniper' ? t.y + DRAGOON_EMITTER.y : port ? t.y + port.x * Math.sin(angle) + port.y * Math.cos(angle) : t.k === 'frost' ? t.y - 18 : t.y + Math.sin(angle) * reach;
@@ -646,6 +646,16 @@ export class GameScene extends Phaser.Scene {
       const flame = this.add.image(muzzleX, muzzleY, 'bunker_muzzle').setOrigin(0, .5).setRotation(angle).setScale(scale).setDepth(12);
       this.tweens.add({ targets: flame, scaleX: scale * 1.3, scaleY: scale * .65, alpha: 0,
         duration: t.k === 'firebat' ? 150 : 90, onComplete: () => flame.destroy() });
+    } else if (t.k === 'cannon') {
+      const flash = this.add.image(muzzleX, muzzleY, 'siege_muzzle').setOrigin(0, .5).setRotation(angle).setScale(.8).setDepth(12);
+      this.tweens.add({ targets: flash, scaleX: 1.3, scaleY: 1.1, alpha: 0, duration: 140, onComplete: () => flash.destroy() });
+      for (let i = 0; i < 3; i++) {
+        const x = muzzleX + Math.cos(angle) * (10 + i * 4) - Math.sin(angle) * (i - 1) * 5;
+        const y = muzzleY + Math.sin(angle) * (10 + i * 4) + Math.cos(angle) * (i - 1) * 5;
+        const smoke = this.add.image(x, y, 'siege_smoke').setScale(.35 + i * .1).setAlpha(.65).setDepth(11);
+        this.tweens.add({ targets: smoke, x: x + Math.cos(angle) * 14, y: y + Math.sin(angle) * 10 - 12,
+          scale: 1.1 + i * .2, alpha: 0, duration: 650 + i * 120, onComplete: () => smoke.destroy() });
+      }
     } else if (t.k === 'firebat') {
       for (const port of FIREBAT_MUZZLES) {
         const x = t.x + port.x * Math.cos(angle) - port.y * Math.sin(angle);
@@ -662,12 +672,13 @@ export class GameScene extends Phaser.Scene {
       const flare = this.add.image(muzzleX, muzzleY, 'dragoon_charge').setScale(.8).setDepth(12);
       this.tweens.add({ targets: flare, scale: 1.25, alpha: 0, duration: 180, onComplete: () => flare.destroy() });
     } else {
-      const flash = this.add.circle(muzzleX, muzzleY, t.k === 'cannon' ? 8 : 5, d.proj, .7).setDepth(9);
+      const flash = this.add.circle(muzzleX, muzzleY, 5, d.proj, .7).setDepth(9);
       this.tweens.add({ targets: flash, scale: 1.8, alpha: 0, duration: 160, onComplete: () => flash.destroy() });
     }
     if (t.k === 'cannon') {
-      const recoil = 5 * (UNIT_WORLD_SCALE.cannon ?? 1);
-      this.tweens.add({ targets: t.barrel, x: t.x - Math.cos(angle) * recoil, y: t.y - Math.sin(angle) * recoil, duration: 90, yoyo: true });
+      const recoil = 6 * (UNIT_WORLD_SCALE.cannon ?? 1);
+      this.tweens.add({ targets: t.barrel, x: t.x - Math.cos(angle) * recoil, y: t.y - Math.sin(angle) * recoil,
+        duration: 80, hold: 30, yoyo: true, ease: 'Cubic.Out' });
     } else if (t.k === 'frost' || t.k === 'templar') {
       this.tweens.add({ targets: t.barrel, scale: { from: 1.1, to: 1 }, duration: 220 });
     } else if (t.k === 'arrow' || t.k === 'cruiser' || t.k === 'sniper') {
@@ -798,6 +809,10 @@ export class GameScene extends Phaser.Scene {
       if (p.k === 'templar') this.archonBurst(e.x, e.y, st.splash);
       else {
         this.fxBoom.explode(14, e.x, e.y);
+        if (p.k === 'cannon') {
+          const blast = this.add.image(e.x, e.y, 'siege_blast').setScale(st.splash / 50).setDepth(20);
+          this.tweens.add({ targets: blast, scale: st.splash / 30, alpha: 0, duration: 280, onComplete: () => blast.destroy() });
+        }
         const ring = this.add.circle(e.x, e.y, 6, 0xff8a65, .3).setStrokeStyle(2, 0xff8a65).setDepth(21);
         this.tweens.add({ targets: ring, scale: st.splash / 6, alpha: 0, duration: 300, onComplete: () => ring.destroy() });
       }
