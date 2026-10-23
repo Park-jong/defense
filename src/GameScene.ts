@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import {
-  CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE, COLS, CONSOLE_Y, ENEMY_DEFS, EnemyKey, FINAL_BOSS_HP_MULT, FONT, H, MAP_H, MAP_Y, MAX_WAVE, ROWS, T, TEST_GOLD, TOWER_DEFS, TOWER_KEYS, TowerKey, W, WP, pathCells,
+  CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE, COLS, CONSOLE_Y, ENEMY_DEFS, EnemyKey, FINAL_BOSS_HP_MULT, FONT, H, MAP_H, MAP_Y, MAX_CATCHUP_SEC, MAX_WAVE, ROWS, STEP_SEC, T, TEST_GOLD, TOWER_DEFS, TOWER_KEYS, TowerKey, W, WP, pathCells,
 } from './config';
 import { drawMap, makeTextures } from './textures';
 import { Btn, mkBtn } from './ui';
@@ -47,6 +47,8 @@ export class GameScene extends Phaser.Scene {
   private speed = 1;
   private paused = false;
   private over = false;
+  private lastTick = 0;
+  private stepAcc = 0;
   private bossLeaked = false;
   private testMode = false;
   private repeat = 0;
@@ -97,6 +99,7 @@ export class GameScene extends Phaser.Scene {
     this.spawnQ = []; this.spawnT = 0; this.waveActive = false;
     this.building = null; this.selected = null; this.hover = null;
     this.speed = 1; this.paused = false; this.over = false; this.bossLeaked = false;
+    this.lastTick = 0; this.stepAcc = 0;
     this.uiCache = {};
     this.towerBtns = [];
     this.fields = []; this.shopOpen = false;
@@ -419,11 +422,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ---------- 게임 루프 ----------
-  update(_time: number, delta: number): void {
+  update(): void {
+    // Phaser의 delta는 포커스를 잃거나 프레임이 밀리면 잘리므로 실제 경과 시간으로 따라잡는다.
+    const now = performance.now();
+    const elapsed = this.lastTick ? Math.min(MAX_CATCHUP_SEC, (now - this.lastTick) / 1000) : 0;
+    this.lastTick = now;
     if (!this.paused && !this.over && !this.shopOpen) {
-      const dt = Math.min(.05, delta / 1000);
-      for (let i = 0; i < this.speed && !this.over; i++) this.step(dt);
-    }
+      this.stepAcc += elapsed;
+      while (this.stepAcc >= STEP_SEC && !this.over) {
+        for (let i = 0; i < this.speed && !this.over; i++) this.step(STEP_SEC);
+        this.stepAcc -= STEP_SEC;
+      }
+    } else this.stepAcc = 0;
     this.refreshUI();
     this.drawOverlay();
   }

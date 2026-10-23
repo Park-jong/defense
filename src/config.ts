@@ -7,6 +7,10 @@ export const CONSOLE_Y = MAP_Y + MAP_H;
 export const W = COLS * T;
 export const H = 856;
 export const MAX_WAVE = 30;
+/** 게임 로직 고정 스텝(초). 실제 경과 시간을 이 단위로 나눠 진행한다. */
+export const STEP_SEC = 1 / 60;
+/** 창이 가려져 루프가 드물게 돌 때 한 번에 따라잡는 최대 시간(초). */
+export const MAX_CATCHUP_SEC = 60;
 /** 웨이브 클리어 보너스 = BASE + PER_WAVE * 웨이브. 웨이브 30 시작 시점의 누적 골드가 약 12,000이 되도록 맞춤. */
 export const CLEAR_BONUS_BASE = 17;
 export const CLEAR_BONUS_PER_WAVE = 4;
