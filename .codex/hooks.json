@@ -1,0 +1,32 @@
+{
+  "description": "수정 전 원격 동기화와 작업 완료 후 자동 커밋·푸시 확인",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.claude/hooks/git-workflow.cjs\" before",
+            "commandWindows": "powershell.exe -NoProfile -Command \"& node (Join-Path (git rev-parse --show-toplevel) '.claude/hooks/git-workflow.cjs') before\"",
+            "timeout": 90,
+            "statusMessage": "수정 전 git pull"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.claude/hooks/git-workflow.cjs\" finish",
+            "commandWindows": "powershell.exe -NoProfile -Command \"& node (Join-Path (git rev-parse --show-toplevel) '.claude/hooks/git-workflow.cjs') finish\"",
+            "timeout": 30,
+            "statusMessage": "자동 커밋·푸시 완료 확인"
+          }
+        ]
+      }
+    ]
+  }
+}

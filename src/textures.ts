@@ -9,6 +9,13 @@ export function makeTextures(scene: Phaser.Scene): void {
     fn(g); g.generateTexture(key, w, h); g.destroy();
   };
   tex('spark', 8, 8, g => g.fillStyle(0xffffff).fillRect(2, 2, 4, 4));
+  tex('bunker_muzzle', 32, 24, g => {
+    // Pointed orange flame with a white-hot core, anchored at the firing aperture.
+    g.fillStyle(0xff752b, .18).fillEllipse(11, 12, 25, 21);
+    g.fillStyle(0xff8135, .9).fillPoints([{ x: 0, y: 10 }, { x: 7, y: 8 }, { x: 16, y: 3 }, { x: 14, y: 9 }, { x: 30, y: 12 }, { x: 14, y: 15 }, { x: 18, y: 21 }, { x: 7, y: 16 }, { x: 0, y: 14 }], true);
+    g.fillStyle(0xffd36d).fillPoints([{ x: 0, y: 10 }, { x: 8, y: 10 }, { x: 17, y: 7 }, { x: 14, y: 11 }, { x: 23, y: 12 }, { x: 13, y: 14 }, { x: 17, y: 17 }, { x: 7, y: 14 }, { x: 0, y: 14 }], true);
+    g.fillStyle(0xfff3ca).fillTriangle(0, 10, 14, 12, 0, 14);
+  });
   tex('shot_arrow', 22, 10, g => {
     g.fillStyle(0xffb554, .2).fillEllipse(6, 5, 12, 8);
     g.fillStyle(0xffbd64).fillTriangle(1, 5, 9, 2, 9, 8);
@@ -24,7 +31,7 @@ export function makeTextures(scene: Phaser.Scene): void {
     g.fillStyle(0xffe6a3).fillEllipse(12, 6, 8, 5);
     g.fillStyle(0xffffff).fillEllipse(14, 6, 4, 3);
   });
-  for (const [key, radius] of [['frost', 6], ['sniper', 8]] as const) {
+  for (const [key, radius] of [['frost', 6]] as const) {
     const size = radius * 4, c = size / 2;
     tex('shot_' + key, size, size, g => {
       for (let r = radius * 2; r > 0; r -= 2) g.fillStyle(0x449eff, .04 + (1 - r / (radius * 2)) * .09).fillCircle(c, c, r);
@@ -34,22 +41,62 @@ export function makeTextures(scene: Phaser.Scene): void {
       g.lineStyle(1, 0xd8ffff, .8).strokeCircle(c, c, radius + 1);
     });
   }
+  tex('dragoon_charge', 48, 48, g => {
+    for (let r = 22; r > 2; r -= 2) g.fillStyle(0x398dff, .035 + (1 - r / 22) * .06).fillCircle(24, 24, r);
+    g.lineStyle(1.2, 0x6aceff, .8).lineBetween(11, 15, 17, 11).lineBetween(17, 11, 21, 16)
+      .lineBetween(29, 12, 36, 18).lineBetween(36, 18, 31, 23).lineBetween(14, 29, 20, 35).lineBetween(20, 35, 25, 30);
+    g.fillStyle(0x377ee9, .7).fillCircle(24, 24, 10);
+    g.fillStyle(0x8de5ff).fillCircle(24, 24, 6);
+    g.fillStyle(0xf0ffff).fillCircle(24, 24, 3.5);
+  });
+  tex('shot_sniper', 48, 32, g => {
+    g.fillStyle(0x3d8fff, .18).fillTriangle(1, 16, 25, 6, 25, 26);
+    g.fillStyle(0x83dfff, .45).fillTriangle(7, 16, 24, 12, 24, 20);
+    for (let r = 15; r > 2; r -= 2) g.fillStyle(0x398dff, .035 + (1 - r / 15) * .07).fillCircle(25, 16, r);
+    g.fillStyle(0x356fdf, .85).fillCircle(25, 16, 8);
+    g.fillStyle(0x6bd6ff).fillCircle(25, 16, 5.5);
+    g.fillStyle(0xf1ffff).fillCircle(26, 15, 3.5);
+    g.lineStyle(1, 0xc0f4ff, .9).lineBetween(15, 9, 20, 6).lineBetween(20, 6, 23, 10)
+      .lineBetween(30, 7, 35, 12).lineBetween(35, 12, 31, 17).lineBetween(18, 23, 24, 26).lineBetween(24, 26, 28, 22);
+  });
   tex('shot_marine', 18, 6, g => {
     g.fillStyle(0xffd571, .25).fillEllipse(8, 3, 16, 6);
     g.fillStyle(0xffedac).fillRect(4, 2, 10, 2);
     g.fillStyle(0xffffff).fillRect(12, 2, 5, 2);
   });
+  tex('firebat_flame', 68, 32, g => {
+    // A narrow jet at the nozzle opens into a ragged, white-hot flame front.
+    g.fillStyle(0xff5227, .16).fillEllipse(42, 16, 52, 32);
+    g.fillStyle(0xff6427, .8).fillPoints([{ x: 0, y: 14 }, { x: 20, y: 11 }, { x: 35, y: 7 },
+      { x: 44, y: 9 }, { x: 48, y: 1 }, { x: 53, y: 7 }, { x: 62, y: 5 }, { x: 59, y: 12 },
+      { x: 68, y: 16 }, { x: 61, y: 21 }, { x: 64, y: 27 }, { x: 54, y: 25 }, { x: 50, y: 31 },
+      { x: 43, y: 24 }, { x: 33, y: 25 }, { x: 20, y: 20 }, { x: 0, y: 18 }], true);
+    g.fillStyle(0xffc34f, .95).fillPoints([{ x: 0, y: 15 }, { x: 24, y: 12 }, { x: 40, y: 9 },
+      { x: 47, y: 6 }, { x: 51, y: 10 }, { x: 60, y: 10 }, { x: 64, y: 16 }, { x: 58, y: 23 },
+      { x: 50, y: 22 }, { x: 46, y: 26 }, { x: 37, y: 22 }, { x: 23, y: 19 }, { x: 0, y: 17 }], true);
+    g.fillStyle(0xfff4b7).fillTriangle(1, 16, 48, 11, 48, 22);
+    g.fillStyle(0xffffff, .95).fillEllipse(48, 16, 23, 13);
+    g.fillStyle(0xfffbda).fillCircle(57, 16, 4);
+  });
   tex('shot_firebat', 30, 24, g => {
     g.fillStyle(0xff5b29, .12).fillEllipse(15, 12, 30, 24);
     g.fillStyle(0xff813a, .55).fillEllipse(16, 12, 24, 18);
     g.fillStyle(0xffc15a, .85).fillEllipse(20, 12, 16, 12);
-    g.fillStyle(0xffe4a1).fillEllipse(23, 12, 9, 7);
+    g.fillStyle(0xffefb0).fillEllipse(23, 12, 9, 7);
+    g.fillStyle(0xfffbe0).fillEllipse(24, 12, 5, 4);
   });
-  tex('shot_templar', 24, 24, g => {
-    g.fillStyle(0xb98cff, .15).fillCircle(12, 12, 12);
-    g.fillStyle(0xa684e9, .5).fillCircle(12, 12, 8);
-    g.lineStyle(2, 0xe5d6ff).lineBetween(4, 12, 10, 8).lineBetween(10, 8, 14, 15).lineBetween(14, 15, 21, 11);
-    g.fillStyle(0xffffff).fillCircle(12, 12, 3);
+  tex('shot_templar', 56, 48, g => {
+    g.fillStyle(0x286dff, .18).fillTriangle(0, 24, 29, 7, 29, 41);
+    g.fillStyle(0x72eaff, .35).fillTriangle(4, 24, 27, 17, 27, 31);
+    for (let r = 23; r > 2; r -= 2) g.fillStyle(0x348dff, .045 + (1 - r / 23) * .09).fillCircle(29, 24, r);
+    g.fillStyle(0x277bff, .85).fillCircle(29, 24, 14);
+    g.fillStyle(0x49dfff, .9).fillCircle(29, 24, 10);
+    g.fillStyle(0xc0ffff).fillCircle(29, 24, 6);
+    g.fillStyle(0xffffff).fillCircle(30, 23, 3);
+    g.lineStyle(1.3, 0xd5ffff, .95).lineBetween(16, 10, 23, 14).lineBetween(23, 14, 20, 20)
+      .lineBetween(36, 8, 33, 15).lineBetween(33, 15, 42, 19).lineBetween(42, 19, 39, 27)
+      .lineBetween(19, 29, 14, 35).lineBetween(14, 35, 25, 39).lineBetween(25, 39, 29, 33)
+      .lineBetween(37, 32, 42, 35).lineBetween(42, 35, 46, 29);
   });
   tex('shot_cruiser', 26, 12, g => {
     g.fillStyle(0xff735b, .2).fillEllipse(13, 6, 26, 12);
