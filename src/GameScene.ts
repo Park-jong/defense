@@ -7,7 +7,7 @@ import { Btn, mkBtn } from './ui';
 import { loadUnitArt, TURRET_LAUNCH_PORTS, UNIT_WORLD_SCALE } from './unitArt';
 import { EquippedSkill, SKILL_DEFS, SKILL_SLOTS, SkillKey, UnitBuff } from './catalog';
 import { SupplyShop } from './shop';
-import { BUNKER_CAPACITY, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
+import { BUNKER_BARREL_LENGTH, BUNKER_CAPACITY, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
 
 interface Tower {
   id: string;
@@ -618,14 +618,21 @@ export class GameScene extends Phaser.Scene {
     t.cd = st.rate;
     const d = TOWER_DEFS[t.k];
     const angle = Math.atan2(best.y - t.y, best.x - t.x);
-    const reach = t.k === 'cruiser' ? 29 * (UNIT_WORLD_SCALE.cruiser ?? 1) : t.k === 'cannon' ? 31 * (UNIT_WORLD_SCALE.cannon ?? 1) : t.k === 'marine' && !t.host ? 31 : t.k === 'arrow' ? 15 : 8;
+    const reach = t.host ? BUNKER_BARREL_LENGTH : t.k === 'cruiser' ? 29 * (UNIT_WORLD_SCALE.cruiser ?? 1) : t.k === 'cannon' ? 31 * (UNIT_WORLD_SCALE.cannon ?? 1) : t.k === 'marine' ? 31 : t.k === 'arrow' ? 15 : 8;
     const port = t.k === 'arrow' ? TURRET_LAUNCH_PORTS[t.shotPort++ % TURRET_LAUNCH_PORTS.length] : null;
     const muzzleX = port ? t.x + port.x * Math.cos(angle) - port.y * Math.sin(angle) : t.k === 'frost' ? t.x : t.x + Math.cos(angle) * reach;
     const muzzleY = port ? t.y + port.x * Math.sin(angle) + port.y * Math.cos(angle) : t.k === 'frost' ? t.y - 18 : t.y + Math.sin(angle) * reach;
     const s = this.add.image(muzzleX, muzzleY, 'shot_' + t.k).setDepth(9).setRotation(angle);
     this.projs.push({ s, x: muzzleX, y: muzzleY, tgt: best, k: t.k, st });
-    const flash = this.add.circle(muzzleX, muzzleY, t.k === 'cannon' ? 8 : 5, d.proj, .7).setDepth(9);
-    this.tweens.add({ targets: flash, scale: 1.8, alpha: 0, duration: 160, onComplete: () => flash.destroy() });
+    if (t.host) {
+      const scale = t.k === 'firebat' ? 1 : .6;
+      const flame = this.add.image(muzzleX, muzzleY, 'bunker_muzzle').setOrigin(0, .5).setRotation(angle).setScale(scale).setDepth(12);
+      this.tweens.add({ targets: flame, scaleX: scale * 1.3, scaleY: scale * .65, alpha: 0,
+        duration: t.k === 'firebat' ? 150 : 90, onComplete: () => flame.destroy() });
+    } else {
+      const flash = this.add.circle(muzzleX, muzzleY, t.k === 'cannon' ? 8 : 5, d.proj, .7).setDepth(9);
+      this.tweens.add({ targets: flash, scale: 1.8, alpha: 0, duration: 160, onComplete: () => flash.destroy() });
+    }
     if (t.k === 'cannon') {
       const recoil = 5 * (UNIT_WORLD_SCALE.cannon ?? 1);
       this.tweens.add({ targets: t.barrel, x: t.x - Math.cos(angle) * recoil, y: t.y - Math.sin(angle) * recoil, duration: 90, yoyo: true });
@@ -782,10 +789,10 @@ export class GameScene extends Phaser.Scene {
       if (t.host) {
         // Occupants stay hidden; their individual barrels and lights appear at the apertures.
         const color = t.k === 'firebat' ? 0xffa15c : 0xa7d5e7;
-        g.fillStyle(0x0b1712).fillCircle(t.x, t.y, 4);
-        g.lineStyle(3, 0x18281f).lineBetween(t.x, t.y, t.x + Math.cos(t.barrel.rotation) * 8, t.y + Math.sin(t.barrel.rotation) * 8);
-        g.lineStyle(1.5, color, .9).lineBetween(t.x, t.y, t.x + Math.cos(t.barrel.rotation) * 7, t.y + Math.sin(t.barrel.rotation) * 7);
-        g.fillStyle(color, .8).fillCircle(t.x, t.y, 1.8);
+        const tipX = t.x + Math.cos(t.barrel.rotation) * BUNKER_BARREL_LENGTH;
+        const tipY = t.y + Math.sin(t.barrel.rotation) * BUNKER_BARREL_LENGTH;
+        g.lineStyle(2.5, 0x111f2c).lineBetween(t.x, t.y, tipX, tipY);
+        g.lineStyle(1, 0xb0bec0, .85).lineBetween(t.x, t.y, tipX, tipY);
         if (t === this.selected) {
           const range = this.stats(t).range;
           g.lineStyle(1, color, .5).strokeCircle(t.x, t.y, range);
@@ -801,7 +808,7 @@ export class GameScene extends Phaser.Scene {
       }
       if (t.k === 'bunker') {
         t.passengers.forEach((p, slot) => {
-          const x = t.x - 15 + slot * 10, y = t.y - 23;
+          const x = t.x - 15 + slot * 10, y = t.y - 17;
           g.fillStyle(p ? p.k === 'firebat' ? 0xffa15c : 0xa7d5e7 : 0x1d2c22).fillRect(x, y, 7, 4);
           g.lineStyle(1, 0x8da17c, .7).strokeRect(x, y, 7, 4);
         });

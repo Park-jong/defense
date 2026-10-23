@@ -9,6 +9,13 @@ export function makeTextures(scene: Phaser.Scene): void {
     fn(g); g.generateTexture(key, w, h); g.destroy();
   };
   tex('spark', 8, 8, g => g.fillStyle(0xffffff).fillRect(2, 2, 4, 4));
+  tex('bunker_muzzle', 32, 24, g => {
+    // Pointed orange flame with a white-hot core, anchored at the firing aperture.
+    g.fillStyle(0xff752b, .18).fillEllipse(11, 12, 25, 21);
+    g.fillStyle(0xff8135, .9).fillPoints([{ x: 0, y: 10 }, { x: 7, y: 8 }, { x: 16, y: 3 }, { x: 14, y: 9 }, { x: 30, y: 12 }, { x: 14, y: 15 }, { x: 18, y: 21 }, { x: 7, y: 16 }, { x: 0, y: 14 }], true);
+    g.fillStyle(0xffd36d).fillPoints([{ x: 0, y: 10 }, { x: 8, y: 10 }, { x: 17, y: 7 }, { x: 14, y: 11 }, { x: 23, y: 12 }, { x: 13, y: 14 }, { x: 17, y: 17 }, { x: 7, y: 14 }, { x: 0, y: 14 }], true);
+    g.fillStyle(0xfff3ca).fillTriangle(0, 10, 14, 12, 0, 14);
+  });
   tex('shot_arrow', 22, 10, g => {
     g.fillStyle(0xffb554, .2).fillEllipse(6, 5, 12, 8);
     g.fillStyle(0xffbd64).fillTriangle(1, 5, 9, 2, 9, 8);

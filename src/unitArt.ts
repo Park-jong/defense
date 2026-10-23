@@ -462,22 +462,49 @@ const cruiserHead = `
 `;
 
 const bunkerBase = `
-  <ellipse cx="32" cy="47" rx="31" ry="14" fill="#000" opacity=".4"/>
-  <path d="M3 32 11 18 32 10 53 18 61 32 61 47 48 58H16L3 47Z" fill="#25352b" stroke="#121d17" stroke-width="1.5"/>
-  <path d="M4 32 13 20 32 13 51 20 60 32 48 43H16Z" fill="url(#olive)" stroke="#bcc4a5" stroke-width=".8"/>
-  <path d="M4 34 16 44h32l12-10v11L47 55H17L4 45Z" fill="url(#steel)" stroke="#17291d"/>
-  <path d="M12 22 24 17h16l12 5 5 10-10 8H17L7 32Z" fill="#5c6d50" stroke="#243725" stroke-width="1.1"/>
-  <path d="M16 21 25 18h14l9 3-6 5H22Z" fill="#c6c8a5"/>
-  <path d="M18 27h28l6 6-7 5H19l-7-5Z" fill="url(#olive)" stroke="#aeb798" stroke-width=".6"/>
-  <path d="M23 28h18v7H23Z" fill="#718064" stroke="#344934"/>
-  <path d="M27 30h10m-10 2h10" stroke="#2a3e2b" stroke-width="1"/>
-  <path d="m9 30 9 6v8l-9-6Zm37 6 9-6v8l-9 6ZM16 43h12v7H16Zm20 0h12v7H36Z" fill="#0b1712" stroke="#b2bc98" stroke-width=".8"/>
-  <path d="M27 43h10v12H27Z" fill="#354c39" stroke="#14291b"/>
-  <path d="M29 45h6v8h-6Z" fill="#192d20"/>
-  <path d="M5 40v5l8 6v-5Zm54 0v5l-8 6v-5Z" fill="url(#red)"/>
-  <path d="M12 22v-9m0 0 4 3" stroke="#c4cdb4" stroke-width="1"/>
-  <circle cx="12" cy="13" r="1.4" fill="#e68b68"/>
-  <path d="m17 54 5-2 4 2m12 0 4-2 5 2" fill="none" stroke="#d3bf73" stroke-width="1.4"/>
+  <defs>
+    <radialGradient id="bunkerDome" cx=".32" cy=".2" r=".85"><stop stop-color="#ecece2"/><stop offset=".3" stop-color="#b6bec1"/><stop offset=".58" stop-color="#7b8794"/><stop offset=".82" stop-color="#4a5669"/><stop offset="1" stop-color="#263343"/></radialGradient>
+    <linearGradient id="bunkerRamp" x1="0" y1="0" x2=".3" y2="1"><stop stop-color="#67778b"/><stop offset=".3" stop-color="#3f526b"/><stop offset="1" stop-color="#1b2c40"/></linearGradient>
+    <linearGradient id="bunkerFrame" x1="0" y1="0" x2=".6" y2="1"><stop stop-color="#8d99a2"/><stop offset=".45" stop-color="#485463"/><stop offset="1" stop-color="#202d3b"/></linearGradient>
+    <linearGradient id="bunkerRed" x1="0" y1="0" x2=".3" y2="1"><stop stop-color="#e05a57"/><stop offset=".3" stop-color="#bb262f"/><stop offset="1" stop-color="#5a1824"/></linearGradient>
+  </defs>
+  <g transform="translate(0 9) scale(1 .85)">
+  <ellipse cx="32" cy="49" rx="31" ry="13" fill="#000" opacity=".4"/>
+  <g stroke-linejoin="round">
+    <!-- Low angular buttresses and four broad, ribbed armour slopes. -->
+    <path d="M3 32 14 20 32 14 50 20 61 32l2 15-16 14H17L1 47Z" fill="#17222e" stroke="#0b1721" stroke-width="1.4"/>
+    <path d="M8 29 19 17 30 15 24 29l-13 7Zm26-14 11 2 11 12-3 7-13-7Z" fill="url(#bunkerRamp)" stroke="#6f808e" stroke-width=".65"/>
+    <path d="m12 27 11-6m-9 8 10-5m16-4 11 7m-12-4 10 6" stroke="#24364b" stroke-width="1.2"/>
+    <path d="M4 32 14 28l7 9-8 10-12-4Zm46-4 10 4 3 11-12 4-8-10Z" fill="url(#bunkerFrame)" stroke="#0f1e29" stroke-width="1"/>
+    <path d="m5 35 2-1 3 8-2 1Zm5-2 2-1 4 8-2 2Zm44-1 2 1-4 9-2-2Zm5 2 2 1-3 8-2-1Z" fill="url(#bunkerRed)" stroke="#561d29" stroke-width=".5"/>
+    <path d="M17 36 32 40 47 36 53 49 43 58H21L11 49Z" fill="url(#bunkerFrame)" stroke="#16232e" stroke-width="1"/>
+    <!-- Flared silver dome with recessed firing embrasures, not a flat roof. -->
+    <path d="M13 30C15 17 21 10 32 10s17 7 19 20l-4 8c-8 8-22 8-30 0Z" fill="url(#bunkerDome)" stroke="#1c2c39" stroke-width="1.2"/>
+    <path d="M14 31c4 9 11 13 18 13s15-5 18-13" fill="none" stroke="#aeb8ba" stroke-width=".8"/>
+    <path d="M18 20q3-5 8-7m-8 17 6-10m22 1-7-7m7 18-6-11M31 24v16" fill="none" stroke="#dae0d8" stroke-width=".65" opacity=".65"/>
+    <path d="m15 24 6 2v6l-5-1Zm29 2 5-3-1 8-5 2ZM21 32l6 2-1 6-6-2Zm16 2 6-2 1 6-6 2Z" fill="#0b151e" stroke="#5c6e7c" stroke-width=".8"/>
+    <path d="m16 25 4 2m24 0 4-2M22 33l4 2m12 0 4-2" fill="none" stroke="#040c12" stroke-width="1.1"/>
+    <!-- The roof hatch has eight red radial locks around a dark centre. -->
+    <ellipse cx="32" cy="17" rx="12" ry="7.2" fill="#637281" stroke="#cbd1ca" stroke-width=".8"/>
+    <ellipse cx="32" cy="17" rx="10.5" ry="5.7" fill="#283746" stroke="#83949c" stroke-width=".6"/>
+    <ellipse cx="32" cy="17" rx="6.7" ry="3.8" fill="#131e29" stroke="#0e1820" stroke-width=".6"/>
+    <g fill="url(#bunkerRed)" stroke="#551c26" stroke-width=".5">
+      <path d="M30.5 10.8h3v3.4h-3Zm0 9.2h3v3.4h-3ZM21.5 15.7h4.2v2.6h-4.2Zm16.8 0h4.2v2.6h-4.2ZM24 12l2.2-1 2.5 2.8-2.3 1Zm11.3 1.8 2.5-2.8 2.2 1-2.4 2.8ZM24 22l2.4-2.8 2.3 1-2.5 2.8Zm11.3-1.8 2.3-1L40 22l-2.2 1Z"/>
+    </g>
+    <path d="M31 11h2m-9 5h2m13 0h2m-10 4h2" stroke="#f28170" stroke-width=".5"/>
+    <!-- Ribbed skirts overlap the dome's lower perimeter. -->
+    <path d="m9 39 10-5 11 10-9 15-17-9Zm36-5 10 5 5 11-17 9-9-15Z" fill="url(#bunkerRamp)" stroke="#172a3d" stroke-width="1.1"/>
+    <path d="m10 40 10-4 8 8-8 13-13-7Zm34-4 10 4 3 10-13 7-8-13Z" fill="none" stroke="#8a9ba6" stroke-width=".6"/>
+    <path d="M9 42 24 49M8 45 22 52M10 48 21 54M13 39 26 45M38 43 51 37M39 46 54 39M40 49 56 42M42 52 57 45M43 55 58 48" stroke="#22364d" stroke-width="1.1"/>
+    <path d="M10 42 24 48M9 45 22 51M38 42 51 36M39 45 54 38M41 51 56 44" stroke="#7f93a6" stroke-width=".4"/>
+    <path d="M26 45h12l8 10-14 8-14-8Z" fill="url(#bunkerFrame)" stroke="#142634" stroke-width="1.1"/>
+    <path d="M27 48h10l6 7-11 6-11-6Z" fill="#52616e" stroke="#8d9b9f" stroke-width=".6"/>
+    <path d="m23 52 2-1 4 7-2 1Zm5-2 2-1 3 9-2 1Zm9-1 2 1-3 9-2-1Zm5 3 2 1-4 7-2-1Z" fill="url(#bunkerRed)" stroke="#571e29" stroke-width=".45"/>
+    <path d="M30 37h4v10h-4Z" fill="#172734" stroke="#0c1a24" stroke-width=".8"/>
+    <path d="M31 38h2v8h-2Z" fill="url(#bunkerRed)"/>
+    <g fill="#a9b9ba" stroke="#243e4c" stroke-width=".4"><circle cx="10" cy="32" r=".65"/><circle cx="54" cy="32" r=".65"/><circle cx="23" cy="55" r=".65"/><circle cx="41" cy="55" r=".65"/></g>
+  </g>
+  </g>
 `;
 
 const layers: Record<TowerKey, { base: string; head: string }> = {
