@@ -1,0 +1,22 @@
+# 의존성 / 빌드 결과
+node_modules/
+dist/
+
+# 로그
+*.log
+npm-debug.log*
+
+# 환경 변수
+.env
+.env.*
+
+# 에디터 / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# .claude는 저장소에 포함한다 (에이전트, 훅, 스킬, TODO).
+# 개인 로컬 설정과 에이전트 요약 산출물만 제외한다.
+.claude/settings.local.json
+agent-summaries/
