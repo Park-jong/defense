@@ -11,7 +11,7 @@ const modules = new Map();
 function load(name) {
   if (name === 'phaser') return { Scene: class {} };
   if (name === './unitArt') return { UNIT_WORLD_SCALE: { cannon: 1.15, cruiser: 1.3 } };
-  if (['./shop', './textures', './ui'].includes(name)) return {};
+  if (['./shop', './textures', './ui', './operations'].includes(name)) return {};
   if (modules.has(name)) return modules.get(name);
   const filename = path.resolve(__dirname, '../src', name.replace('./', '') + '.ts');
   const code = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
@@ -459,6 +459,7 @@ test('1~49 클리어 보상을 지급하고 50에서만 승리하며 51스테이
       assert.equal(s.over, false); assert.deepEqual(results, []);
     }
     assert.equal(s.gold, expectedGold);
+    if (s.pending.length) s.takeReward(s.pending.includes('power') ? 'power' : s.pending.includes('haste') ? 'haste' : 'range');
   }
   assert.deepEqual(results, [true]);
   s.startWave(); assert.equal(s.wave, 50); assert.equal(s.waveActive, false);

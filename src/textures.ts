@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ENEMY_DEFS, FONT, MAP_H, MAP_Y, RENDER_SCALE, T, W, WP, pathCells } from './config';
+import { activeMap, ENEMY_DEFS, FONT, MAP_H, MAP_Y, RENDER_SCALE, ROUTES, T, W, WP, pathCells } from './config';
 
 /** All art is generated locally: no image downloads or external assets. */
 export function makeTextures(scene: Phaser.Scene): void {
@@ -174,7 +174,7 @@ export function makeTextures(scene: Phaser.Scene): void {
 }
 
 export function drawMap(scene: Phaser.Scene, cols: number, rows: number): void {
-  const key = 'battlefield';
+  const key = 'battlefield_' + activeMap;
   if (!scene.textures.exists(key)) {
     // 고밀도 화면에서도 선명하도록 RENDER_SCALE배 크기로 그리고, 화면에는 W×MAP_H로 표시한다.
     const texture = scene.textures.createCanvas(key, W * RENDER_SCALE, MAP_H * RENDER_SCALE)!;
@@ -230,8 +230,8 @@ export function drawMap(scene: Phaser.Scene, cols: number, rows: number): void {
   g.lineBetween(410, MAP_Y + 357, 550, MAP_Y + 357).lineBetween(480, MAP_Y + 287, 480, MAP_Y + 427);
   scene.add.text(480, MAP_Y + 347, 'F-07', { fontFamily: 'monospace', fontSize: '24px', color: '#6b7560' }).setOrigin(.5).setAlpha(.35);
   const label = (x: number, y: number, text: string, color: string) => scene.add.text(x, y, text, {fontFamily: FONT, fontSize: '10px', color}).setDepth(2);
-  label(16, MAP_Y + 83, '▶  적 진입', '#c1a271');
-  label(W - 103, MAP_Y + 493, '방어선  ▶', '#a7cd8d');
+  ROUTES.forEach(route => label(16, route[0].y - 37, '▶  적 진입', '#c1a271'));
+  label(W - 103, WP[WP.length - 1].y + 30, '방어선  ▶', '#a7cd8d');
   for (const x of [W - 40, W - 12]) {
     g.fillStyle(0x141d1b).fillRect(x, WP[WP.length - 1].y - 33, 10, 66);
     g.fillStyle(0x89bf78).fillRect(x + 3, WP[WP.length - 1].y - 22, 3, 44);

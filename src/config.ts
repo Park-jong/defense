@@ -29,8 +29,30 @@ export const FONT = '"Malgun Gothic", system-ui, sans-serif';
 
 export interface Point { x: number; y: number }
 
-const WP_CELLS = [[-1, 2], [16, 2], [16, 5], [3, 5], [3, 9], [20, 9]] as const;
-export const WP: Point[] = WP_CELLS.map(([c, r]) => ({ x: (c + .5) * T, y: MAP_Y + (r + .5) * T }));
+export const MAP_DEFS = {
+  frontier: { name: '프런티어', desc: '긴 단일 진입로 · 기본 전장', routes: [[[-1, 2], [16, 2], [16, 5], [3, 5], [3, 9], [20, 9]]] },
+  canyon: { name: '협곡', desc: '좁은 회랑과 네 번의 굴곡', routes: [[[-1, 1], [17, 1], [17, 4], [2, 4], [2, 7], [17, 7], [17, 10], [20, 10]]] },
+  junction: { name: '합류 지대', desc: '두 진입로가 중앙에서 합류', routes: [[[-1, 1], [10, 1], [10, 5], [4, 5], [4, 9], [20, 9]], [[-1, 9], [1, 9], [1, 5], [4, 5], [4, 9], [20, 9]]] },
+} satisfies Record<string, { name: string; desc: string; routes: number[][][] }>;
+export type MapKey = keyof typeof MAP_DEFS;
+export let activeMap: MapKey = 'frontier';
+export const WP: Point[] = [];
+export const ROUTES: Point[][] = [];
+export const pathCells = new Set<string>();
+export function configureMap(key: MapKey): void {
+  activeMap = key;
+  ROUTES.splice(0, ROUTES.length, ...MAP_DEFS[key].routes.map(route => route.map(([c, r]) => ({ x: (c + .5) * T, y: MAP_Y + (r + .5) * T }))));
+  WP.splice(0, WP.length, ...ROUTES[0]);
+  pathCells.clear();
+  for (const route of ROUTES) for (let i = 0; i < route.length - 1; i++) {
+    const a = route[i], b = route[i + 1];
+    const c0 = Math.floor(a.x / T), r0 = Math.floor((a.y - MAP_Y) / T);
+    const c1 = Math.floor(b.x / T), r1 = Math.floor((b.y - MAP_Y) / T);
+    for (let c = Math.min(c0, c1); c <= Math.max(c0, c1); c++)
+      for (let r = Math.min(r0, r1); r <= Math.max(r0, r1); r++) pathCells.add(c + ',' + r);
+  }
+}
+configureMap('frontier');
 
 /**
  * 캔버스를 게임 좌표의 몇 배 픽셀로 그릴지. 고밀도 화면(휴대폰 등)에서 CSS로 늘려 흐려지는 것을 막는다.
@@ -46,16 +68,7 @@ export function useMobileLayout(): void {
   CONSOLE_Y = MAP_H;
   GAME_W = W + SIDE_W;
   H = MAP_H;
-  WP_CELLS.forEach(([, r], i) => { WP[i].y = MAP_Y + (r + .5) * T; });
-}
-
-export const pathCells = new Set<string>();
-for (let i = 0; i < WP.length - 1; i++) {
-  const a = WP[i], b = WP[i + 1];
-  const c0 = Math.floor(a.x / T), r0 = Math.floor((a.y - MAP_Y) / T);
-  const c1 = Math.floor(b.x / T), r1 = Math.floor((b.y - MAP_Y) / T);
-  for (let c = Math.min(c0, c1); c <= Math.max(c0, c1); c++)
-    for (let r = Math.min(r0, r1); r <= Math.max(r0, r1); r++) pathCells.add(c + ',' + r);
+  configureMap(activeMap);
 }
 
 export interface TowerDef {
@@ -75,6 +88,8 @@ export const TOWER_DEFS = {
   templar: { name: '아칸', faction: 'protoss', role: '에너지 / 범위 공격', cost: 190, range: 160, dmg: 22, rate: 1.2, color: 0x54bdff, proj: 0x9cefff, barrel: 12, splash: 48, desc: '푸른 에너지에 둘러싸인 사이오닉 전사. 플라즈마를 방출해 반경 48의 적을 함께 타격합니다.' },
   cruiser: { name: '배틀크루저', faction: 'terran', role: '중화력 / 범위', cost: 300, range: 230, dmg: 72, rate: .8, splash: 55, color: 0xa2b4c2, proj: 0xff8a76, barrel: 24, desc: '장거리 레이저 포격으로 밀집한 적을 제압하는 전투순양함. 야마토 포는 보스를 우선 공격하며, 융단 폭격으로 전선을 정리합니다.' },
   bunker: { name: '벙커', faction: 'terran', role: '주둔 / 보병 4기', cost: 40, range: 0, dmg: 0, rate: 1, color: 0x8f9d76, proj: 0xffe8a3, barrel: 0, desc: '빈 벙커는 공격하지 않습니다. 마린·파이어뱃 최대 4기 탑승, 각 병력의 사거리 +24. 스킬도 자동 사용합니다.' },
+  support: { name: '전술 지원기', faction: 'terran', role: '지원 / 공격 속도', cost: 160, range: 145, dmg: 0, rate: 1, color: 0x81cead, proj: 0x81cead, barrel: 0, desc: '범위 내 다른 병력의 공격 속도를 20% 높입니다. 강화당 추가 5%. 같은 지원 효과는 중첩되지 않습니다.' },
+  observer: { name: '관측기', faction: 'protoss', role: '지원 / 약점 노출', cost: 175, range: 170, dmg: 0, rate: 1.4, color: 0xc4a1ff, proj: 0xc4a1ff, barrel: 0, desc: '사거리 내 적 하나의 약점을 3초간 노출해 받는 피해를 35% 높입니다. 직접 공격하지 않습니다.' },
 } satisfies Record<string, TowerDef>;
 
 export type TowerKey = keyof typeof TOWER_DEFS;
@@ -85,5 +100,8 @@ export const ENEMY_DEFS = {
   runner: { hp: 25,   speed: 110, reward: 5,   color: 0xffb74d, r: 9 },
   tank:   { hp: 160,  speed: 40,  reward: 12,  color: 0x8d6e63, r: 14 },
   boss:   { hp: 1200, speed: 34,  reward: 120, color: 0xab47bc, r: 19 },
+  medic:  { hp: 90, speed: 48, reward: 10, color: 0x76d6a5, r: 12 },
+  splitter: { hp: 130, speed: 50, reward: 10, color: 0xe3c36b, r: 13 },
+  shielder: { hp: 110, speed: 46, reward: 11, color: 0x72a9ed, r: 12 },
 };
 export type EnemyKey = keyof typeof ENEMY_DEFS;

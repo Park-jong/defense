@@ -13,6 +13,10 @@ import { DamageKind, DamageNumbers } from './damageNumbers';
 import { ShopState, SupplyShop } from './shop';
 import { MAX_UNIT_LEVEL, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
 import { BUNKER_BARREL_LENGTH, BUNKER_CAPACITY, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
+import { configureMap, ROUTES, Point } from './config';
+import { ACHIEVEMENTS, allowedUnit, awardAchievements, Bonuses, bossPattern, Branch, COMMANDERS, CommanderKey, DEFAULT_OPTIONS, DIFFICULTIES, newStats, Profile, PROFILE_KEY, readProfile, readSave, REWARDS, RewardKey, rewardChoices, RunOptions, RunSave, RunStats, SavedUnit, SAVE_KEY, clearSave, TargetMode, validateSave, wavePlan, writeStored } from './campaign';
+import { BattleAudio } from './audio';
+import { OperationsCenter, OperationsView } from './operations';
 
 interface Tower {
   id: string;
@@ -22,6 +26,7 @@ interface Tower {
   skills: EquippedSkill[]; buffs: UnitBuff[];
   host?: Tower; passengers: (Tower | null)[];
   charge?: { target: Enemy; left: number };
+  target: TargetMode; branch?: Branch;
 }
 
 interface Enemy {
@@ -29,16 +34,17 @@ interface Enemy {
   x: number; y: number; seg: number; hp: number; max: number; speed: number;
   slow: number; slowT: number; reward: number; r: number; dead?: boolean;
   stunT: number; burnT: number; burnDps: number; vulnerableT: number;
+  route?: Point[]; shield?: number; pulse?: number; age?: number; hasteT?: number; spawned?: boolean; burnSource?: string;
 }
 
 interface TowerStats { dmg: number; range: number; rate: number; splash: number; slow: number }
 
 interface Projectile {
-  s: Phaser.GameObjects.Image; x: number; y: number; tgt: Enemy; k: TowerKey; st: TowerStats; dead?: boolean;
+  s: Phaser.GameObjects.Image; x: number; y: number; tgt: Enemy; k: TowerKey; st: TowerStats; dead?: boolean; source?: string;
 }
 
 interface Cell { c: number; r: number }
-interface SkillField { x: number; y: number; radius: number; left: number; tick: number; dmg: number; color: number }
+interface SkillField { x: number; y: number; radius: number; left: number; tick: number; dmg: number; color: number; source?: string }
 const DRAGOON_CHARGE_TIME = .18;
 /** 이 depth 이상은 UI로 보고 uiCam만, 미만은 맵으로 보고 mapCam만 그린다. */
 const UI_DEPTH = 25;
@@ -69,6 +75,26 @@ export class GameScene extends Phaser.Scene {
   private bossLeaked = false;
   private testMode = false;
   private repeat = 0;
+  private options: RunOptions = { ...DEFAULT_OPTIONS };
+  private profile: Profile = readProfile();
+  private bonuses: Bonuses = { power: 0, haste: 0, range: 0 };
+  private runStats: RunStats = newStats();
+  private commander: Record<CommanderKey, number> = { strike: 0, slow: 0, supply: 0 };
+  private pending: RewardKey[] = [];
+  private rewarded = 0;
+  private usedKinds: TowerKey[] = [];
+  private tutorial = 0;
+  private operations?: OperationsCenter;
+  private operationsOpen = false;
+  private relocating: Tower | null = null;
+  private audio = new BattleAudio();
+  private opsNotice = '';
+  private checkpoint: RunSave | null = null;
+  private waveStart = { kills: 0, lost: 0, seconds: 0 };
+  private waveSpawnIndex = 0;
+  private opsRefresh = 0;
+  private saveClock = 0;
+  private runLaunched = false;
   private shop!: SupplyShop;
   private shopOpen = false;
   private shopInputEnabled = true;
@@ -117,7 +143,9 @@ export class GameScene extends Phaser.Scene {
   preload(): void { loadUnitArt(this); loadCommandIcons(this); if (!MOBILE_LAYOUT) loadConsoleChrome(this); }
 
   // ---------- 생성 ----------
-  create(): void {
+  create(data: { options?: RunOptions; resume?: RunSave; launched?: boolean } = {}): void {
+    this.options = { ...(data.resume?.options ?? data.options ?? DEFAULT_OPTIONS) };
+    configureMap(this.options.map);
     makeTextures(this);
     // 캔버스는 RENDER_SCALE배 픽셀이므로 카메라를 같은 배율로 확대해 게임 좌표(GAME_W×H)를 화면에 꽉 채운다.
     // 기본 카메라는 맵 영역만 담당(mapCam)하고, 그 위에 전체 화면 uiCam을 얹어 UI를 그린다.
@@ -131,7 +159,7 @@ export class GameScene extends Phaser.Scene {
     // scene.restart() 시 인스턴스가 재사용되므로 상태를 초기화한다.
     this.testMode = new URLSearchParams(location.search).has('test');
     this.repeat = 0;
-    this.gold = this.testMode ? TEST_GOLD : 150;
+    this.gold = this.testMode ? TEST_GOLD : this.options.mode === 'budget' ? 1500 : DIFFICULTIES[this.options.difficulty].gold;
     this.lives = 20;
     this.wave = this.testMode ? MAX_WAVE : 0;
     this.towers = []; this.enemies = []; this.projs = [];
@@ -143,6 +171,12 @@ export class GameScene extends Phaser.Scene {
     this.touchUI = window.matchMedia('(pointer: coarse)').matches;
     this.uiCache = {};
     this.fields = []; this.shopOpen = false;
+    this.profile = readProfile(); this.audio = new BattleAudio(); this.audio.volume = this.profile.volume;
+    this.bonuses = { power: 0, haste: 0, range: 0 }; this.runStats = newStats();
+    this.commander = { strike: 0, slow: 0, supply: 0 }; this.pending = []; this.rewarded = 0; this.usedKinds = [];
+    this.operationsOpen = false; this.relocating = null; this.tutorial = this.profile.tutorialDone ? 4 : 0;
+    this.opsNotice = ''; this.opsRefresh = 0; this.saveClock = 0; this.checkpoint = readSave();
+    this.runLaunched = !!data.launched || this.testMode; this.waveSpawnIndex = 0;
     this.damageNumbers = new DamageNumbers(this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.damageNumbers?.destroy());
 
@@ -172,7 +206,7 @@ export class GameScene extends Phaser.Scene {
       recruit: (id, slot, key) => this.recruit(id, slot, key),
       board: (id, slot, unitId) => this.board(id, slot, unitId),
       unload: id => this.beginUnload(id),
-      close: () => { this.shopOpen = false; this.input.enabled = this.shopInputEnabled; },
+      close: () => { this.shopOpen = false; this.input.enabled = this.shopInputEnabled; this.input.keyboard?.resetKeys(); },
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.shop.destroy());
 
@@ -186,6 +220,151 @@ export class GameScene extends Phaser.Scene {
     this.input.mouse?.disableContextMenu();
     this.input.keyboard?.addCapture('SPACE');
     this.input.keyboard?.on('keydown', (e: KeyboardEvent) => this.onKey(e));
+    this.setupOperations();
+    if (data.resume) this.restoreCheckpoint(data.resume);
+    this.applySkin();
+    if (!data.launched && !this.testMode) this.operations!.show('setup');
+    else if (this.pending.length) this.operations!.show('reward');
+    else this.saveCheckpoint(false);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.operations?.destroy(); this.operations = undefined; this.audio.destroy(); });
+  }
+
+  private savedUnits(): SavedUnit[] {
+    return this.towers.map(t => ({ id: t.id, k: t.k, c: t.c, r: t.r, lvl: t.lvl, spent: t.spent,
+      skills: t.skills.map(s => ({ ...s })), cd: t.cd, buffs: t.buffs.map(b => ({ ...b })), target: t.target, branch: t.branch,
+      hostId: t.host?.id, slot: t.host ? t.host.passengers.indexOf(t) : undefined }));
+  }
+
+  private operationsView(): OperationsView {
+    const units = this.savedUnits();
+    return { options: this.options, wave: this.wave, gold: this.gold, lives: this.lives, active: this.waveActive, over: this.over,
+      selected: units.find(u => u.id === this.selected?.id), units, stats: this.runStats, profile: this.profile,
+      commander: this.commander, pending: this.pending, checkpoint: this.checkpoint, tutorial: this.tutorial, notice: this.opsNotice, test: this.testMode, paused: this.paused };
+  }
+
+  private setupOperations(): void {
+    this.operations = new OperationsCenter({
+      view: () => this.operationsView(),
+      pause: open => { this.operationsOpen = open; this.input.enabled = !open && !this.shopOpen; this.input.keyboard?.resetKeys(); this.lastTick = performance.now(); },
+      start: options => { this.scene.restart({ options, launched: true }); },
+      resume: () => { const save = readSave(); if (save) this.scene.restart({ resume: save, launched: true }); },
+      target: mode => { if (this.selected && !this.over) this.selected.target = mode; },
+      branch: key => this.specialize(key),
+      move: () => this.beginRelocate(),
+      select: id => this.selectUnit(id),
+      choose: key => this.chooseBuild(key, true),
+      commander: key => this.useCommander(key),
+      reward: key => this.takeReward(key),
+      skin: key => { this.profile.skin = key; this.applySkin(); this.persistProfile(); },
+      volume: value => { this.profile.volume = value; this.audio.volume = value; this.audio.unlock(); this.audio.play('build'); this.persistProfile(); },
+      tutorial: skip => { this.profile.tutorialDone = skip; this.tutorial = skip ? 4 : 0; this.persistProfile(); },
+      save: () => { this.runLaunched = true; this.saveCheckpoint(true); },
+    });
+    const unlock = () => this.audio.unlock();
+    const save = () => this.saveCheckpoint(false);
+    document.addEventListener('pointerdown', unlock); document.addEventListener('keydown', unlock); window.addEventListener('pagehide', save);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      document.removeEventListener('pointerdown', unlock); document.removeEventListener('keydown', unlock); window.removeEventListener('pagehide', save);
+    });
+  }
+
+  private persistProfile(): void { if (!this.testMode) writeStored(PROFILE_KEY, this.profile); }
+
+  private saveCheckpoint(notify: boolean): void {
+    if (this.testMode || this.over || this.waveActive || !this.runLaunched) return;
+    const save: RunSave = { version: 1, options: { ...this.options }, wave: this.wave, gold: this.gold, lives: this.lives,
+      units: this.savedUnits(), bonuses: { ...this.bonuses }, stats: this.runStats, commander: { ...this.commander },
+      pending: [...this.pending], rewarded: this.rewarded, tutorial: this.tutorial, usedKinds: [...this.usedKinds] };
+    if (!validateSave(save)) { if (notify) this.opsNotice = '현재 상태를 저장할 수 없습니다.'; return; }
+    if (writeStored(SAVE_KEY, save)) {
+      this.checkpoint = structuredClone(save);
+      if (notify) this.opsNotice = '현재 준비 상태를 저장했습니다.';
+    } else this.opsNotice = '브라우저 저장 공간을 사용할 수 없습니다. 이 창에서는 계속 플레이할 수 있습니다.';
+  }
+
+  private restoreCheckpoint(save: RunSave): void {
+    if (!validateSave(save)) return;
+    this.wave = save.wave; this.gold = save.gold; this.lives = save.lives;
+    const units = new Map<string, Tower>();
+    for (const u of save.units) {
+      const t = this.createTower(u.k, u.c, u.r);
+      t.id = u.id; t.lvl = u.lvl; t.spent = u.spent; t.skills = u.skills.map(s => ({ ...s })); t.target = u.target; t.branch = u.branch;
+      t.cd = u.cd; t.buffs = u.buffs.map(b => ({ ...b }));
+      units.set(t.id, t);
+    }
+    for (const u of save.units) if (u.hostId) this.garrison(units.get(u.hostId)!, u.slot!, units.get(u.id)!);
+    this.nextUnitId = Math.max(0, ...save.units.map(u => Number(u.id)));
+    this.bonuses = { ...save.bonuses }; this.runStats = structuredClone(save.stats); this.commander = { ...save.commander };
+    this.pending = [...save.pending]; this.rewarded = save.rewarded; this.tutorial = save.tutorial; this.usedKinds = [...save.usedKinds];
+    this.opsNotice = `${save.wave}웨이브 준비 시점에서 복귀했습니다.`;
+  }
+
+  private applySkin(): void {
+    const tint = this.profile.skin === 'gold' ? 0xffdb85 : this.profile.skin === 'ion' ? 0x9bcfff : 0xffffff;
+    for (const t of this.towers) { t.base.setTint(tint); t.barrel.setTint(tint); }
+  }
+
+  private advanceTutorial(): void {
+    if (this.profile.tutorialDone || this.testMode) return;
+    const steps = [this.towers.some(t => t.k !== 'bunker'), this.towers.some(t => t.lvl > 1), this.towers.some(t => t.skills.length > 0), this.towers.some(t => t.host)];
+    while (this.tutorial < 4 && steps[this.tutorial]) this.tutorial++;
+    if (this.tutorial === 4) { this.profile.tutorialDone = true; this.persistProfile(); }
+  }
+
+  private specialize(key: Branch): boolean {
+    const t = this.selected;
+    if (!t || this.over || t.k === 'bunker' || t.lvl !== 3 || t.branch || this.gold < TOWER_DEFS[t.k].cost) return false;
+    const cost = TOWER_DEFS[t.k].cost; this.gold -= cost; t.spent += cost; t.branch = key;
+    this.audio.play('build'); this.opsNotice = '특화가 적용되었습니다.'; this.saveCheckpoint(false); return true;
+  }
+
+  private beginRelocate(): boolean {
+    const t = this.selected;
+    if (!t || t.host || this.waveActive || this.over || this.gold < 20) return false;
+    this.cancelCommand(); this.relocating = t;
+    this.banner('빈 칸을 지정해 재배치 · 20 미네랄 · ESC 취소'); return true;
+  }
+
+  private finishRelocate(c: number, r: number): void {
+    const t = this.relocating;
+    if (!t || this.waveActive || !this.cellFree(c, r) || this.gold < 20) return;
+    this.gold -= 20;
+    for (const unit of [t, ...t.passengers.filter((p): p is Tower => !!p)]) {
+      unit.c = c; unit.r = r;
+      if (unit === t) { unit.x = (c + .5) * T; unit.y = MAP_Y + (r + .5) * T; }
+      this.tweens.killTweensOf([unit.base, unit.barrel]);
+      unit.base.setPosition(unit.x, unit.y); unit.barrel.setPosition(unit.x, unit.y);
+    }
+    t.passengers.forEach((p, i) => { if (p) this.garrison(t, i, p); });
+    this.selected = t; this.relocating = null; this.saveCheckpoint(false);
+  }
+
+  private useCommander(key: CommanderKey): void {
+    if (this.over || this.paused || this.operationsOpen || this.shopOpen || !this.waveActive || this.commander[key] > 0 || key === 'supply' && this.options.mode === 'budget') return;
+    this.commander[key] = COMMANDERS[key].cooldown;
+    if (key === 'supply') this.gold += 100;
+    else for (const e of [...this.enemies]) {
+      if (e.dead) continue;
+      if (key === 'strike') this.damageEnemy(e, e.max * (e.type === 'boss' ? .12 : .3), 'skill', 'commander');
+      else { e.slow = Math.min(e.slow, .35); e.slowT = Math.max(e.slowT, 5); }
+    }
+    this.audio.play('skill'); this.banner(COMMANDERS[key].name);
+  }
+
+  private takeReward(key: RewardKey): void {
+    if (!this.pending.includes(key) || this.over || this.waveActive || this.rewarded >= this.wave) return;
+    if (key === 'power') this.bonuses.power += .12;
+    if (key === 'haste') this.bonuses.haste += .1;
+    if (key === 'range') this.bonuses.range += 12;
+    if (key === 'repair') this.lives = Math.min(20, this.lives + 4);
+    if (key === 'supply' && this.options.mode !== 'budget') this.gold += 150;
+    this.rewarded = this.wave; this.pending = []; this.opsNotice = REWARDS[key].name + ' 보상을 획득했습니다.'; this.saveCheckpoint(false);
+  }
+
+  private recordWave(cleared = true): void {
+    this.runStats.waves.push({ wave: this.wave, kills: this.runStats.kills - this.waveStart.kills,
+      lost: this.runStats.lost - this.waveStart.lost, seconds: this.runStats.seconds - this.waveStart.seconds });
+    if (!this.testMode && cleared) { awardAchievements(this.profile, this.wave, false, this.runStats, this.options, this.usedKinds); this.persistProfile(); }
   }
 
   private cellAt(p: Phaser.Input.Pointer): Cell | null {
@@ -424,13 +603,13 @@ export class GameScene extends Phaser.Scene {
     const hud = `${this.wave}/${this.gold}/${this.lives}/${remaining}/${this.paused}/${this.over}`;
     if (this.uiCache.hud !== hud) {
       this.uiCache.hud = hud;
-      this.hud.setText(`WAVE  ${String(this.wave).padStart(2, '0')} / ${MAX_WAVE}`);
+      this.hud.setText(`WAVE  ${String(this.wave).padStart(2, '0')} / ${this.options.mode === 'endless' ? '∞' : MAX_WAVE}`);
       this.mineralTxt.setText(this.gold.toLocaleString());
       this.lifeTxt.setText(`${Math.max(0, this.lives)} / 20`);
       this.lifeTxt.setColor(this.lives <= 5 ? '#e29a7f' : '#b7dc8e');
       this.goBtn.set(this.over ? '작전 종료' : this.waveActive ? `${MOBILE_LAYOUT ? '교전' : '교전 중'} · 남은 적 ${remaining}` : `▶  웨이브 시작${this.kb('  [SPACE]')}`);
     }
-    this.goBtn.en(!this.waveActive && !this.over && !this.paused && !this.shopOpen && (this.testMode || this.wave < MAX_WAVE));
+    this.goBtn.en(!this.waveActive && !this.over && !this.paused && !this.shopOpen && !this.operationsOpen && !this.pending.length && (this.testMode || this.options.mode === 'endless' || this.wave < MAX_WAVE));
     this.shopBtn.en(!this.over);
     const t = this.selected, k = t?.k ?? this.building;
     let title: string, msg: string;
@@ -441,6 +620,8 @@ export class GameScene extends Phaser.Scene {
         const crew = t?.passengers.filter((p): p is Tower => !!p) ?? [];
         title = `벙커  ${crew.length}/${BUNKER_CAPACITY} 주둔`;
         msg = `보병 최대 4기 · 사거리 +${BUNKER_RANGE_BONUS}\n` + (crew.length ? crew.map(p => `${TOWER_DEFS[p.k].name} Lv.${p.lvl} · 스킬 ${p.skills.length}/2`).join('\n') : '현재 주둔 병력 없음\n빈 벙커는 공격하지 않습니다.\n명령 아이콘으로 탑승·구매');
+      } else if (k === 'support' || k === 'observer') {
+        msg = `지원 사거리 ${st.range.toFixed(0)}\n` + (k === 'support' ? `주변 공격 속도 +${20 + ((t?.lvl ?? 1) - 1) * 5}%\n같은 지원 효과는 중첩되지 않습니다.` : '적 하나의 약점을 3초 노출\n받는 피해 +35%') + '\n강화·특화로 지원 성능 개선';
       } else {
         msg = `공격 ${st.dmg.toFixed(0)} · 사거리 ${st.range.toFixed(0)}\n공격 속도 ${(1 / st.rate).toFixed(1)}/초\n자동 스킬 ${t?.skills.length ?? 0}/${SKILL_SLOTS}`;
         msg += t?.skills.length ? '\n' + t.skills.map(s => `${SKILL_DEFS[s.key].name} ${s.cd > 0 ? Math.ceil(s.cd) + '초' : '준비'}`).join('\n') : '\n명령 아이콘으로 스킬 장착';
@@ -482,11 +663,11 @@ export class GameScene extends Phaser.Scene {
       enabled = true, price?: number): UnitCommand => ({ id, title, texture, detail, run, enabled: !this.over && enabled, price });
     const cancel = make('cancel', '선택 해제', 'cmd_cancel', '선택과 배치 명령을 취소하고 유닛 보급으로 돌아갑니다.', () => this.cancelCommand());
     cancel.hotkey = this.kb('ESC');
-    if (this.unloading) { cells[8] = cancel; return cells; }
+    if (this.unloading || this.relocating) { cells[8] = cancel; return cells; }
     const t = this.selected;
-    if (!t) return TOWER_KEYS.map((key, i) => ({
+    if (!t) return TOWER_KEYS.slice(0, 9).map((key, i) => ({
       ...make('build:' + key, TOWER_DEFS[key].name, 'unit_' + key, TOWER_DEFS[key].desc + '\n아이콘 선택 후 빈 구역에 배치하세요.',
-        () => this.chooseBuild(key), this.gold >= TOWER_DEFS[key].cost || this.building === key, TOWER_DEFS[key].cost),
+        () => this.chooseBuild(key), allowedUnit(key, this.options.mode) && (this.gold >= TOWER_DEFS[key].cost || this.building === key), TOWER_DEFS[key].cost),
       active: this.building === key, hotkey: this.kb(String(i + 1)),
     }));
     if (t.k === 'bunker') {
@@ -523,6 +704,8 @@ export class GameScene extends Phaser.Scene {
         () => { if (this.selected?.id === t.id) this.sell(); });
       cells[3].hotkey = this.kb('S');
       cells[4] = make('manage', '부대 일괄 관리', 'cmd_manage', '전장과 모든 벙커의 병력을 함께 강화하거나 스킬을 일괄 장착합니다.', () => this.openShop('manage'));
+      cells[5] = make('tactics', '전술 / 특화', 'cmd_manage', '공격 대상 우선순위와 Lv.3 특화를 선택합니다.', () => this.operations?.show('tactics'));
+      if (!t.host) cells[7] = make('relocate', '재배치', 'cmd_unload', '준비 시간에 빈 칸을 지정하면 20미네랄로 이동합니다.', () => this.beginRelocate(), !this.waveActive && this.gold >= 20, 20);
       if (t.host) {
         const hostId = t.host.id;
         cells[6] = make('host:' + hostId, '벙커로 돌아가기', 'unit_bunker', '이 병력이 탑승한 벙커를 선택합니다.', () => this.selectUnit(hostId));
@@ -540,7 +723,7 @@ export class GameScene extends Phaser.Scene {
 
   private describeCommand(command?: UnitCommand): void {
     const t = this.selected;
-    this.commandTitle.setText(this.unloading ? '하차 위치 지정' : t ? TOWER_DEFS[t.k].name + ' 명령' : '유닛 보급 / 9종');
+    this.commandTitle.setText(this.relocating ? '재배치 위치 지정' : this.unloading ? '하차 위치 지정' : t ? TOWER_DEFS[t.k].name + ' 명령' : '유닛 보급 / 지원기는 상점');
     this.commandHint.setVisible(MOBILE_LAYOUT || !!command);
     this.commandTip?.setVisible(!!command);
     const detail = command ? `${command.title}${command.price !== undefined ? ' · ◆ ' + command.price : ''}${!command.enabled && !command.active ? ' · 사용 불가' : ''}\n${MOBILE_LAYOUT ? command.detail.replace(/\n/g, ' ').slice(0, 48) : command.detail}`
@@ -556,10 +739,13 @@ export class GameScene extends Phaser.Scene {
   /** 키보드 단축키 안내. 터치 기기와 좁은 모바일 패널에서는 비운다. */
   private kb(hint: string): string { return this.touchUI || MOBILE_LAYOUT ? '' : hint; }
 
-  private cancelCommand(): void { this.building = null; this.selected = null; this.unloading = null; this.hover = null; }
+  private cancelCommand(): void { this.building = null; this.selected = null; this.unloading = null; this.relocating = null; this.hover = null; }
 
   private onKey(e: KeyboardEvent): void {
     if (e.repeat) return;
+    this.audio.unlock();
+    if (e.key.toLowerCase() === 'o' && !this.shopOpen) { if (this.operations?.open) this.operations.close(); else this.operations?.show(); return; }
+    if (this.operationsOpen) return;
     if (this.shopOpen) { if (e.key === 'Escape' || e.key.toLowerCase() === 'b') this.shop.close(); return; }
     if (e.key.toLowerCase() === 'b') { this.openShop(this.selected?.k === 'bunker' ? 'garrison' : this.selected ? 'skills' : 'manage'); return; }
     if ((e.key.toLowerCase() === 'z' || e.key.toLowerCase() === 'x') && this.selected && this.selected.k !== 'bunker') {
@@ -575,9 +761,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private chooseBuild(k: TowerKey, force = false): void {
+    if (!allowedUnit(k, this.options.mode)) return;
     if (this.over) return;
     this.building = (!force && this.building === k) ? null : k;
-    this.selected = null; this.unloading = null;
+    this.selected = null; this.unloading = null; this.relocating = null;
   }
 
   private togglePause(): void {
@@ -588,15 +775,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onMapClick(p: Phaser.Input.Pointer): void {
-    if (this.over || this.shopOpen) return;
+    if (this.over || this.shopOpen || this.operationsOpen) return;
     const cell = this.cellAt(p);
     if (!cell) return;
     const t = this.towers.find(t => !t.host && t.c === cell.c && t.r === cell.r);
     // 터치에는 호버가 없으므로, 첫 탭은 위치·사거리 미리보기만 하고 같은 칸을 다시 탭해야 확정한다.
-    if (p.wasTouch && (this.unloading || (this.building && !t)) && (this.hover?.c !== cell.c || this.hover?.r !== cell.r)) {
+    if (p.wasTouch && (this.relocating || this.unloading || (this.building && !t)) && (this.hover?.c !== cell.c || this.hover?.r !== cell.r)) {
       this.hover = cell;
       return;
     }
+    if (this.relocating) { this.finishRelocate(cell.c, cell.r); if (p.wasTouch) this.hover = null; return; }
     if (this.unloading) { this.finishUnload(cell.c, cell.r); if (p.wasTouch) this.hover = null; return; }
     if (t) {
       this.selected = this.selected === t ? null : t; this.building = null;
@@ -607,13 +795,13 @@ export class GameScene extends Phaser.Scene {
 
   // ---------- 타워 ----------
   private shopState(): ShopState {
-    return { gold: this.gold, selectedId: this.selected?.id ?? null,
+    return { gold: this.gold, selectedId: this.selected?.id ?? null, mode: this.options.mode,
       units: this.towers.map(t => ({ id: t.id, k: t.k, lvl: t.lvl, skills: t.skills, c: t.c, r: t.r,
         hostId: t.host?.id, passengers: t.passengers.map(p => p?.id ?? null) })) };
   }
 
   private openShop(tab: 'units' | 'skills' | 'garrison' | 'manage' = 'units'): void {
-    if (this.over || this.shopOpen) return;
+    if (this.over || this.shopOpen || this.operationsOpen) return;
     this.shopOpen = true; this.hover = null;
     this.shopInputEnabled = this.input.enabled;
     this.input.enabled = false;
@@ -643,15 +831,20 @@ export class GameScene extends Phaser.Scene {
   private stats(t: Tower): TowerStats {
     const d: { dmg: number; range: number; rate: number; splash?: number; slow?: number } = TOWER_DEFS[t.k];
     const l = t.lvl - 1;
-    const haste = t.buffs.reduce((v, b) => v * b.haste, 1);
+    let aura = 1;
+    for (const ally of this.towers) if (ally !== t && ally.k === 'support' && Math.hypot(ally.x - t.x, ally.y - t.y) <= this.supportRange(ally)) aura = Math.max(aura, 1.2 + (ally.lvl - 1) * .05);
+    const haste = t.buffs.reduce((v, b) => v * b.haste, 1) * aura * (1 + this.bonuses.haste) * (t.branch === 'rapid' ? 1.4 : 1);
     const power = t.buffs.reduce((v, b) => v * b.power, 1);
     return {
-      dmg: d.dmg * Math.pow(1.6, l) * power,
-      range: d.range * (1 + .08 * l) + (t.host ? BUNKER_RANGE_BONUS : 0),
-      rate: d.rate * Math.pow(.92, l) / haste,
-      splash: d.splash ? d.splash * (1 + .1 * l) : 0,
+      dmg: d.dmg * Math.pow(1.6, l) * power * (1 + this.bonuses.power) * (t.branch === 'power' ? 1.7 : 1),
+      range: this.supportRange(t) + (t.host ? BUNKER_RANGE_BONUS : 0),
+      rate: d.rate * Math.pow(.92, l) * (t.branch === 'power' ? 1.15 : 1) / haste,
+      splash: d.splash ? d.splash * (1 + .1 * l) * (t.branch === 'rapid' ? 1.35 : 1) : 0,
       slow: d.slow ? Math.max(.2, d.slow - .08 * l) : 0,
     };
+  }
+  private supportRange(t: Tower): number {
+    return TOWER_DEFS[t.k].range * (1 + .08 * (t.lvl - 1)) + this.bonuses.range + (['support', 'observer'].includes(t.k) && t.branch ? t.branch === 'power' ? 45 : 25 : 0);
   }
   private upgradeCost(t: Tower): number { return unitUpgradeCost(t); }
   private sellValue(t: Tower): number { return Math.round(t.spent * .7); }
@@ -665,7 +858,8 @@ export class GameScene extends Phaser.Scene {
     const k = this.building;
     if (!k) return;
     const d = TOWER_DEFS[k];
-    if (!this.cellFree(c, r) || this.gold < d.cost) return;
+    if (!allowedUnit(k, this.options.mode) || !this.cellFree(c, r) || this.gold < d.cost) return;
+    this.runLaunched = true;
     this.gold -= d.cost;
     const t = this.createTower(k, c, r);
     this.floatText(t.x, t.y, d.name, '#c7dfaa');
@@ -682,8 +876,12 @@ export class GameScene extends Phaser.Scene {
     if (k === 'cruiser') this.tweens.add({ targets: barrel, y: y - 2, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
     if (k === 'frost') this.tweens.add({ targets: barrel, alpha: { from: .72, to: 1 }, duration: 1100, yoyo: true, repeat: -1 });
     this.fxPlace.explode(8, x, y);
-    const t: Tower = { id: String(++this.nextUnitId), k, c, r, x, y, lvl: 1, cd: 0, shotPort: 0, spent: TOWER_DEFS[k].cost, base, barrel, skills: [], buffs: [], passengers: Array(BUNKER_CAPACITY).fill(null) };
+    const t: Tower = { id: String(++this.nextUnitId), k, c, r, x, y, lvl: 1, cd: 0, shotPort: 0, spent: TOWER_DEFS[k].cost, base, barrel, skills: [], buffs: [], passengers: Array(BUNKER_CAPACITY).fill(null), target: 'first' };
     this.towers.push(t);
+    this.runStats.units.push({ id: t.id, k, damage: 0, kills: 0 });
+    if (!this.usedKinds.includes(k)) this.usedKinds.push(k);
+    if (this.profile.skin !== 'standard') this.applySkin();
+    this.audio.play('build');
     return t;
   }
 
@@ -771,40 +969,41 @@ export class GameScene extends Phaser.Scene {
 
   // ---------- 웨이브 / 적 ----------
   private startWave(): void {
-    if (this.over || this.paused || this.shopOpen || this.waveActive || (!this.testMode && this.wave >= MAX_WAVE)) return;
+    if (this.over || this.paused || this.shopOpen || this.operationsOpen || this.pending.length || this.waveActive || (!this.testMode && this.options.mode !== 'endless' && this.wave >= MAX_WAVE)) return;
+    this.runLaunched = true; this.saveCheckpoint(false); this.cancelCommand();
     if (this.testMode) this.repeat++; else this.wave++;
-    const w = this.wave, q: EnemyKey[] = [], n = 6 + Math.floor(w * 1.6);
-    for (let i = 0; i < n; i++) {
-      let t: EnemyKey = 'grunt';
-      if (w >= 3 && i % 3 === 1) t = 'runner';
-      if (w >= 5 && i % 4 === 3) t = 'tank';
-      q.push(t);
-    }
-    if (w % 10 === 0) q.push('boss');
+    const w = this.wave, q = wavePlan(w);
+    this.waveStart = { kills: this.runStats.kills, lost: this.runStats.lost, seconds: this.runStats.seconds };
     this.spawnQ = q; this.spawnT = 0; this.waveActive = true;
-    this.banner(w % 10 === 0 ? `웨이브 ${w} — 보스 출현! (놓치면 패배)` : `웨이브 ${w}`);
+    this.banner(w % 10 === 0 ? `웨이브 ${w} — ${bossPattern(w)}` : `웨이브 ${w}`);
+    if (w % 10 === 0) this.audio.play('boss');
   }
 
-  private spawn(type: EnemyKey): void {
+  private spawn(type: EnemyKey, parent?: Enemy, child = false): void {
     const d = ENEMY_DEFS[type];
     const finalBoss = type === 'boss' && this.wave >= MAX_WAVE;
-    const hp = d.hp * Math.pow(1.17, this.wave - 1) * (finalBoss ? FINAL_BOSS_HP_MULT : 1);
-    const sprite = this.add.image(WP[0].x, WP[0].y, 'enemy_' + type).setDepth(8);
+    const hp = d.hp * Math.pow(1.17, Math.min(100, this.wave) - 1) * (1 + Math.max(0, this.wave - 100) * .1) * DIFFICULTIES[this.options.difficulty].hp * (finalBoss ? FINAL_BOSS_HP_MULT : 1);
+    const route = parent?.route ?? ROUTES[(this.waveSpawnIndex++) % ROUTES.length];
+    const sprite = this.add.image(parent?.x ?? route[0].x, parent?.y ?? route[0].y, 'enemy_' + type).setDepth(8);
     this.tweens.add({ targets: sprite, scale: { from: 0, to: 1 }, duration: 200 });
     this.enemies.push({
-      type, sprite, x: sprite.x, y: sprite.y, seg: 1, hp, max: hp, speed: d.speed,
-      slow: 1, slowT: 0, reward: d.reward + Math.floor(this.wave / 4), r: d.r,
+      type, sprite, x: sprite.x, y: sprite.y, seg: parent?.seg ?? 1, hp, max: hp, speed: d.speed * DIFFICULTIES[this.options.difficulty].speed,
+      slow: 1, slowT: 0, reward: child ? 0 : d.reward + Math.floor(this.wave / 4), r: d.r,
+      route, shield: type === 'boss' && (this.wave === 10 || this.wave >= 50) ? hp * .18 : 0, pulse: type === 'boss' ? 8 : 2, age: 0, spawned: child,
       stunT: 0, burnT: 0, burnDps: 0, vulnerableT: 0,
     });
   }
 
-  private killEnemy(e: Enemy): void {
+  private killEnemy(e: Enemy, source?: string): void {
     if (e.dead) return;
     this.damageNumbers?.flush(e);
     e.dead = true;
-    this.gold += e.reward;
+    if (this.options.mode !== 'budget') this.gold += e.reward;
+    this.runStats.kills++;
+    const record = this.runStats.units.find(u => u.id === source); if (record) record.kills++;
+    if (e.type === 'splitter' && !e.spawned) { this.spawn('runner', e, true); this.spawn('runner', e, true); }
     this.fxDie.explode(e.type === 'boss' ? 40 : 10, e.x, e.y);
-    this.floatText(e.x + 8, e.y + 10, '+' + e.reward, '#ffd54f');
+    if (this.options.mode !== 'budget' && e.reward > 0) this.floatText(e.x + 8, e.y + 10, '+' + e.reward, '#ffd54f');
     if (e.type === 'boss') this.shakeAll(300, .01);
     this.tweens.add({ targets: e.sprite, scale: 0, alpha: 0, duration: 150, onComplete: () => e.sprite.destroy() });
   }
@@ -826,19 +1025,28 @@ export class GameScene extends Phaser.Scene {
     const now = performance.now();
     const elapsed = this.lastTick ? Math.min(MAX_CATCHUP_SEC, (now - this.lastTick) / 1000) : 0;
     this.lastTick = now;
-    if (!this.paused && !this.over && !this.shopOpen) {
+    if (!this.paused && !this.over && !this.shopOpen && !this.operationsOpen) {
       this.stepAcc += elapsed;
-      while (this.stepAcc >= STEP_SEC && !this.over) {
-        for (let i = 0; i < this.speed && !this.over; i++) this.step(STEP_SEC);
+      while (this.stepAcc >= STEP_SEC && !this.over && !this.operationsOpen) {
+        for (let i = 0; i < this.speed && !this.over && !this.operationsOpen; i++) this.step(STEP_SEC);
         this.stepAcc -= STEP_SEC;
       }
     } else this.stepAcc = 0;
-    this.damageNumbers?.update(this.paused || this.shopOpen ? 0 : Math.min(.05, elapsed));
+    this.damageNumbers?.update(this.paused || this.shopOpen || this.operationsOpen ? 0 : Math.min(.05, elapsed));
+    this.advanceTutorial();
+    this.opsRefresh += elapsed;
+    if (this.opsRefresh >= .3) { this.operations?.update(); this.opsRefresh = 0; }
+    this.saveClock += elapsed;
+    if (this.saveClock >= 2) { this.saveCheckpoint(false); this.saveClock = 0; }
     this.refreshUI();
     this.drawOverlay();
   }
 
   private step(dt: number): void {
+    if (this.waveActive) {
+      this.runStats.seconds += dt;
+      for (const key of Object.keys(COMMANDERS) as CommanderKey[]) this.commander[key] = Math.max(0, this.commander[key] - dt);
+    }
     if (this.spawnQ.length) {
       this.spawnT -= dt;
       if (this.spawnT <= 0) {
@@ -849,9 +1057,10 @@ export class GameScene extends Phaser.Scene {
 
     for (const e of this.enemies) {
       if (e.dead) continue;
+      this.enemyAct(e, dt);
       e.vulnerableT = Math.max(0, e.vulnerableT - dt);
       if (e.burnT > 0) {
-        this.damageEnemy(e, e.burnDps * Math.min(dt, e.burnT), 'burn');
+        this.damageEnemy(e, e.burnDps * Math.min(dt, e.burnT), 'burn', e.burnSource);
         e.burnT = Math.max(0, e.burnT - dt);
         if (e.dead) continue;
       }
@@ -859,21 +1068,25 @@ export class GameScene extends Phaser.Scene {
       e.stunT = Math.max(0, e.stunT - dt);
       e.slowT = Math.max(0, e.slowT - dt);
       if (!e.slowT) e.slow = 1;
-      let mv = stunned ? 0 : e.speed * e.slow * dt;
-      while (mv > 0 && e.seg < WP.length) {
-        const tg = WP[e.seg], dx = tg.x - e.x, dy = tg.y - e.y, dist = Math.hypot(dx, dy);
+      const route = e.route ?? WP;
+      const accelerated = e.type === 'boss' && ((this.wave === 40 && (e.age ?? 0) % 10 >= 7) || (e.hasteT ?? 0) > 0);
+      let mv = stunned ? 0 : e.speed * e.slow * dt * (accelerated ? 1.8 : 1);
+      while (mv > 0 && e.seg < route.length) {
+        const tg = route[e.seg], dx = tg.x - e.x, dy = tg.y - e.y, dist = Math.hypot(dx, dy);
         if (dist <= mv) { e.x = tg.x; e.y = tg.y; e.seg++; mv -= dist; }
         else { e.x += dx / dist * mv; e.y += dy / dist * mv; mv = 0; }
       }
       e.sprite.setPosition(e.x, e.y);
-      if (e.seg < WP.length) e.sprite.setRotation(Math.atan2(WP[e.seg].y - e.y, WP[e.seg].x - e.x));
+      if (e.seg < route.length) e.sprite.setRotation(Math.atan2(route[e.seg].y - e.y, route[e.seg].x - e.x));
       if (stunned) e.sprite.setTint(0xb7f5ff);
       else if (e.burnT > 0) e.sprite.setTint(0xffab69);
       else if (e.vulnerableT > 0) e.sprite.setTint(0xb8a0ff);
-      else if (e.slow < 1) e.sprite.setTint(0x81d4fa); else e.sprite.clearTint();
-      if (e.seg >= WP.length) {
+      else if (e.slow < 1) e.sprite.setTint(0x81d4fa); else if (accelerated) e.sprite.setTint(0xffb76f); else e.sprite.clearTint();
+      if (e.seg >= route.length) {
         e.dead = true; e.sprite.destroy();
+        this.runStats.lost += e.type === 'boss' ? this.lives : 1;
         if (e.type === 'boss') { this.bossLeaked = true; this.lives = 0; } else this.lives--;
+        this.audio.play('warning');
         this.shakeAll(150, .006);
         this.uiCam.flash(120, 255, 60, 60);
       }
@@ -885,7 +1098,7 @@ export class GameScene extends Phaser.Scene {
       field.left -= dt; field.tick -= dt;
       if (field.tick <= 0) {
         field.tick += .5;
-        for (const e of this.enemies) if (!e.dead && Math.hypot(e.x - field.x, e.y - field.y) <= field.radius) this.damageEnemy(e, field.dmg, 'skill');
+        for (const e of this.enemies) if (!e.dead && Math.hypot(e.x - field.x, e.y - field.y) <= field.radius) this.damageEnemy(e, field.dmg, 'skill', field.source);
       }
     }
     this.fields = this.fields.filter(f => f.left > 0);
@@ -902,18 +1115,47 @@ export class GameScene extends Phaser.Scene {
 
     if (this.waveActive && !this.spawnQ.length && !this.enemies.length && this.lives > 0) {
       this.waveActive = false;
-      if (this.wave >= MAX_WAVE && !this.testMode) this.endGame(true);
+      this.recordWave();
+      if (this.wave >= MAX_WAVE && !this.testMode && this.options.mode !== 'endless') this.endGame(true);
       else {
-        const bonus = CLEAR_BONUS_BASE + this.wave * CLEAR_BONUS_PER_WAVE;
+        const bonus = this.options.mode === 'budget' ? 0 : CLEAR_BONUS_BASE + this.wave * CLEAR_BONUS_PER_WAVE;
         this.gold += bonus;
         this.banner(`구역 확보 · +${bonus} 미네랄`);
+        this.audio.play('clear');
+        if (!this.testMode && this.wave % 5 === 0 && this.rewarded < this.wave) {
+          this.pending = rewardChoices(this.options.mode); this.opsNotice = ''; this.operations?.show('reward');
+        }
+        this.saveCheckpoint(false);
       }
     }
     if (this.lives <= 0) this.endGame(false);
   }
 
+  private enemyAct(e: Enemy, dt: number): void {
+    e.hasteT = Math.max(0, (e.hasteT ?? 0) - dt);
+    e.age = (e.age ?? 0) + dt; e.pulse = (e.pulse ?? 2) - dt;
+    if (e.pulse > 0 || e.stunT > 0) return;
+    if (e.type === 'boss') {
+      e.pulse = 8;
+      const phase = this.wave >= 50 ? Math.floor(e.age / 8) % 3 : Math.floor(this.wave / 10) - 1;
+      if (phase === 0) { e.shield = Math.max(e.shield ?? 0, e.max * .18); this.skillRing(e.x, e.y, 40, 0x8ab6ff); }
+      if (phase === 1) { this.spawn('grunt', e, true); this.spawn('grunt', e, true); this.spawn('medic', e, true); }
+      if (phase === 2) {
+        if (this.wave >= 50) { e.hasteT = 4; this.skillRing(e.x, e.y, 40, 0xffb76f); }
+        else { this.spawn('runner', e, true); this.spawn('runner', e, true); this.spawn('runner', e, true); }
+      }
+    } else if (e.type === 'medic' || e.type === 'shielder') {
+      const heal = e.type === 'medic'; e.pulse = heal ? 2 : 3;
+      for (const ally of this.enemies) if (!ally.dead && Math.hypot(ally.x - e.x, ally.y - e.y) <= (heal ? 100 : 95)) {
+        if (heal) ally.hp = Math.min(ally.max, ally.hp + ally.max * .05);
+        else ally.shield = Math.max(ally.shield ?? 0, ally.max * .08);
+      }
+      this.skillRing(e.x, e.y, heal ? 100 : 95, heal ? 0x76d6a5 : 0x72a9ed);
+    }
+  }
+
   private towerAct(t: Tower, dt: number): void {
-    if (t.k === 'bunker') return;
+    if (t.k === 'bunker' || t.k === 'support') return;
     for (const buff of t.buffs) buff.left -= dt;
     t.buffs = t.buffs.filter(b => b.left > 0);
     for (const skill of t.skills) skill.cd = Math.max(0, skill.cd - dt);
@@ -929,6 +1171,10 @@ export class GameScene extends Phaser.Scene {
     }
     let best = this.findTarget(t);
     if (!best) return;
+    if (t.k === 'observer') {
+      if (t.cd <= 0) { best.vulnerableT = Math.max(best.vulnerableT, 3); t.cd = this.stats(t).rate; this.skillBeam(t, best, 0xc4a1ff); }
+      return;
+    }
     for (const skill of t.skills) {
       if (skill.cd > 0) continue;
       if (best.dead) best = this.findTarget(t);
@@ -948,6 +1194,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private fire(t: Tower, best: Enemy, st: TowerStats): void {
+    this.audio.play(t.k);
     const d = TOWER_DEFS[t.k];
     const angle = Math.atan2(best.y - t.y, best.x - t.x);
     const reach = t.host ? BUNKER_BARREL_LENGTH : t.k === 'cruiser' ? 29 * (UNIT_WORLD_SCALE.cruiser ?? 1) : t.k === 'cannon' ? SIEGE_MUZZLE.x * (UNIT_WORLD_SCALE.cannon ?? 1) : t.k === 'marine' ? 31 : t.k === 'firebat' ? FIREBAT_MUZZLES[0].x : t.k === 'arrow' ? 15 : 8;
@@ -956,7 +1203,7 @@ export class GameScene extends Phaser.Scene {
     const muzzleY = t.k === 'templar' ? t.y - 8 : t.k === 'sniper' ? t.y + DRAGOON_EMITTER.y : port ? t.y + port.x * Math.sin(angle) + port.y * Math.cos(angle) : t.k === 'frost' ? t.y - 18 : t.y + Math.sin(angle) * reach;
     const flightAngle = t.k === 'sniper' || t.k === 'templar' ? Math.atan2(best.y - muzzleY, best.x - muzzleX) : angle;
     const s = this.add.image(muzzleX, muzzleY, 'shot_' + t.k).setDepth(9).setRotation(flightAngle);
-    this.projs.push({ s, x: muzzleX, y: muzzleY, tgt: best, k: t.k, st });
+    this.projs.push({ s, x: muzzleX, y: muzzleY, tgt: best, k: t.k, st, source: t.id });
     if (t.host) {
       const scale = t.k === 'firebat' ? 1 : .6;
       const flame = this.add.image(muzzleX, muzzleY, 'bunker_muzzle').setOrigin(0, .5).setRotation(angle).setScale(scale).setDepth(12);
@@ -1009,19 +1256,27 @@ export class GameScene extends Phaser.Scene {
     let best: Enemy | null = null, bp = -Infinity;
     for (const e of this.enemies) {
       if (e.dead || Math.hypot(e.x - t.x, e.y - t.y) > range) continue;
-      const nx = WP[Math.min(e.seg, WP.length - 1)];
-      const p = e.seg * 10000 - Math.hypot(nx.x - e.x, nx.y - e.y);
+      const route = e.route ?? WP, nx = route[Math.min(e.seg, route.length - 1)];
+      let remaining = Math.hypot(nx.x - e.x, nx.y - e.y);
+      for (let i = e.seg; i < route.length - 1; i++) remaining += Math.hypot(route[i + 1].x - route[i].x, route[i + 1].y - route[i].y);
+      const p = t.target === 'strong' ? e.hp : t.target === 'weak' ? -e.hp : t.target === 'boss' ? (e.type === 'boss' ? 1e9 : 0) - remaining : -remaining;
       if (p > bp) { bp = p; best = e; }
     }
     return best;
   }
 
-  private damageEnemy(e: Enemy, dmg: number, kind: DamageKind = 'normal'): void {
+  private damageEnemy(e: Enemy, dmg: number, kind: DamageKind = 'normal', source?: string): void {
     if (e.dead || !Number.isFinite(dmg) || dmg <= 0) return;
     const amount = dmg * (e.vulnerableT > 0 ? 1.35 : 1);
-    e.hp -= amount;
-    this.damageNumbers?.hit(e, amount, kind);
-    if (e.hp <= 0) this.killEnemy(e);
+    const absorbed = Math.min(e.shield ?? 0, amount);
+    e.shield = Math.max(0, (e.shield ?? 0) - absorbed);
+    const dealt = Math.min(e.hp, amount - absorbed);
+    e.hp -= dealt;
+    this.runStats.damage += dealt;
+    const record = this.runStats.units.find(u => u.id === source); if (record) record.damage += dealt;
+    if (source === 'commander') this.runStats.commanderDamage += dealt;
+    this.damageNumbers?.hit(e, amount - absorbed, kind);
+    if (e.hp <= 0) this.killEnemy(e, source);
   }
 
   private skillRing(x: number, y: number, radius: number, color: number): void {
@@ -1056,24 +1311,25 @@ export class GameScene extends Phaser.Scene {
   }
 
   private autoSkill(t: Tower, key: SkillKey, target: Enemy): void {
+    this.audio.play('skill');
     const d = SKILL_DEFS[key], st = this.stats(t);
     const nearby = this.enemies.filter(e => !e.dead && Math.hypot(e.x - t.x, e.y - t.y) <= st.range)
       .sort((a, b) => Math.hypot(a.x - target.x, a.y - target.y) - Math.hypot(b.x - target.x, b.y - target.y));
     const burn = (e: Enemy, factor: number, seconds: number) => {
-      e.burnDps = Math.max(e.burnT > 0 ? e.burnDps : 0, st.dmg * factor);
+      if (e.burnT <= 0 || e.burnDps <= st.dmg * factor) { e.burnDps = st.dmg * factor; e.burnSource = t.id; }
       e.burnT = Math.max(e.burnT, seconds);
     };
     const area = (x: number, y: number, radius: number, factor: number, status?: (e: Enemy) => void) => {
       this.skillRing(x, y, radius, d.color);
       for (const e of this.enemies) {
         if (e.dead || Math.hypot(e.x - x, e.y - y) > radius) continue;
-        status?.(e); this.damageEnemy(e, st.dmg * factor, 'skill');
+        status?.(e); this.damageEnemy(e, st.dmg * factor, 'skill', t.id);
       }
     };
     this.floatText(t.x, t.y - 12, d.name, '#' + d.color.toString(16).padStart(6, '0'));
     switch (key) {
       case 'barrage':
-        for (const e of nearby.slice(0, 4)) { this.skillBeam(t, e, d.color); this.damageEnemy(e, st.dmg * 2, 'skill'); }
+        for (const e of nearby.slice(0, 4)) { this.skillBeam(t, e, d.color); this.damageEnemy(e, st.dmg * 2, 'skill', t.id); }
         break;
       case 'overdrive': t.buffs.push({ left: 4, haste: 2, power: 1 }); this.skillRing(t.x, t.y, 35, d.color); break;
       case 'siege': area(target.x, target.y, 90, 3.2); this.fxBoom.explode(24, target.x, target.y); break;
@@ -1082,21 +1338,21 @@ export class GameScene extends Phaser.Scene {
       case 'nova': area(t.x, t.y, 135, 5, e => { e.slow = Math.min(e.slow, .35); e.slowT = Math.max(e.slowT, 4); }); break;
       case 'plasma':
         this.skillBeam({ x: t.x + DRAGOON_EMITTER.x, y: t.y + DRAGOON_EMITTER.y }, target, d.color, 4);
-        this.damageEnemy(target, st.dmg * 2, 'skill'); target.vulnerableT = 5;
+        this.damageEnemy(target, st.dmg * 2, 'skill', t.id); target.vulnerableT = 5;
         break;
       case 'chain': {
         let previous = { x: t.x + DRAGOON_EMITTER.x, y: t.y + DRAGOON_EMITTER.y };
-        nearby.slice(0, 5).forEach((e, i) => { this.skillBeam(previous, e, d.color, 2); this.damageEnemy(e, st.dmg * 1.8 * (1 - .12 * i), 'skill'); previous = e; });
+        nearby.slice(0, 5).forEach((e, i) => { this.skillBeam(previous, e, d.color, 2); this.damageEnemy(e, st.dmg * 1.8 * (1 - .12 * i), 'skill', t.id); previous = e; });
         break;
       }
       case 'stim': t.buffs.push({ left: 6, haste: 1.8, power: 1 }); this.skillRing(t.x, t.y, 35, d.color); break;
-      case 'burst': this.skillBeam(t, target, d.color, 3); this.damageEnemy(target, st.dmg * 4.5, 'skill'); break;
+      case 'burst': this.skillBeam(t, target, d.color, 3); this.damageEnemy(target, st.dmg * 4.5, 'skill', t.id); break;
       case 'inferno': area(target.x, target.y, 70, 2.5, e => burn(e, 1, 4)); this.fxBoom.explode(20, target.x, target.y); break;
       case 'ignite':
         for (const e of nearby.slice(0, 3)) { burn(e, 1.5, 6); this.skillBeam(t, e, d.color); }
         break;
       case 'storm':
-        this.fields.push({ x: target.x, y: target.y, radius: 85, left: 4, tick: .5, dmg: st.dmg * .9, color: d.color });
+        this.fields.push({ x: target.x, y: target.y, radius: 85, left: 4, tick: .5, dmg: st.dmg * .9, color: d.color, source: t.id });
         this.archonBurst(target.x, target.y, 65);
         this.skillRing(target.x, target.y, 85, d.color);
         break;
@@ -1116,7 +1372,7 @@ export class GameScene extends Phaser.Scene {
         const core = this.add.circle(bow.x, bow.y, 6, 0xffda8a, .85).setStrokeStyle(2, 0xfff2c8).setDepth(12);
         this.tweens.add({ targets: core, scale: 2.5, alpha: 0, duration: 360, onComplete: () => core.destroy() });
         this.skillBeam(bow, victim, d.color, 9); this.skillRing(victim.x, victim.y, 55, d.color);
-        this.damageEnemy(victim, st.dmg * 12, 'skill'); this.fxBoom.explode(30, victim.x, victim.y);
+        this.damageEnemy(victim, st.dmg * 12, 'skill', t.id); this.fxBoom.explode(30, victim.x, victim.y);
         break;
       }
       case 'bombard':
@@ -1140,10 +1396,10 @@ export class GameScene extends Phaser.Scene {
       }
       for (const o of this.enemies) {
         if (o.dead || Math.hypot(o.x - e.x, o.y - e.y) > st.splash) continue;
-        this.damageEnemy(o, st.dmg);
+        this.damageEnemy(o, st.dmg, 'normal', p.source);
       }
     } else {
-      this.damageEnemy(e, st.dmg);
+      this.damageEnemy(e, st.dmg, 'normal', p.source);
     }
     if (st.slow && !e.dead) {
       e.slow = Math.min(e.slow, st.slow); e.slowT = Math.max(e.slowT, 2);
@@ -1154,6 +1410,14 @@ export class GameScene extends Phaser.Scene {
   private drawOverlay(): void {
     const g = this.gfx;
     g.clear();
+    const skinColor = this.profile.skin === 'gold' ? 0xffdb85 : this.profile.skin === 'ion' ? 0x9bcfff : 0x91bd7a;
+    const gate = WP[WP.length - 1];
+    g.lineStyle(3, skinColor, .9).strokeRect(W - 35, gate.y - 29, 26, 58);
+    if (this.relocating && this.hover) {
+      const cell = this.hover;
+      g.lineStyle(2, this.cellFree(cell.c, cell.r) ? 0xc0ec94 : 0xe38670, .9).strokeRect(cell.c * T + 2, MAP_Y + cell.r * T + 2, T - 4, T - 4);
+    }
+    if (this.selected && ['support', 'observer'].includes(this.selected.k)) g.lineStyle(1, 0x9fd9bf, .45).strokeCircle(this.selected.x, this.selected.y, this.supportRange(this.selected));
     for (const field of this.fields) {
       g.fillStyle(field.color, .09).fillCircle(field.x, field.y, field.radius);
       g.lineStyle(1.5, field.color, .55).strokeCircle(field.x, field.y, field.radius);
@@ -1249,6 +1513,12 @@ export class GameScene extends Phaser.Scene {
       const w = e.r * 2 + 4, x = e.x - w / 2, y = e.y - e.r - 9;
       g.fillStyle(0x000000, .65).fillRect(x, y, w, 4);
       g.fillStyle(0x66bb6a).fillRect(x, y, w * Math.max(0, e.hp / e.max), 4);
+      if ((e.shield ?? 0) > 0) {
+        g.fillStyle(0x81b8ff).fillRect(x, y - 4, w * Math.min(1, (e.shield ?? 0) / (e.max * .18)), 2);
+        g.lineStyle(1, 0x81b8ff, .65).strokeCircle(e.x, e.y, e.r + 3);
+      }
+      if (e.type === 'medic') { g.lineStyle(2, 0xc1ffe1).lineBetween(e.x - 4, e.y, e.x + 4, e.y).lineBetween(e.x, e.y - 4, e.x, e.y + 4); }
+      if (e.type === 'splitter') g.lineStyle(1.5, 0xffe4a1).strokeTriangle(e.x - 6, e.y + 5, e.x, e.y - 6, e.x + 6, e.y + 5);
       if (e.stunT > 0) g.lineStyle(1, 0xb4f4ff, .8).strokeCircle(e.x, e.y, e.r + 4);
       if (e.burnT > 0) g.fillStyle(0xffb456, .8).fillTriangle(e.x - 4, e.y - e.r, e.x, e.y - e.r - 8, e.x + 4, e.y - e.r);
     }
@@ -1269,6 +1539,13 @@ export class GameScene extends Phaser.Scene {
   private endGame(win: boolean): void {
     if (this.over) return;
     this.over = true;
+    if (!win && this.waveActive) this.recordWave(false);
+    if (!this.testMode) {
+      const earned = awardAchievements(this.profile, win ? this.wave : Math.max(0, this.wave - 1), win, this.runStats, this.options, this.usedKinds);
+      this.persistProfile(); clearSave(); this.checkpoint = null;
+      this.opsNotice = earned.length ? '업적 달성: ' + earned.map(k => ACHIEVEMENTS[k as keyof typeof ACHIEVEMENTS].name).join(' · ') : '작전이 종료되었습니다. 전투 통계에서 병력별 전과를 확인하세요.';
+    }
+    this.operations?.update();
     this.pauseTxt.setVisible(false);
     this.add.rectangle(0, 0, GAME_W, H, 0x030906, .82).setOrigin(0).setDepth(50);
     this.add.rectangle(W / 2, 330, 580, 280, 0x18221c).setStrokeStyle(2, 0x738361).setDepth(51);
@@ -1280,6 +1557,9 @@ export class GameScene extends Phaser.Scene {
     const btn = this.add.rectangle(W / 2, 410, 230, 46, 0x2c3d29).setStrokeStyle(1, 0x8aab6a)
       .setInteractive({ useHandCursor: true }).setDepth(51);
     this.add.text(W / 2, 410, '↻  작전 재시작', { fontFamily: FONT, fontSize: '16px', color: '#d2e7b5' }).setOrigin(.5).setDepth(52);
-    btn.on('pointerdown', () => this.scene.restart());
+    btn.on('pointerdown', () => this.scene.restart({ options: this.options, launched: true }));
+    const report = this.add.rectangle(W / 2, 458, 230, 32, 0x21372a).setStrokeStyle(1, 0x66825d).setInteractive({ useHandCursor: true }).setDepth(51);
+    this.add.text(W / 2, 458, '전투 통계 / 업적', { fontFamily: FONT, fontSize: '13px', color: '#d2e7b5' }).setOrigin(.5).setDepth(52);
+    report.on('pointerdown', () => this.operations?.show('stats'));
   }
 }
