@@ -76,7 +76,7 @@ test('서로 다른 장면의 건설 금지 칸·적 진입 경로·이동은 �
   const before = frontier.enemies[0].x;
   frontier.step(.1);
   assert.ok(frontier.enemies[0].x > before);
-  assert.equal(frontier.enemies[0].y, 176);
+  assert.equal(frontier.enemies[0].y, config.MAP_Y + 120);
   assert.equal(junction.enemies[0].x, -24);
 });
 

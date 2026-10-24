@@ -1,4 +1,4 @@
-import { ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, GAME_W, MAP_DEFS, MAP_Y, MAX_WAVE, TOWER_DEFS, TowerKey, TOWER_KEYS, W } from './config';
+import { ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, GAME_W, MAP_DEFS, MAX_WAVE, MOBILE_LAYOUT, SIDE_W, TOP_BAR_H, TOWER_DEFS, TowerKey, TOWER_KEYS, W } from './config';
 import { SKILL_DEFS } from './catalog';
 import { unitImageUrl } from './unitArt';
 import { commandIconUrl } from './commandIcons';
@@ -110,18 +110,23 @@ export class OperationsCenter {
     const tutorial = !v.profile.tutorialDone && v.tutorial < 4 && !v.test && !v.active && !v.over
       ? `<div class="field-tutorial">${icon(tutorialIcons[v.tutorial])}<span title="${escape(tutorialSteps[v.tutorial])}">${tutorialHints[v.tutorial]}</span><span class="training-progress" role="img" aria-label="훈련 ${v.tutorial + 1}/4">${tutorialSteps.map((_, i) => `<i class="${i <= v.tutorial ? 'done' : ''}"></i>`).join('')}</span>${button('open', 'codex', icon('help'), '도움말')}${button('skip', '', icon('skip'), '훈련 건너뛰기')}</div>` : '';
     const factions = `<div class="mission-actions mission-factions" role="group" aria-label="종족 선택">${(Object.keys(FACTIONS) as Faction[]).map(k => button('faction', k, icon(k), `${FACTIONS[k].name} 병력 9종${k === 'terran' ? ' [T]' : ' [R]'}`, { disabled: v.over || v.options.mode === 'bunker' && k === 'protoss', selected: v.faction === k })).join('')}</div>`;
+    // 모바일 사이드 패널은 한 줄(32px)뿐이라 훈련 안내가 있으면 예보 대신 보여준다.
+    const forecast = !v.active && !v.over && !(tutorial && MOBILE_LAYOUT) ? `<div class="mission-forecast" role="group" aria-label="다음 웨이브 ${next}"><b>W ${String(next).padStart(2, '0')}</b>${this.enemies(next)}</div>` : '';
     const html = `<div class="mission-strip"><div class="mission-toolbar">${factions}<div class="mission-actions" role="group" aria-label="사령관 패널">${button('open', 'tactics', icon('manage'), '작전실 [O]')}${(['strike', 'slow', 'supply'] as CommanderKey[]).map(k => {
       const cooldown = Math.ceil(v.commander[k]);
       return button('commander', k, `${icon(k)}${cooldown > 0 ? `<span class="mission-cooldown" aria-hidden="true">${cooldown}</span>` : ''}`, COMMANDERS[k].name + (cooldown > 0 ? ` ${cooldown}초` : ''), { disabled: v.over || v.paused || !v.active || cooldown > 0 || v.options.mode === 'budget' && k === 'supply', hint: `${COMMANDERS[k].name} · ${COMMANDERS[k].desc} · 재사용 ${COMMANDERS[k].cooldown}초${cooldown > 0 ? ` · 남은 ${cooldown}초` : ''}` });
-    }).join('')}</div></div>${!v.active && !v.over ? `<div class="mission-forecast" role="group" aria-label="다음 웨이브 ${next}"><b>W ${String(next).padStart(2, '0')}</b>${this.enemies(next)}</div>` : ''}</div>${tutorial}`;
+    }).join('')}</div></div>${forecast}${tutorial}</div>`;
     if (html !== this.cache) { this.ribbon.innerHTML = html; this.cache = html; }
     this.position();
   }
+  /** 게임 좌표 크기 그대로 배치하고 캔버스 배율만큼 줄인다: 데스크톱은 맵 위 전술 띠, 모바일은 사이드 패널 맨 위. */
   private position(): void {
     const canvas = document.querySelector('canvas'); if (!canvas) return;
-    const r = canvas.getBoundingClientRect(), scale = r.width / GAME_W;
-    Object.assign(this.ribbon.style, { left: `${r.left + 8 * scale}px`, top: `${r.top + (MAP_Y + 6) * scale}px`, width: `${(W - 16) * scale}px` });
-    this.ribbon.classList.toggle('compact', W * scale < 650);
+    const r = canvas.getBoundingClientRect(), scale = r.width / GAME_W, side = MOBILE_LAYOUT;
+    Object.assign(this.ribbon.style, side
+      ? { left: `${r.left + (W + 8) * scale}px`, top: `${r.top + 4 * scale}px`, width: `${SIDE_W - 16}px`, transform: `scale(${scale})` }
+      : { left: `${r.left + 8 * scale}px`, top: `${r.top + (TOP_BAR_H + 2) * scale}px`, width: `${W - 16}px`, transform: `scale(${scale})` });
+    this.ribbon.classList.toggle('side', side);
   }
   private art(key: TowerKey): string { return `<img class="ops-unit-art" src="${this.images.get(key)}" width="64" height="64" alt="" aria-hidden="true">`; }
   private enemies(wave: number): string {

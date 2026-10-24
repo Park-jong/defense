@@ -11,13 +11,14 @@ const { createLayoutConfig } = load('./interface/layout');
 test('기존 세 전장의 입구·출구 좌표와 모바일의 경로·건설 제한을 보존한다', () => {
   const entries = { frontier: [176], canyon: [128], junction: [128, 512] };
   const exits = { frontier: 512, canyon: 560, junction: 512 };
+  const top = createLayoutConfig('desktop').mapY - 56; // 데스크톱 전술 띠만큼 내려간 높이
   for (const key of Object.keys(MAP_DEFS)) {
     const desktop = createMapRuntime(key, createLayoutConfig('desktop').mapY);
     const mobile = createMapRuntime(key, createLayoutConfig('mobile').mapY);
-    assert.deepEqual(desktop.routes.map(route => route[0]), entries[key].map(y => ({ x: -24, y })));
-    for (const route of desktop.routes) assert.deepEqual(route.at(-1), { x: 984, y: exits[key] });
+    assert.deepEqual(desktop.routes.map(route => route[0]), entries[key].map(y => ({ x: -24, y: y + top })));
+    for (const route of desktop.routes) assert.deepEqual(route.at(-1), { x: 984, y: exits[key] + top });
     assert.deepEqual(desktop.pathCells, mobile.pathCells);
-    assert.deepEqual(mobile.routes, desktop.routes.map(route => route.map(p => ({ x: p.x, y: p.y - 56 }))));
+    assert.deepEqual(mobile.routes, desktop.routes.map(route => route.map(p => ({ x: p.x, y: p.y - createLayoutConfig('desktop').mapY }))));
   }
 });
 
@@ -39,7 +40,7 @@ test('화면 배치 생성과 배율 변경은 이미 만든 전장의 경로를
   const { createMapRuntime } = local('./game/map');
   const map = createMapRuntime('junction', config.MAP_Y), snapshot = structuredClone(map);
   config.createLayoutConfig('mobile');
-  assert.equal(config.MAP_Y, 56);
+  assert.equal(config.MAP_Y, 112);
   config.useMobileLayout(); config.setRenderScale(2.5);
   assert.equal(config.MAP_Y, 0);
   assert.deepEqual(map, snapshot);

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { MAP_H, RENDER_SCALE, W } from './config';
+import { RENDER_SCALE, W } from './config';
 
 export const CONSOLE_RISE = 32;
 const HEIGHT = 256;
@@ -93,20 +93,9 @@ export function loadConsoleChrome(scene: Phaser.Scene): void {
   scene.load.svg(KEY, 'data:image/svg+xml;base64,' + btoa(artwork()), { width: W * RENDER_SCALE, height: HEIGHT * RENDER_SCALE });
 }
 
-export function addConsoleChrome(scene: Phaser.Scene, y: number, battlefieldKey: string): void {
-  // Continue the battlefield floor through the valleys between raised housings.
-  const groundKey = 'console-ground_' + battlefieldKey, bleed = 88, rs = RENDER_SCALE;
-  if (!scene.textures.exists(groundKey)) {
-    const ground = scene.textures.createCanvas(groundKey, W * rs, bleed * rs)!;
-    // 맵 아래 가장자리를 거울처럼 뒤집어 이어 붙여 경계가 끊기지 않게 한다.
-    ground.context.setTransform(1, 0, 0, -1, 0, bleed * rs);
-    ground.context.drawImage(scene.textures.get(battlefieldKey).getSourceImage() as HTMLCanvasElement,
-      0, (MAP_H - bleed) * rs, W * rs, bleed * rs, 0, 0, W * rs, bleed * rs);
-    ground.refresh();
-  }
-  // 맵 아래 가장자리(y - 26)부터 가장 깊은 골짜기(능선 y=82)까지 채운다.
-  scene.add.image(0, y - 26, groundKey).setOrigin(0).setDisplaySize(W, bleed).setDepth(25);
+export function addConsoleChrome(scene: Phaser.Scene, y: number): void {
+  // 골짜기 바닥의 땅은 맵 카메라(GameScene)가 맵 아래로 이어 그린다. 여기서는 장갑만 얹는다.
   const armor = scene.add.image(0, y - CONSOLE_RISE, KEY).setOrigin(0).setDisplaySize(W, HEIGHT).setDepth(26);
-  const shape = new Phaser.Geom.Polygon([...ridge, [W, HEIGHT], [0, HEIGHT]].map(([x, yy]) => ({ x: x * rs, y: yy * rs })));
+  const shape = new Phaser.Geom.Polygon([...ridge, [W, HEIGHT], [0, HEIGHT]].map(([x, yy]) => ({ x: x * RENDER_SCALE, y: yy * RENDER_SCALE })));
   armor.setInteractive(shape, Phaser.Geom.Polygon.Contains);
 }

@@ -1,7 +1,8 @@
 .mission-ribbon,.operations-center { font-family:'Malgun Gothic',system-ui,sans-serif; color:#e0e8d6; }
-.mission-ribbon { position:fixed; z-index:5; pointer-events:none; }
-.mission-strip { box-sizing:border-box; display:flex; flex-direction:column; align-items:center; gap:4px; width:fit-content; max-width:100%; margin:0 auto; padding:5px; background:#0c1714ed; border:1px solid #4c6251; border-radius:10px; pointer-events:auto; box-shadow:0 4px 15px #0005; }
-.mission-toolbar,.mission-actions { display:flex; justify-content:center; align-items:center; gap:5px; }
+.mission-ribbon { position:fixed; z-index:5; pointer-events:none; transform-origin:0 0; }
+/* 데스크톱: 상단 바와 맵 사이 56px 띠 안의 한 줄(상황판은 게임 좌표 크기로 배치되고 캔버스 배율만큼 줄어든다). */
+.mission-strip { box-sizing:border-box; display:flex; align-items:center; gap:10px; height:52px; width:fit-content; max-width:100%; margin:0 auto; padding:3px 6px; background:#0c1714b8; border:1px solid #3d4b3f; border-radius:8px; pointer-events:auto; }
+.mission-toolbar,.mission-actions { display:flex; justify-content:center; align-items:center; flex:none; gap:5px; }
 .mission-factions { padding-right:6px; margin-right:1px; border-right:1px solid #455c49; }
 .mission-ribbon button { position:relative; display:grid; place-items:center; box-sizing:border-box; flex:0 0 44px; width:44px; height:44px; padding:4px; color:inherit; background:#20362b; border:1px solid #50684d; border-radius:6px; cursor:pointer; }
 .mission-ribbon .mission-factions button[data-key="protoss"] { border-color:#8b7849; }
@@ -11,23 +12,33 @@
 .mission-ribbon button:hover:enabled { background:#3b5340; }
 .mission-ribbon button:focus-visible,.operations-center :focus-visible { outline:2px solid #d0ee9b; outline-offset:3px; }
 .mission-cooldown { position:absolute; inset:0; display:grid; place-items:center; border-radius:5px; background:#07100ed9; color:#e4edc7; font:bold 14px monospace; }
-.mission-forecast { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:5px; max-width:100%; color:#aec298; font:10px monospace; }
+.mission-forecast { display:flex; flex:none; justify-content:center; align-items:center; gap:5px; max-width:100%; color:#aec298; font:10px monospace; }
 .mission-forecast>b { margin:0 4px; color:#c9dbb2; }
 .ops-icon { display:block; flex-shrink:0; object-fit:contain; }
 .ops-enemy { display:inline-flex; align-items:center; gap:3px; color:#b9cba9; }
 .ops-enemy .ops-icon { width:24px; height:24px; }
 .ops-enemy b { font:11px monospace; }
 .ops-enemy.is-boss { color:#e9b588; }
-.field-tutorial { display:flex; align-items:center; gap:7px; width:fit-content; max-width:100%; box-sizing:border-box; margin:5px auto 0; padding:3px 5px 3px 8px; background:#13221bf2; border:1px solid #3f5a3d; border-radius:8px; font-size:11px; pointer-events:auto; }
+.field-tutorial { display:flex; align-items:center; gap:7px; width:auto; max-width:100%; box-sizing:border-box; flex:1 1 0; min-width:0; margin:0; padding:2px 5px 2px 8px; background:#13221bf2; border:1px solid #3f5a3d; border-radius:8px; font-size:11px; pointer-events:auto; }
 .field-tutorial>.ops-icon { width:26px; height:26px; }
-.field-tutorial>span:first-of-type { min-width:0; }
+.field-tutorial>span:first-of-type { flex:1 1 0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .field-tutorial button { width:32px; height:32px; flex-basis:32px; padding:3px; border-color:transparent; background:transparent; }
 .field-tutorial button img { width:24px; height:24px; }
 .training-progress { display:flex; gap:3px; flex-shrink:0; margin:0 4px; }
 .training-progress i { width:4px; height:4px; border-radius:50%; background:#42513c; }
 .training-progress i.done { background:#bddc88; }
-.mission-ribbon.compact .mission-strip { padding:3px; gap:1px; }
-.mission-ribbon.compact .field-tutorial { font-size:10px; gap:4px; }
+/* 모바일: 사이드 패널 맨 위(304px) 두 줄. 1줄 = 종족 + 사령관 버튼, 2줄 = 예보 또는 훈련 안내. */
+.mission-ribbon.side .mission-strip { flex-direction:column; align-items:stretch; gap:2px; height:auto; width:100%; padding:3px; background:#1b2320; border-color:#596150; border-radius:0; }
+.mission-ribbon.side .mission-toolbar { justify-content:space-between; gap:3px; }
+.mission-ribbon.side .mission-actions { gap:3px; }
+.mission-ribbon.side .mission-factions { padding-right:4px; margin-right:0; }
+.mission-ribbon.side button { flex:0 1 42px; width:42px; height:42px; }
+.mission-ribbon.side .mission-forecast { position:absolute; top:52px; left:0; width:100%; height:30px; box-sizing:border-box; padding:0 8px; justify-content:flex-start; flex-wrap:nowrap; overflow:hidden; pointer-events:auto; background:#1b2320; border:1px solid #596150; }
+.mission-ribbon.side .field-tutorial { position:absolute; top:52px; left:0; width:100%; height:30px; flex:none; border-radius:0; padding:0 3px 0 8px; gap:5px; }
+.mission-ribbon.side .field-tutorial>.ops-icon { width:22px; height:22px; }
+.mission-ribbon.side .field-tutorial button { width:30px; height:30px; flex-basis:30px; }
+.mission-ribbon.side .field-tutorial button img { width:22px; height:22px; }
+.mission-ribbon.side .training-progress { margin:0 2px; }
 .operations-center { box-sizing:border-box; padding:0; width:min(700px,calc(100vw - 32px)); max-width:calc(100vw - 32px); max-height:calc(100dvh - 40px); overflow:hidden; border:1px solid #70825a; border-radius:16px; background:#111e18; box-shadow:0 0 0 4px #26342666,0 24px 100px #000b; }
 .operations-center::backdrop { background:#030a08bd; backdrop-filter:blur(5px); }
 .operations-center[open] { display:flex; flex-direction:column; }
@@ -294,4 +305,4 @@
   .ops-reward b { margin-top:10px; }
 }
 @media(prefers-reduced-motion:reduce) { .operations-center button { transition:none; } }
-@media(pointer:coarse) { .field-tutorial button { width:44px; height:44px; flex-basis:44px; } .ops-close { min-width:44px; min-height:44px; } }
+@media(pointer:coarse) { .field-tutorial button { width:40px; height:40px; flex-basis:40px; } .ops-close { min-width:44px; min-height:44px; } }

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { MapRuntime } from './game/map';
-import { ENEMY_DEFS, FONT, MAP_H, RENDER_SCALE, T, TOWER_DEFS, W } from './config';
+import { ENEMY_DEFS, FONT, MAP_H, RENDER_SCALE, T, TOWER_DEFS, VIEW_H, W } from './config';
 
 /** All art is generated locally: no image downloads or external assets. */
 export function makeTextures(scene: Phaser.Scene): void {
@@ -245,6 +245,18 @@ export function drawMap(scene: Phaser.Scene, cols: number, rows: number, map: Ma
     texture.refresh();
   }
   scene.add.image(0, mapY, key).setOrigin(0).setDisplaySize(W, MAP_H);
+  // 데스크톱: 콘솔 골짜기 아래로 이어지는 땅. 길이 없는 맨 아랫줄(한 칸 높이)을 격자에 맞춰 반복한다 (뒤집지 않음).
+  const bleed = VIEW_H - MAP_H;
+  if (bleed > 0) {
+    const groundKey = key + '_ground', rs = RENDER_SCALE;
+    if (!scene.textures.exists(groundKey)) {
+      const ground = scene.textures.createCanvas(groundKey, W * rs, bleed * rs)!;
+      const source = scene.textures.get(key).getSourceImage() as HTMLCanvasElement;
+      for (let y = 0; y < bleed; y += T) ground.context.drawImage(source, 0, (MAP_H - T) * rs, W * rs, Math.min(T, bleed - y) * rs, 0, y * rs, W * rs, Math.min(T, bleed - y) * rs);
+      ground.refresh();
+    }
+    scene.add.image(0, mapY + MAP_H, groundKey).setOrigin(0).setDisplaySize(W, bleed);
+  }
   const g = scene.add.graphics();
   // Landing-zone markings and a powered exit gate.
   g.lineStyle(1, 0x859274, .2).strokeCircle(480, mapY + 357, 59).strokeCircle(480, mapY + 357, 66);
@@ -257,5 +269,5 @@ export function drawMap(scene: Phaser.Scene, cols: number, rows: number, map: Ma
     g.fillStyle(0x141d1b).fillRect(x, waypoints[waypoints.length - 1].y - 33, 10, 66);
     g.fillStyle(0x89bf78).fillRect(x + 3, waypoints[waypoints.length - 1].y - 22, 3, 44);
   }
-  g.lineStyle(2, 0x090f0c).strokeRect(1, mapY + 1, W - 2, MAP_H - 2);
+  g.lineStyle(2, 0x090f0c).strokeRect(1, mapY + 1, W - 2, VIEW_H - 2);
 }

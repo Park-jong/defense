@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import {
-  CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE, COLS, CONSOLE_Y, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, FINAL_BOSS_HP_MULT, FONT, GAME_W, H, MAP_H, MAP_Y, MAX_CATCHUP_SEC, MAX_WAVE, MOBILE_LAYOUT, RENDER_SCALE, ROWS, SIDE_W, STEP_SEC, T, TEST_GOLD, TOWER_DEFS, TowerKey, W,
+  CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE, COLS, CONSOLE_Y, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, FINAL_BOSS_HP_MULT, FONT, GAME_W, H, MAP_H, MAP_Y, MAX_CATCHUP_SEC, MAX_WAVE, MOBILE_LAYOUT, RENDER_SCALE, RIBBON_BAND, ROWS, SIDE_RIBBON_H, SIDE_W, STEP_SEC, T, TEST_GOLD, TOP_BAR_H, TOWER_DEFS, TowerKey, VIEW_H, W,
 } from './config';
 import { drawMap, makeTextures } from './textures';
 import { Btn, mkBtn } from './ui';
@@ -8,7 +8,7 @@ import { DRAGOON_EMITTER, FIREBAT_MUZZLES, loadUnitArt, SIEGE_MUZZLE, TURRET_LAU
 import { EquippedSkill, SKILL_DEFS, SKILL_KEYS, SKILL_SLOTS, SkillKey, UnitBuff } from './catalog';
 import { CommandCard, UnitCommand } from './commandCard';
 import { loadCommandIcons } from './commandIcons';
-import { addConsoleChrome, loadConsoleChrome } from './consoleChrome';
+import { addConsoleChrome, CONSOLE_RISE, consoleContains, loadConsoleChrome } from './consoleChrome';
 import { DamageKind, DamageNumbers } from './damageNumbers';
 import { ShopState, SupplyShop } from './shop';
 import { MAX_UNIT_LEVEL, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
@@ -109,7 +109,7 @@ export class GameScene extends Phaser.Scene {
   private uiCam!: Phaser.Cameras.Scene2D.Camera;
   private mapZoom = 1;
   private mapCx = W / 2;
-  private mapCy = MAP_Y + MAP_H / 2;
+  private mapCy = MAP_Y + VIEW_H / 2;
   /** 맵에서 시작된 포인터 입력(탭/드래그 구분용), 두 손가락 제스처 여부, 핀치 직전 거리·중점. */
   private mapDown: { id: number; dragged: boolean } | null = null;
   private gesture = false;
@@ -152,10 +152,11 @@ export class GameScene extends Phaser.Scene {
     // 캔버스는 RENDER_SCALE배 픽셀이므로 카메라를 같은 배율로 확대해 게임 좌표(GAME_W×H)를 화면에 꽉 채운다.
     // 기본 카메라는 맵 영역만 담당(mapCam)하고, 그 위에 전체 화면 uiCam을 얹어 UI를 그린다.
     const rs = RENDER_SCALE;
-    this.mapCam = this.cameras.main.setViewport(0, MAP_Y * rs, W * rs, MAP_H * rs);
+    // 데스크톱은 뷰포트를 맵보다 VIEW_H - MAP_H만큼 더 길게 잡아, 사거리 원·효과가 콘솔 골짜기 속으로 이어지고 장갑에 자연스럽게 가려지게 한다.
+    this.mapCam = this.cameras.main.setViewport(0, MAP_Y * rs, W * rs, VIEW_H * rs);
     this.uiCam = this.cameras.add(0, 0, GAME_W * rs, H * rs).setZoom(rs).centerOn(GAME_W / 2, H / 2);
     this.mapDown = null; this.gesture = false; this.pinch = { d: 0, x: 0, y: 0 };
-    this.setMapView(1, W / 2, MAP_Y + MAP_H / 2);
+    this.setMapView(1, W / 2, MAP_Y + VIEW_H / 2);
     drawMap(this, COLS, ROWS, this.map);
 
     // scene.restart() 시 인스턴스가 재사용되므로 상태를 초기화한다.
@@ -373,7 +374,7 @@ export class GameScene extends Phaser.Scene {
     // 맵 카메라 줌·스크롤이 있으므로 화면 좌표(p.x)가 아니라 mapCam 기준 세계 좌표로 칸을 찾는다.
     if (!this.inMapView(p)) return null;
     const { x, y } = this.mapPoint(p.x, p.y);
-    if (y < MAP_Y || y >= MAP_Y + MAP_H || x < 0 || x >= W) return null;
+    if (y < MAP_Y || y >= MAP_Y + MAP_H || x < 0 || x >= W) return null; // 뷰포트 아래 덤 땅(VIEW_H - MAP_H)은 칸이 아니다
     return { c: Math.floor(x / T), r: Math.floor((y - MAP_Y) / T) };
   }
 
@@ -381,40 +382,41 @@ export class GameScene extends Phaser.Scene {
   /** 포인터(캔버스 픽셀)가 맵 영역 위에 있는가. */
   private inMapView(p: { x: number; y: number }): boolean {
     const x = p.x / RENDER_SCALE, y = p.y / RENDER_SCALE;
-    return x >= 0 && x < W && y >= MAP_Y && y < MAP_Y + MAP_H;
+    if (!MOBILE_LAYOUT && consoleContains(x, y - CONSOLE_Y + CONSOLE_RISE)) return false;
+    return x >= 0 && x < W && y >= MAP_Y && y < MAP_Y + VIEW_H;
   }
 
   /** 캔버스 픽셀 좌표 → mapCam 기준 게임 세계 좌표. */
   private mapPoint(sx: number, sy: number): { x: number; y: number } {
     const k = RENDER_SCALE * this.mapZoom;
-    return { x: this.mapCx + (sx - W * RENDER_SCALE / 2) / k, y: this.mapCy + (sy - (MAP_Y + MAP_H / 2) * RENDER_SCALE) / k };
+    return { x: this.mapCx + (sx - W * RENDER_SCALE / 2) / k, y: this.mapCy + (sy - (MAP_Y + VIEW_H / 2) * RENDER_SCALE) / k };
   }
 
   /** 줌과 시점 중심을 정하고 맵 경계 밖이 보이지 않게 제한한다. */
   private setMapView(zoom: number, cx: number, cy: number): void {
-    const z = Phaser.Math.Clamp(zoom, 1, MAX_MAP_ZOOM), hw = W / 2 / z, hh = MAP_H / 2 / z;
+    const z = Phaser.Math.Clamp(zoom, 1, MAX_MAP_ZOOM), hw = W / 2 / z, hh = VIEW_H / 2 / z;
     this.mapZoom = z;
-    this.mapCx = Phaser.Math.Clamp(cx, hw, W - hw); this.mapCy = Phaser.Math.Clamp(cy, MAP_Y + hh, MAP_Y + MAP_H - hh);
+    this.mapCx = Phaser.Math.Clamp(cx, hw, W - hw); this.mapCy = Phaser.Math.Clamp(cy, MAP_Y + hh, MAP_Y + VIEW_H - hh);
     this.mapCam.setZoom(RENDER_SCALE * z).centerOn(this.mapCx, this.mapCy);
   }
 
   /** (fx,fy) 화면 지점 아래의 세계 좌표가 (tx,ty) 화면 지점에 오도록 확대한다 (핀치 중점 이동 포함). */
   private zoomMap(zoom: number, fx: number, fy: number, tx = fx, ty = fy): void {
     const wp = this.mapPoint(fx, fy), z = Phaser.Math.Clamp(zoom, 1, MAX_MAP_ZOOM), k = RENDER_SCALE * z;
-    this.setMapView(z, wp.x - (tx - W * RENDER_SCALE / 2) / k, wp.y - (ty - (MAP_Y + MAP_H / 2) * RENDER_SCALE) / k);
+    this.setMapView(z, wp.x - (tx - W * RENDER_SCALE / 2) / k, wp.y - (ty - (MAP_Y + VIEW_H / 2) * RENDER_SCALE) / k);
   }
 
   /** 화면 전체가 흔들리도록 두 카메라에 shake를 건다. flash는 겹쳐 밝아지지 않게 uiCam에만 쓴다. */
   private shakeAll(ms: number, power: number): void { this.mapCam.shake(ms, power); this.uiCam.shake(ms, power); }
 
   private zoomStep(f: number): void {
-    this.zoomMap(this.mapZoom * f, W * RENDER_SCALE / 2, (MAP_Y + MAP_H / 2) * RENDER_SCALE);
+    this.zoomMap(this.mapZoom * f, W * RENDER_SCALE / 2, (MAP_Y + VIEW_H / 2) * RENDER_SCALE);
   }
 
   /** 맵 오른쪽 위 모서리의 [+] [−] [⟲] 버튼. 손가락 기기에서는 더 크게. */
   private buildZoomUI(): void {
     const big = this.touchUI || MOBILE_LAYOUT, s = big ? 40 : 28, x = W - s - 8;
-    const items: [string, () => void][] = [['+', () => this.zoomStep(1.4)], ['−', () => this.zoomStep(1 / 1.4)], ['⟲', () => this.setMapView(1, W / 2, MAP_Y + MAP_H / 2)]];
+    const items: [string, () => void][] = [['+', () => this.zoomStep(1.4)], ['−', () => this.zoomStep(1 / 1.4)], ['⟲', () => this.setMapView(1, W / 2, MAP_Y + VIEW_H / 2)]];
     items.forEach(([label, cb], i) => mkBtn(this, x, MAP_Y + 8 + i * (s + 4), s, s, label, cb, big ? 20 : 15));
   }
 
@@ -476,9 +478,9 @@ export class GameScene extends Phaser.Scene {
     return true;
   }
 
-  /** 휴대폰 가로 화면용: 맵 오른쪽 SIDE_W 패널에 상황판·유닛 정보·건설 명령을 크게 세로로 쌓는다. */
+  /** 휴대폰 가로 화면용: 맵 오른쪽 SIDE_W 패널 맨 위에 상황판(HTML 띠)을 두고, 그 아래에 상황판·유닛 정보·건설 명령을 세로로 쌓는다. */
   private buildMobileUI(): void {
-    const x0 = W, pw = SIDE_W, right = x0 + pw, L = x0 + 20;
+    const x0 = W, pw = SIDE_W, right = x0 + pw, L = x0 + 20, o = SIDE_RIBBON_H;
     const g = this.add.graphics().setDepth(25);
     g.fillStyle(0x111915).fillRect(x0, 0, pw, H);
     g.fillStyle(0x626751).fillRect(x0, 0, 2, H);
@@ -490,34 +492,37 @@ export class GameScene extends Phaser.Scene {
     const text = (x: number, top: number, value: string, size: number, color: string) =>
       this.add.text(x, top, value, { fontFamily: FONT, fontSize: size + 'px', color }).setDepth(30);
     this.portraitSize = 60;
-    this.lifeMeter = { x: right - 86, y: 68, w: 66 };
+    this.lifeMeter = { x: right - 86, y: o + 58, w: 66 };
 
-    // 상황판: 웨이브 · 미네랄 · 기지 내구도
-    box(8, 72);
-    this.hud = text(L, 14, '', 18, '#cbd5b8').setFontFamily('monospace');
-    if (!this.addFullscreenButton(right - 104, 12, 86, 26, 11)) text(right - 20, 18, 'FRONTIER', 12, '#8a967b').setOrigin(1, 0).setLetterSpacing(2);
-    g.fillStyle(0x5dacc0).fillTriangle(L + 6, 46, L, 55, L + 6, 64).fillTriangle(L + 8, 46, L + 14, 55, L + 8, 64);
-    this.mineralTxt = text(L + 22, 43, '', 19, '#a6d7e1').setFontFamily('monospace');
-    this.lifeTxt = text(right - 20, 43, '', 18, '#b7dc8e').setFontFamily('monospace').setOrigin(1, 0);
+    // 상황판: 웨이브 · 미네랄 · 기지 내구도 (위쪽 o px는 HTML 전술 상황판 자리)
+    box(o, 70);
+    this.hud = text(L, o + 6, '', 18, '#cbd5b8').setFontFamily('monospace');
+    if (!this.addFullscreenButton(right - 104, o + 4, 86, 26, 11)) text(right - 20, o + 10, 'FRONTIER', 12, '#8a967b').setOrigin(1, 0).setLetterSpacing(2);
+    g.fillStyle(0x5dacc0).fillTriangle(L + 6, o + 35, L, o + 44, L + 6, o + 53).fillTriangle(L + 8, o + 35, L + 14, o + 44, L + 8, o + 53);
+    this.mineralTxt = text(L + 22, o + 32, '', 19, '#a6d7e1').setFontFamily('monospace');
+    this.lifeTxt = text(right - 20, o + 32, '', 18, '#b7dc8e').setFontFamily('monospace').setOrigin(1, 0);
     this.miniGfx = this.add.graphics().setDepth(29);
 
     // 유닛 정보
-    box(88, 150);
-    this.unitTitle = text(L, 96, '기지 사령부', 15, '#c9d7b2').setFontStyle('bold');
-    this.add.rectangle(right - 84, 128, 64, 76, 0x0a1710).setOrigin(0).setStrokeStyle(1, 0x52634b).setDepth(27);
-    this.unitImage = this.add.image(right - 52, 166, 'portrait').setDisplaySize(60, 71).setDepth(28);
-    this.info = text(L, 126, '', 13, '#a5b897').setLineSpacing(4).setWordWrapWidth(200);
+    const u = o + 72;
+    box(u, 128);
+    this.unitTitle = text(L, u + 7, '기지 사령부', 15, '#c9d7b2').setFontStyle('bold');
+    this.add.rectangle(right - 84, u + 36, 64, 76, 0x0a1710).setOrigin(0).setStrokeStyle(1, 0x52634b).setDepth(27);
+    this.unitImage = this.add.image(right - 52, u + 74, 'portrait').setDisplaySize(60, 71).setDepth(28);
+    this.info = text(L, u + 34, '', 12, '#a5b897').setLineSpacing(3).setWordWrapWidth(200);
 
-    this.commandTitle = text(L, 245, '', 13, '#cedfb1').setFontStyle('bold');
-    this.commandHint = text(L, 266, '', 10, '#a3ba94').setLineSpacing(2).setWordWrapWidth(280);
-    this.shopBtn = mkBtn(this, right - 110, 240, 92, 24, '', () => this.selected ? this.cancelCommand() : this.openShop('manage'), 11);
-    this.commandCard = new CommandCard(this, x0 + 10, 314, pw - 20, 176, command => this.describeCommand(command), true);
-    this.goBtn = mkBtn(this, x0 + 10, 498, 160, 66, '▶  웨이브 시작', () => this.startWave(), 15);
+    const c = u + 128 + 7;
+    this.commandTitle = text(L, c, '', 13, '#cedfb1').setFontStyle('bold');
+    this.commandHint = text(L, c + 21, '', 10, '#a3ba94').setLineSpacing(2).setWordWrapWidth(280);
+    this.shopBtn = mkBtn(this, right - 110, c - 5, 92, 24, '', () => this.selected ? this.cancelCommand() : this.openShop('manage'), 11);
+    this.commandCard = new CommandCard(this, x0 + 10, c + 69, pw - 20, 150, command => this.describeCommand(command), true);
+    const b = c + 69 + 150 + 6;
+    this.goBtn = mkBtn(this, x0 + 10, b, 160, 50, '▶  웨이브 시작', () => this.startWave(), 15);
     this.goBtn.act(true);
-    this.spdBtn = mkBtn(this, x0 + 176, 498, 66, 66, '배속 ×1', () => {
+    this.spdBtn = mkBtn(this, x0 + 176, b, 66, 50, '배속 ×1', () => {
       this.speed = this.speed % 3 + 1; this.spdBtn.set('배속 ×' + this.speed);
     }, 12);
-    this.pauseBtn = mkBtn(this, x0 + 248, 498, 62, 66, `정지${this.kb(' [P]')}`, () => this.togglePause(), 13);
+    this.pauseBtn = mkBtn(this, x0 + 248, b, 62, 50, `정지${this.kb(' [P]')}`, () => this.togglePause(), 13);
 
     this.add.text(W - 8, H - 6, `FRONTIER  /  v${__APP_VERSION__}`, { fontFamily: 'monospace', fontSize: '10px', color: '#616f5b' })
       .setOrigin(1, 1).setDepth(30).setAlpha(.8);
@@ -544,8 +549,11 @@ export class GameScene extends Phaser.Scene {
     };
     const text = (x: number, top: number, value: string, size = 12, color = '#a0ad92') =>
       this.add.text(x, top, value, { fontFamily: FONT, fontSize: size + 'px', color }).setDepth(30);
-    panel(0, 0, W, MAP_Y);
-    addConsoleChrome(this, y, 'battlefield_' + this.map.key);
+    panel(0, 0, W, TOP_BAR_H);
+    // 전술 띠: 상단 바와 맵 사이. HTML 상황판(operations.ts)이 이 안에 놓인다.
+    metal.fillStyle(0x111715).fillRect(0, TOP_BAR_H, W, RIBBON_BAND).fillStyle(0x1b2320).fillRect(0, TOP_BAR_H, W, RIBBON_BAND - 3);
+    metal.fillStyle(0x29312e).fillRect(0, MAP_Y - 3, W, 3).lineStyle(1, 0x596150).lineBetween(0, TOP_BAR_H + .5, W, TOP_BAR_H + .5).lineBetween(0, MAP_Y - 3.5, W, MAP_Y - 3.5);
+    addConsoleChrome(this, y);
     text(21, 10, 'FRONTIER', 21, '#d2d7be').setFontStyle('bold').setLetterSpacing(3);
     text(23, 36, '기지 방어   /   SECTOR 07', 9, '#8a967b').setLetterSpacing(1);
     text(316, 10, 'OPERATION', 8, '#77876d').setLetterSpacing(2);
@@ -1610,19 +1618,20 @@ export class GameScene extends Phaser.Scene {
     }
     this.operations?.update();
     this.pauseTxt.setVisible(false);
+    const dy = MOBILE_LAYOUT ? 0 : MAP_Y - TOP_BAR_H; // 맵이 내려간 만큼 결과 창도 내린다
     this.add.rectangle(0, 0, GAME_W, H, 0x030906, .82).setOrigin(0).setDepth(50);
-    this.add.rectangle(W / 2, 330, 580, 280, 0x18221c).setStrokeStyle(2, 0x738361).setDepth(51);
-    this.add.rectangle(W / 2, 330, 568, 268).setStrokeStyle(1, 0x354530).setDepth(51);
-    this.add.text(W / 2, 226, win ? 'MISSION COMPLETE' : 'SIGNAL LOST', { fontFamily: 'monospace', fontSize: '12px', color: '#94a680' }).setLetterSpacing(3).setOrigin(.5).setDepth(52);
-    this.add.text(W / 2, 277, win ? '방어 작전 성공' : '기지 함락', { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: win ? '#c7e99e' : '#d79a7f' }).setOrigin(.5).setDepth(52);
-    this.add.text(W / 2, 334, win ? `${MAX_WAVE}개 웨이브를 모두 방어했습니다.` : (this.bossLeaked ? `웨이브 ${this.wave} · 적 지휘 개체가 방어선을 돌파했습니다.` : `웨이브 ${this.wave} · 기지 방어선이 무너졌습니다.`),
+    this.add.rectangle(W / 2, 330 + dy, 580, 280, 0x18221c).setStrokeStyle(2, 0x738361).setDepth(51);
+    this.add.rectangle(W / 2, 330 + dy, 568, 268).setStrokeStyle(1, 0x354530).setDepth(51);
+    this.add.text(W / 2, 226 + dy, win ? 'MISSION COMPLETE' : 'SIGNAL LOST', { fontFamily: 'monospace', fontSize: '12px', color: '#94a680' }).setLetterSpacing(3).setOrigin(.5).setDepth(52);
+    this.add.text(W / 2, 277 + dy, win ? '방어 작전 성공' : '기지 함락', { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: win ? '#c7e99e' : '#d79a7f' }).setOrigin(.5).setDepth(52);
+    this.add.text(W / 2, 334 + dy, win ? `${MAX_WAVE}개 웨이브를 모두 방어했습니다.` : (this.bossLeaked ? `웨이브 ${this.wave} · 적 지휘 개체가 방어선을 돌파했습니다.` : `웨이브 ${this.wave} · 기지 방어선이 무너졌습니다.`),
       { fontFamily: FONT, fontSize: '16px', color: '#aab99c' }).setOrigin(.5).setDepth(52);
-    const btn = this.add.rectangle(W / 2, 410, 230, 46, 0x2c3d29).setStrokeStyle(1, 0x8aab6a)
+    const btn = this.add.rectangle(W / 2, 410 + dy, 230, 46, 0x2c3d29).setStrokeStyle(1, 0x8aab6a)
       .setInteractive({ useHandCursor: true }).setDepth(51);
-    this.add.text(W / 2, 410, '↻  작전 재시작', { fontFamily: FONT, fontSize: '16px', color: '#d2e7b5' }).setOrigin(.5).setDepth(52);
+    this.add.text(W / 2, 410 + dy, '↻  작전 재시작', { fontFamily: FONT, fontSize: '16px', color: '#d2e7b5' }).setOrigin(.5).setDepth(52);
     btn.on('pointerdown', () => this.scene.restart({ options: this.options, launched: true }));
-    const report = this.add.rectangle(W / 2, 458, 230, 32, 0x21372a).setStrokeStyle(1, 0x66825d).setInteractive({ useHandCursor: true }).setDepth(51);
-    this.add.text(W / 2, 458, '전투 통계 / 업적', { fontFamily: FONT, fontSize: '13px', color: '#d2e7b5' }).setOrigin(.5).setDepth(52);
+    const report = this.add.rectangle(W / 2, 458 + dy, 230, 32, 0x21372a).setStrokeStyle(1, 0x66825d).setInteractive({ useHandCursor: true }).setDepth(51);
+    this.add.text(W / 2, 458 + dy, '전투 통계 / 업적', { fontFamily: FONT, fontSize: '13px', color: '#d2e7b5' }).setOrigin(.5).setDepth(52);
     report.on('pointerdown', () => this.operations?.show('stats'));
   }
 }

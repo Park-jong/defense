@@ -404,20 +404,38 @@ test('연사 숫자는 서로 다른 위치에서 떠오르고 최대 160개를 
   numbers.destroy(); assert.ok(views.every(v => v.destroyed)); assert.equal(numbers.active.length, 0);
 });
 
-test('콘솔 장갑은 맵 아래로 내려가 맨 아랫줄 모든 칸을 고밀도 화면에서도 건설할 수 있다', () => {
+test('솟은 콘솔 장갑 위에서는 건설·맵 입력을 막고 가운데 열린 맵은 고밀도 화면에서도 사용할 수 있다', () => {
   const config = load('./config'), originalScale = config.RENDER_SCALE;
   try {
     for (const scale of [1, 2]) {
       config.setRenderScale(scale);
       const s = setup(), gold = s.gold;
-      const pointer = x => ({ x: x * scale, y: (config.MAP_Y + config.MAP_H - 2) * scale, wasTouch: false });
-      assert.ok(config.CONSOLE_Y >= config.MAP_Y + config.MAP_H);
+      const pointer = (x, y = config.CONSOLE_Y - 12) => ({ x: x * scale, y: y * scale, wasTouch: false });
+      assert.equal(config.CONSOLE_Y, config.MAP_Y + config.MAP_H);
       s.building = 'marine';
-      for (const x of [100, 408, 800]) assert.equal(s.inMapView(pointer(x)), true);
-      s.onMapClick(pointer(408));
+      for (const x of [100, 800]) {
+        assert.equal(s.inMapView(pointer(x)), false); s.onMapClick(pointer(x));
+      }
+      assert.equal(s.towers.length, 0); assert.equal(s.gold, gold);
+      assert.equal(s.inMapView(pointer(408)), true); s.onMapClick(pointer(408));
       assert.equal(s.towers.length, 1); assert.equal(s.towers[0].c, 8); assert.equal(s.towers[0].r, 11);
       assert.equal(s.gold, gold - TOWER_DEFS.marine.cost);
-      assert.equal(s.cellAt(pointer(100)).r, 11);
+    }
+  } finally { config.setRenderScale(originalScale); }
+});
+
+test('맵 카메라 뷰포트가 골짜기까지 이어져도 맵 아래 덤 땅은 칸이 아니고 줌 1의 시점은 맵 위쪽에 맞는다', () => {
+  const config = load('./config'), originalScale = config.RENDER_SCALE;
+  try {
+    for (const scale of [1, 2]) {
+      config.setRenderScale(scale);
+      const s = setup(), pointer = (x, y) => ({ x: x * scale, y: y * scale, wasTouch: false });
+      assert.equal(config.VIEW_H, config.MAP_H + 50);
+      const below = pointer(408, config.MAP_Y + config.MAP_H + 10);
+      assert.equal(s.inMapView(below), true); assert.equal(s.cellAt(below), null);
+      assert.equal(s.cellAt(pointer(408, config.MAP_Y + config.MAP_H - 2)).r, 11);
+      const top = s.mapPoint(100 * scale, config.MAP_Y * scale);
+      assert.equal(top.y, config.MAP_Y); assert.equal(top.x, 100);
     }
   } finally { config.setRenderScale(originalScale); }
 });
