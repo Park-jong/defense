@@ -1,8 +1,8 @@
-import { ENEMY_DEFS, FACTIONS, FACTION_TOWERS, Faction, GAME_W, MAP_DEFS, MAP_Y, MAX_WAVE, TOWER_DEFS, TowerKey, TOWER_KEYS, W } from './config';
+import { ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, GAME_W, MAP_DEFS, MAP_Y, MAX_WAVE, TOWER_DEFS, TowerKey, TOWER_KEYS, W } from './config';
 import { SKILL_DEFS } from './catalog';
 import { unitImageUrl } from './unitArt';
 import { commandIconUrl } from './commandIcons';
-import { ACHIEVEMENTS, allowedUnit, bossPattern, BRANCHES, COMMANDERS, CommanderKey, DIFFICULTIES, ENEMY_INFO, MODES, Profile, REWARDS, RewardKey, RunOptions, RunSave, RunStats, SavedUnit, TARGETS, TargetMode, wavePlan } from './campaign';
+import { ACHIEVEMENTS, bossPattern, BRANCHES, COMMANDERS, CommanderKey, DIFFICULTIES, ENEMY_INFO, MODES, Profile, REWARDS, RewardKey, RunOptions, RunSave, RunStats, SavedUnit, TARGETS, TargetMode, wavePlan } from './campaign';
 import './operations.css';
 
 export interface OperationsView {
@@ -21,24 +21,48 @@ export interface OperationsActions {
   branch(key: keyof typeof BRANCHES): boolean;
   move(): boolean;
   select(id: string): void;
-  choose(key: TowerKey): void;
   faction(key: Faction): void;
   commander(key: CommanderKey): void;
   reward(key: RewardKey): void;
   skin(key: Profile['skin']): void;
   volume(value: number): void;
   tutorial(skip: boolean): void;
-  save(): void;
 }
-const button = (action: string, key: string, label: string, disabled = false, selected = false, accessible = ''): string =>
-  `<button type="button" data-action="${action}" data-key="${key}" ${accessible ? `aria-label="${accessible}" title="${accessible}"` : ''} ${disabled ? 'disabled' : ''} ${selected ? 'aria-pressed="true" class="selected"' : action === 'faction' ? 'aria-pressed="false"' : ''}>${label}</button>`;
-const missionIcon = (key: string): string => `<img src="${commandIconUrl(key)}" width="32" height="32" alt="" aria-hidden="true">`;
-const tutorialSteps = ['보급 상점(B) 또는 유닛 명령에서 병력을 고르고, 길 옆 빈 칸에 배치하세요. 터치는 같은 칸을 두 번 탭합니다.', '배치한 유닛을 선택하고 강화(U)를 한 번 적용하세요.', '유닛 전용 자동 스킬(Z/X)을 하나 장착하세요. 적이 사거리 안에 들어오면 자동으로 발동합니다.', '벙커를 배치하고 빈 사격구에 마린 또는 파이어뱃을 구매하세요. 벙커는 보병 4기를 수용하며 사거리를 늘립니다.'];
+const escape = (value: string): string => value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+const icon = (key: string): string => `<img class="ops-icon" src="${commandIconUrl(key)}" width="32" height="32" alt="" aria-hidden="true">`;
+const button = (action: string, key: string, content: string, label: string, options: { disabled?: boolean; selected?: boolean; className?: string; hint?: string } = {}): string =>
+  `<button type="button" data-action="${action}" data-key="${key}" class="${options.className ?? ''}" aria-label="${escape(label)}" title="${escape(options.hint ?? label)}" ${options.disabled ? 'disabled' : ''} ${options.selected === undefined ? '' : `aria-pressed="${options.selected}"`}>${content}</button>`;
+const tutorialSteps = [
+  '병력을 골라 길 옆 빈 칸에 배치하세요. 터치는 같은 칸을 두 번 탭합니다.',
+  '배치한 병력을 선택하고 강화(U)를 누르세요.',
+  '전용 스킬(Z/X)을 장착하세요. 전투 중 자동으로 발동합니다.',
+  '벙커를 배치하고 빈 사격구에 보병을 보급하세요.',
+];
+const tutorialHints = ['병력을 골라 길 옆에 배치', '병력을 선택하고 강화', '전용 스킬 하나 장착', '벙커에 보병 보급'];
+const tutorialIcons = ['terran', 'upgrade', 'storm', 'empty'];
+const enemyIcons: Record<EnemyKey, string> = { grunt: 'first', runner: 'overdrive', tank: 'shield', boss: 'boss', medic: 'repair', splitter: 'shrapnel', shielder: 'plasma' };
+const rewardIcons: Record<RewardKey, string> = { power: 'siege', haste: 'overdrive', range: 'range', repair: 'repair', supply: 'supply' };
+const rewardValues: Record<RewardKey, string> = { power: '+12%', haste: '+10%', range: '+12', repair: '+4', supply: '+150' };
+const modeIcons: Record<RunOptions['mode'], string> = { standard: 'shield', endless: 'endless', bunker: 'empty', budget: 'mineral' };
+const tabs = {
+  setup: { icon: 'flag', name: '출격', label: '작전 설정' },
+  tactics: { icon: 'tactics', name: '병력', label: '전술 / 병력' },
+  stats: { icon: 'stats', name: '전적', label: '전투 통계' },
+  codex: { icon: 'codex', name: '도감', label: '도감 / 훈련' },
+  medals: { icon: 'medal', name: '훈장', label: '업적 / 외형' },
+};
+
+/** Preview the actual routes so the map can be chosen without a settings form. */
+function mapPreview(key: RunOptions['map']): string {
+  const routes = MAP_DEFS[key].routes.map(route => `<polyline points="${route.map(([c, r]) => `${(c + 1) * 8},${(r + 1) * 8}`).join(' ')}"/>`).join('');
+  return `<svg class="ops-map" viewBox="0 0 168 104" fill="none" aria-hidden="true"><path class="ops-map-grid" d="M0 24h168M0 48h168M0 72h168M0 96h168M24 0v104M48 0v104M72 0v104M96 0v104M120 0v104M144 0v104"/><g class="ops-map-road">${routes}</g><g class="ops-map-route">${routes}</g>${MAP_DEFS[key].routes.map(route => `<circle class="ops-map-entry" cx="${(route[0][0] + 1) * 8 + 3}" cy="${(route[0][1] + 1) * 8}" r="3"/>`).join('')}</svg>`;
+}
 
 export class OperationsCenter {
   private ribbon = document.createElement('div');
   private dialog = document.createElement('dialog');
   private section = 'setup';
+  private draft?: RunOptions;
   private cache = '';
   private images = new Map(TOWER_KEYS.map(k => [k, unitImageUrl(k)]));
   private onResize = () => this.position();
@@ -47,9 +71,9 @@ export class OperationsCenter {
     this.dialog.className = 'operations-center'; this.dialog.setAttribute('aria-label', '작전실');
     document.body.append(this.ribbon, this.dialog);
     for (const el of [this.ribbon, this.dialog]) {
-      for (const type of ['pointerdown', 'pointerup', 'pointermove', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'wheel']) el.addEventListener(type, e => e.stopPropagation(), { passive: true });
-      el.addEventListener('click', e => this.click(e));
-      if (el === this.dialog) el.addEventListener('keydown', e => { if (!this.open) return; e.stopPropagation(); if ((e as KeyboardEvent).key.toLowerCase() === 'o') this.close(); });
+      for (const type of ['pointerdown', 'pointerup', 'pointermove', 'pointercancel', 'mousedown', 'mouseup', 'mousemove', 'touchstart', 'touchmove', 'touchend', 'touchcancel', 'wheel']) el.addEventListener(type, e => e.stopPropagation(), { passive: true });
+      el.addEventListener('click', e => { e.stopPropagation(); this.click(e); });
+      if (el === this.dialog) el.addEventListener('keydown', e => { if (!this.open) return; e.stopPropagation(); if ((e as KeyboardEvent).key.toLowerCase() === 'o') { e.preventDefault(); this.close(); } });
     }
     this.dialog.addEventListener('cancel', e => { e.preventDefault(); this.close(); });
     this.dialog.addEventListener('input', e => {
@@ -63,26 +87,33 @@ export class OperationsCenter {
   }
   get open(): boolean { return this.dialog.open; }
   show(section = 'tactics'): void {
-    this.section = this.actions.view().pending.length ? 'reward' : section;
-    this.actions.pause(true); this.render(); if (!this.dialog.open) this.dialog.showModal();
+    const v = this.actions.view();
+    if (!this.open) this.draft = { ...v.options };
+    this.section = v.pending.length ? 'reward' : section;
+    this.actions.pause(true); this.render();
+    if (!this.dialog.open) {
+      this.dialog.showModal();
+      if (this.section === 'setup') this.dialog.querySelector<HTMLButtonElement>(`[data-action="${v.checkpoint ? 'resume' : 'start'}"]`)?.focus({ preventScroll: true });
+    }
   }
   close(): void {
-    if (this.actions.view().pending.length) { this.section = 'reward'; this.render(); return; }
+    if (this.actions.view().pending.length) {
+      if (this.section !== 'reward') { this.section = 'reward'; this.render(); }
+      return;
+    }
     this.dialog.close(); this.actions.pause(false);
     const canvas = document.querySelector('canvas'); canvas?.setAttribute('tabindex', '0'); canvas?.focus({ preventScroll: true });
   }
   destroy(): void { window.removeEventListener('resize', this.onResize); this.ribbon.remove(); this.dialog.remove(); }
   update(): void {
     const v = this.actions.view(), next = v.test ? MAX_WAVE : v.wave + 1;
-    const plan = wavePlan(next), counts = this.counts(plan);
-    const forecast = v.over ? '작전 종료 · 통계와 업적 확인' : v.active ? `교전 ${v.wave} · 기지 ${v.lives}/20` : `다음 ${next} · ${counts}`;
-    const tutorial = !v.profile.tutorialDone && v.tutorial < 4 && !v.test && !v.active && !v.over ? `<div class="field-tutorial"><span><b>훈련 ${v.tutorial + 1}/4</b><span class="training-detail"> · ${tutorialSteps[v.tutorial]}</span></span>${button('open', 'codex', '도움말')}${button('skip', '', '훈련 건너뛰기')}</div>` : '';
-    const factions = `<div class="mission-actions mission-factions" role="group" aria-label="종족 선택">${(Object.keys(FACTIONS) as Faction[]).map(k => button('faction', k, missionIcon(k), v.over || v.options.mode === 'bunker' && k === 'protoss', v.faction === k, `${FACTIONS[k].name} 병력 9종${k === 'terran' ? ' [T]' : ' [R]'}`)).join('')}</div>`;
-    const html = `<div class="mission-strip"><div class="mission-toolbar">${factions}<div class="mission-actions" role="group" aria-label="사령관 패널">${button('open', 'tactics', missionIcon('manage'), false, false, '작전실 [O]')}${(['strike', 'slow', 'supply'] as CommanderKey[]).map(k => {
-      const cooldown = v.commander[k] > 0 ? ` ${Math.ceil(v.commander[k])}초` : '';
-      const label = COMMANDERS[k].name + cooldown;
-      return button('commander', k, `${missionIcon(k)}${cooldown ? `<span class="mission-cooldown" aria-hidden="true">${Math.ceil(v.commander[k])}초</span>` : ''}`, v.over || v.paused || !v.active || v.commander[k] > 0 || v.options.mode === 'budget' && k === 'supply', false, label);
-    }).join('')}</div></div><span class="mission-forecast" title="${forecast}">${forecast}</span></div>${tutorial}`;
+    const tutorial = !v.profile.tutorialDone && v.tutorial < 4 && !v.test && !v.active && !v.over
+      ? `<div class="field-tutorial">${icon(tutorialIcons[v.tutorial])}<span title="${escape(tutorialSteps[v.tutorial])}">${tutorialHints[v.tutorial]}</span><span class="training-progress" role="img" aria-label="훈련 ${v.tutorial + 1}/4">${tutorialSteps.map((_, i) => `<i class="${i <= v.tutorial ? 'done' : ''}"></i>`).join('')}</span>${button('open', 'codex', icon('help'), '도움말')}${button('skip', '', icon('skip'), '훈련 건너뛰기')}</div>` : '';
+    const factions = `<div class="mission-actions mission-factions" role="group" aria-label="종족 선택">${(Object.keys(FACTIONS) as Faction[]).map(k => button('faction', k, icon(k), `${FACTIONS[k].name} 병력 9종${k === 'terran' ? ' [T]' : ' [R]'}`, { disabled: v.over || v.options.mode === 'bunker' && k === 'protoss', selected: v.faction === k })).join('')}</div>`;
+    const html = `<div class="mission-strip"><div class="mission-toolbar">${factions}<div class="mission-actions" role="group" aria-label="사령관 패널">${button('open', 'tactics', icon('manage'), '작전실 [O]')}${(['strike', 'slow', 'supply'] as CommanderKey[]).map(k => {
+      const cooldown = Math.ceil(v.commander[k]);
+      return button('commander', k, `${icon(k)}${cooldown > 0 ? `<span class="mission-cooldown" aria-hidden="true">${cooldown}</span>` : ''}`, COMMANDERS[k].name + (cooldown > 0 ? ` ${cooldown}초` : ''), { disabled: v.over || v.paused || !v.active || cooldown > 0 || v.options.mode === 'budget' && k === 'supply', hint: `${COMMANDERS[k].name} · ${COMMANDERS[k].desc} · 재사용 ${COMMANDERS[k].cooldown}초${cooldown > 0 ? ` · 남은 ${cooldown}초` : ''}` });
+    }).join('')}</div></div>${!v.active && !v.over ? `<div class="mission-forecast" role="group" aria-label="다음 웨이브 ${next}"><b>W ${String(next).padStart(2, '0')}</b>${this.enemies(next)}</div>` : ''}</div>${tutorial}`;
     if (html !== this.cache) { this.ribbon.innerHTML = html; this.cache = html; }
     this.position();
   }
@@ -92,8 +123,13 @@ export class OperationsCenter {
     Object.assign(this.ribbon.style, { left: `${r.left + 8 * scale}px`, top: `${r.top + (MAP_Y + 6) * scale}px`, width: `${(W - 16) * scale}px` });
     this.ribbon.classList.toggle('compact', W * scale < 650);
   }
-  private counts(plan: (keyof typeof ENEMY_DEFS)[]): string {
-    return Object.keys(ENEMY_DEFS).filter(k => plan.includes(k as keyof typeof ENEMY_DEFS)).map(k => `${ENEMY_INFO[k as keyof typeof ENEMY_DEFS].name} ${plan.filter(x => x === k).length}`).join(' · ');
+  private art(key: TowerKey): string { return `<img class="ops-unit-art" src="${this.images.get(key)}" width="64" height="64" alt="" aria-hidden="true">`; }
+  private enemies(wave: number): string {
+    const plan = wavePlan(wave);
+    return (Object.keys(ENEMY_DEFS) as EnemyKey[]).filter(k => plan.includes(k)).map(k => {
+      const count = plan.filter(x => x === k).length, label = `${ENEMY_INFO[k].name} ${count}기`;
+      return `<span class="ops-enemy ${k === 'boss' ? 'is-boss' : ''}" role="img" title="${label}" aria-label="${label}">${icon(enemyIcons[k])}<b aria-hidden="true">${count}</b></span>`;
+    }).join('');
   }
   private click(e: Event): void {
     const el = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-action]'); if (!el || el.disabled) return;
@@ -102,59 +138,72 @@ export class OperationsCenter {
     if (a === 'faction') { this.actions.faction(key as Faction); this.update(); return; }
     if (a === 'close') { this.close(); return; }
     if (a === 'tab') this.section = key;
+    if (a === 'map' || a === 'difficulty' || a === 'mode') this.draft = { ...(this.draft ?? this.actions.view().options), [a]: key };
     if (a === 'commander') { this.actions.commander(key as CommanderKey); this.update(); return; }
-    if (a === 'start') {
-      const get = (id: string) => this.dialog.querySelector<HTMLSelectElement>('#' + id)!.value;
-      this.actions.start({ map: get('run-map'), difficulty: get('run-difficulty'), mode: get('run-mode') } as RunOptions); return;
-    }
+    if (a === 'start') { this.actions.start({ ...(this.draft ?? this.actions.view().options) }); return; }
     if (a === 'resume') { this.actions.resume(); return; }
     if (a === 'target') this.actions.target(key as TargetMode);
     if (a === 'branch') this.actions.branch(key as keyof typeof BRANCHES);
-    if (a === 'select') { this.actions.select(key); }
-    if (a === 'move') { if (this.actions.move()) { this.close(); return; } }
-    if (a === 'choose') { this.actions.choose(key as TowerKey); this.close(); return; }
+    if (a === 'select') this.actions.select(key);
+    if (a === 'move' && this.actions.move()) { this.close(); return; }
     if (a === 'reward') { this.actions.reward(key as RewardKey); this.close(); return; }
     if (a === 'skin') this.actions.skin(key as Profile['skin']);
-    if (a === 'tutorial') this.actions.tutorial(false);
+    if (a === 'tutorial') { this.actions.tutorial(false); this.update(); }
     if (a === 'skip') { this.actions.tutorial(true); this.update(); if (!this.open) return; }
-    if (a === 'save') this.actions.save();
-    const scroll = this.dialog.querySelector('.ops-content')?.scrollTop ?? 0;
+    const scroll = a === 'tab' ? 0 : this.dialog.querySelector('.ops-content')?.scrollTop ?? 0;
     this.render();
     const content = this.dialog.querySelector('.ops-content'); if (content) content.scrollTop = scroll;
     this.dialog.querySelector<HTMLButtonElement>(`button[data-action="${a}"][data-key="${key}"]`)?.focus({ preventScroll: true });
   }
   private render(): void {
-    const v = this.actions.view(), selected = v.selected;
-    const tabs = { setup: '작전 설정', tactics: '전술 / 병력', stats: '전투 통계', codex: '도감 / 훈련', medals: '업적 / 외형' };
-    const next = v.test ? MAX_WAVE : v.wave + 1;
-    this.dialog.innerHTML = `<header><div><small>FRONTIER / COMMAND CENTER</small><h1>${this.section === 'reward' ? '전장 보상 선택' : '작전실'}</h1><p>${MAP_DEFS[v.options.map].name} · ${DIFFICULTIES[v.options.difficulty].name} · ${MODES[v.options.mode].name} · WAVE ${v.wave} · ◆ ${v.gold}</p></div>${v.pending.length ? '' : button('close', '', '전장 복귀')}</header>
-      ${v.pending.length ? '' : `<nav aria-label="작전실 메뉴">${Object.entries(tabs).map(([key, label]) => button('tab', key, label, false, this.section === key)).join('')}</nav>`}
-      <main class="ops-content">${v.notice ? `<p class="ops-notice" role="status">${v.notice}</p>` : ''}${this.section === 'reward' ? this.rewards(v) : this.section === 'setup' ? this.setup(v) : this.section === 'tactics' ? this.tactics(v, selected, next) : this.section === 'stats' ? this.stats(v) : this.section === 'codex' ? this.codex(v) : this.medals(v)}</main>
-      <footer>작전실을 열면 전투가 일시정지됩니다. · 준비 시간 자동 저장${v.test ? ' · TEST: 저장/업적 제외' : ''}</footer>`;
+    const v = this.actions.view();
+    const disclosures = Array.from(this.dialog.querySelectorAll<HTMLDetailsElement>('details[id]')).map(el => ({ id: el.id, open: el.open }));
+    this.dialog.classList.toggle('is-reward', this.section === 'reward');
+    this.dialog.innerHTML = `<header class="ops-header"><div class="ops-heading">${icon(this.section === 'reward' ? 'supply' : 'manage')}<div><h1>${this.section === 'reward' ? '전장 보상 선택' : '작전실'}</h1><p>${this.section === 'reward' ? `WAVE ${v.wave} CLEAR` : MAP_DEFS[v.options.map].name}</p></div></div><span class="ops-wallet" aria-label="미네랄 ${v.gold}">${icon('mineral')}${v.gold.toLocaleString()}</span>${v.pending.length ? '' : button('close', '', icon('close'), '전장 복귀', { className: 'ops-close', hint: '전장 복귀 [Esc / O]' })}</header>
+      ${v.pending.length ? '' : `<nav class="ops-nav" aria-label="작전실 메뉴">${Object.entries(tabs).map(([key, tab]) => button('tab', key, `${icon(tab.icon)}<span>${tab.name}</span>`, tab.label, { selected: this.section === key })).join('')}</nav>`}
+      <main class="ops-content">${v.notice ? `<p class="ops-notice" role="status">${icon('saved')}${v.notice}</p>` : ''}${this.section === 'reward' ? this.rewards(v) : this.section === 'setup' ? this.setup(v) : this.section === 'tactics' ? this.tactics(v) : this.section === 'stats' ? this.stats(v) : this.section === 'codex' ? this.codex() : this.medals(v)}</main>
+      ${v.pending.length ? '' : `<footer class="ops-footer"><label class="ops-volume" title="효과음 음량">${icon('volume')}<input id="battle-volume" aria-label="효과음 음량" type="range" min="0" max="100" value="${Math.round(v.profile.volume * 100)}"><output for="battle-volume">${Math.round(v.profile.volume * 100)}%</output></label><span class="ops-save-status" title="${v.test ? '테스트 모드 · 저장 및 업적 제외' : '웨이브 종료 시 자동 저장 · 교전 중 새로고침하면 마지막 준비 시점으로 복귀'}">${icon('saved')}${v.test ? 'TEST' : '자동 저장'}</span></footer>`}`;
+    for (const { id, open } of disclosures) {
+      const details = this.dialog.querySelector<HTMLDetailsElement>(`#${id}`); if (details) details.open = open;
+    }
   }
   private setup(v: OperationsView): string {
-    const select = (id: string, label: string, defs: Record<string, { name: string; desc?: string }>, value: string) => `<label>${label}<select id="${id}">${Object.entries(defs).map(([k, d]) => `<option value="${k}" ${k === value ? 'selected' : ''}>${d.name}${d.desc ? ' — ' + d.desc : ''}</option>`).join('')}</select></label>`;
-    return `<section class="ops-setup"><div><h2>새 방어 작전</h2><p>전장과 작전 조건을 선택하세요. 새 작전을 시작하면 이전 체크포인트가 교체됩니다.</p>${select('run-map', '전장', MAP_DEFS, v.options.map)}${select('run-difficulty', '난이도', DIFFICULTIES, v.options.difficulty)}${select('run-mode', '작전 모드', MODES, v.options.mode)}${button('start', '', '새 작전 시작')}</div><div><h2>체크포인트</h2>${v.checkpoint ? `<p>${MAP_DEFS[v.checkpoint.options.map].name} · ${DIFFICULTIES[v.checkpoint.options.difficulty].name} · ${MODES[v.checkpoint.options.mode].name}</p><p>${v.checkpoint.wave}웨이브 완료 · 기지 ${v.checkpoint.lives}/20 · 병력 ${v.checkpoint.units.length}기</p>${button('resume', '', '저장된 작전 이어하기')}` : '<p>저장된 작전이 없습니다.</p>'}<p>웨이브 종료 시 자동 저장합니다. 교전 중 새로고침하면 마지막 준비 시점으로 돌아갑니다.</p>${button('save', '', '현재 준비 상태 저장', v.active || v.over || v.test)}<label>효과음 음량 <output>${Math.round(v.profile.volume * 100)}%</output><input id="battle-volume" aria-label="효과음 음량" type="range" min="0" max="100" value="${Math.round(v.profile.volume * 100)}"></label></div></section>`;
+    const draft = this.draft ?? v.options;
+    return `<section class="ops-setup"><div class="ops-section-heading"><h2>전장 선택</h2><span>${MAP_DEFS[draft.map].desc}</span></div><div class="ops-map-picker" role="group" aria-label="전장">${(Object.keys(MAP_DEFS) as RunOptions['map'][]).map(k => button('map', k, `${mapPreview(k)}<span>${MAP_DEFS[k].name}</span>`, MAP_DEFS[k].name, { selected: draft.map === k, hint: `${MAP_DEFS[k].name} · ${MAP_DEFS[k].desc}` })).join('')}</div>
+      <div class="ops-rules"><div><h2>난이도</h2><div class="ops-difficulties" role="group" aria-label="난이도">${(Object.keys(DIFFICULTIES) as RunOptions['difficulty'][]).map((k, i) => button('difficulty', k, `${icon('shield')}<span>${DIFFICULTIES[k].name}</span><span class="ops-pips" aria-hidden="true">${'•'.repeat(i + 1)}</span>`, DIFFICULTIES[k].name, { selected: draft.difficulty === k })).join('')}</div></div><div><h2>모드</h2><div class="ops-modes" role="group" aria-label="작전 모드">${(Object.keys(MODES) as RunOptions['mode'][]).map(k => button('mode', k, k === 'bunker' ? this.art('bunker') : icon(modeIcons[k]), MODES[k].name, { selected: draft.mode === k, hint: `${MODES[k].name} · ${MODES[k].desc}` })).join('')}</div><p class="ops-mode-hint">${MODES[draft.mode].desc}</p></div></div>
+      <div class="ops-launch">${v.checkpoint ? `<div class="ops-checkpoint">${button('resume', '', `${icon('resume')}<span>이어하기</span><b>W ${String(v.checkpoint.wave).padStart(2, '0')}</b>`, '저장된 작전 이어하기', { className: 'ops-resume', hint: `${MAP_DEFS[v.checkpoint.options.map].name} · ${DIFFICULTIES[v.checkpoint.options.difficulty].name} · ${MODES[v.checkpoint.options.mode].name} · ${v.checkpoint.wave}웨이브 완료 · 기지 ${v.checkpoint.lives}/20 · 병력 ${v.checkpoint.units.length}기` })}<small>새 출격 시 기존 저장 교체</small></div>` : ''}${button('start', '', `${icon('deploy')}<span>출격</span>`, '새 작전 시작', { className: 'ops-deploy', hint: v.checkpoint ? '새 작전 시작 · 기존 체크포인트를 교체합니다' : '새 작전 시작' })}</div></section>`;
   }
-  private tactics(v: OperationsView, u: SavedUnit | undefined, next: number): string {
-    const branchCost = u ? TOWER_DEFS[u.k].cost : 0;
-    return `<section class="ops-forecast"><h2>${v.over ? '작전 종료' : v.active ? '다음 교전 준비' : '다음 웨이브 ' + next}</h2><p>${this.counts(wavePlan(next))}</p>${next % 10 === 0 ? `<p class="danger">⚠ ${bossPattern(next)} · 보스를 놓치면 즉시 패배합니다.</p>` : ''}</section>
-      <h2>병력 전술</h2><div class="ops-roster">${v.units.map(t => button('select', t.id, `${TOWER_DEFS[t.k].name} #${t.id} · Lv.${t.lvl}${t.hostId ? ' · 주둔' : ''}`, false, t.id === u?.id)).join('') || '<p>먼저 병력을 배치하세요.</p>'}</div>
-      ${u ? `<section class="ops-unit"><img src="${this.images.get(u.k)}" alt=""><div><h3>${TOWER_DEFS[u.k].name} #${u.id}</h3><p>${TOWER_DEFS[u.k].desc}</p>${u.k !== 'bunker' ? `<div class="ops-buttons" aria-label="공격 대상 우선순위">${Object.entries(TARGETS).map(([k, label]) => button('target', k, label + ' 우선', v.over, u.target === k)).join('')}</div><p>Lv.3 이상 특화 · ◆ ${branchCost} · 선택 후 변경 불가</p><div class="ops-cards">${Object.entries(BRANCHES).map(([k, d]) => `<article><h3>${d.name}</h3><p>${d.desc}</p>${button('branch', k, u.branch === k ? '선택 완료' : d.name + ' 선택', v.over || u.lvl < 3 || !!u.branch || v.gold < branchCost, u.branch === k)}</article>`).join('')}</div>` : ''}${button('move', '', '선택 병력 재배치 · ◆ 20', v.over || v.active || !!u.hostId || v.gold < 20)}<p>준비 시간에 빈 칸을 지정하면 이동합니다. 빈 칸 선택 전까지 비용은 차감되지 않습니다.</p></div></section>` : ''}
-      <h2>지원 병력 보급</h2><div class="ops-cards">${(['support', 'observer'] as TowerKey[]).map(k => `<article><img class="ops-art" src="${this.images.get(k)}" alt=""><h3>${TOWER_DEFS[k].name}</h3><p>${TOWER_DEFS[k].desc}</p>${button('choose', k, `배치 · ◆ ${TOWER_DEFS[k].cost}`, v.over || !allowedUnit(k, v.options.mode) || v.gold < TOWER_DEFS[k].cost)}</article>`).join('')}</div>
-      <h2>지휘관 지원</h2><div class="ops-cards">${Object.entries(COMMANDERS).map(([k, d]) => `<article><h3>${d.name}</h3><p>${d.desc}</p><p>재사용 ${d.cooldown}초 · ${v.commander[k as CommanderKey] > 0 ? '남은 ' + Math.ceil(v.commander[k as CommanderKey]) + '초' : '준비 완료'}</p><p>전장 상단 버튼으로 교전 중 사용하세요.</p></article>`).join('')}</div>`;
+  private tactics(v: OperationsView): string {
+    const u = v.selected, next = v.test ? MAX_WAVE : v.wave + 1;
+    const targetIcons: Record<TargetMode, string> = { first: 'first', strong: 'shield', weak: 'weak', boss: 'boss' };
+    const targetNames: Record<TargetMode, string> = { first: '선두', strong: '강적', weak: '약적', boss: '보스' };
+    const forecast = !v.over ? `<section class="ops-forecast"><div><small>${v.active ? '다음 교전' : '다음 웨이브'}</small><b>${String(next).padStart(2, '0')}</b></div><div class="ops-enemies">${this.enemies(next)}</div>${next % 10 === 0 ? `<p class="ops-danger">${icon('boss')}${bossPattern(next)} · 놓치면 패배</p>` : ''}</section>` : '';
+    if (!v.units.length) return `${forecast}<div class="ops-empty">${this.art(v.faction === 'terran' ? 'marine' : 'zealot')}<h2>방어선을 세워볼까요?</h2><p>병력을 골라 길 옆에 배치하세요.</p>${button('close', '', `${icon('deploy')}<span>병력 배치</span>`, '병력 배치', { className: 'ops-primary' })}</div>`;
+    return `${forecast}<div class="ops-section-heading"><h2>내 병력 <small>${v.units.length}</small></h2></div><div class="ops-roster" role="group" aria-label="배치된 병력">${v.units.map(t => button('select', t.id, `${this.art(t.k)}<span class="ops-level" aria-hidden="true">${t.hostId ? '↳ ' : ''}${'•'.repeat(t.lvl)}</span>`, `${TOWER_DEFS[t.k].name} #${t.id} · Lv.${t.lvl}${t.hostId ? ' · 주둔' : ''}`, { selected: t.id === u?.id })).join('')}</div>
+      ${u ? `<section class="ops-unit"><div class="ops-unit-heading">${this.art(u.k)}<div><h2>${TOWER_DEFS[u.k].name}<small>Lv.${u.lvl}</small></h2><p>${TOWER_DEFS[u.k].role}</p></div>${button('move', '', `${icon('move')}<small>◆ 20</small>`, '선택 병력 재배치 · ◆ 20', { disabled: v.over || v.active || !!u.hostId || v.gold < 20, className: 'ops-move', hint: '준비 시간에 빈 칸으로 재배치 · ◆ 20 · 빈 칸 선택 시 비용 차감' })}</div>${u.k !== 'bunker' ? `<div class="ops-targets" role="group" aria-label="공격 대상 우선순위">${(Object.keys(TARGETS) as TargetMode[]).map(k => button('target', k, `${icon(targetIcons[k])}<span>${targetNames[k]}</span>`, TARGETS[k] + ' 우선', { disabled: v.over, selected: u.target === k })).join('')}</div><div class="ops-section-heading ops-branch-heading"><h3>특화</h3><span>${u.branch ? '선택 완료' : `Lv.3 · ◆ ${TOWER_DEFS[u.k].cost} · 선택 후 변경 불가`}</span></div><div class="ops-branches">${(Object.keys(BRANCHES) as (keyof typeof BRANCHES)[]).map(k => {
+        const support = u.k === 'support' || u.k === 'observer';
+        const value = support ? `+${k === 'power' ? 45 : 25}` : k === 'power' ? '+70%' : '+40%';
+        const detail = support ? '지원 사거리' : k === 'power' ? '공격력 · 간격 +15%' : '공속 · 범위 +35%';
+        return button('branch', k, `${icon(k === 'power' ? 'siege' : 'overdrive')}<span><b>${BRANCHES[k].name}</b><small>${detail}</small></span><strong>${value}</strong>`, u.branch === k ? '선택 완료' : BRANCHES[k].name + ' 선택', { disabled: v.over || u.lvl < 3 || !!u.branch || v.gold < TOWER_DEFS[u.k].cost, selected: u.branch === k, hint: `${BRANCHES[k].name} · ${BRANCHES[k].desc} · ◆ ${TOWER_DEFS[u.k].cost} · 선택 후 변경 불가` });
+      }).join('')}</div>` : `<p class="ops-muted">보병 보급과 강화는 벙커 명령 아이콘에서.</p>`}</section>` : '<p class="ops-muted">병력을 선택해 전술을 바꾸세요.</p>'}`;
   }
   private rewards(v: OperationsView): string {
-    return `<p>${v.wave}웨이브를 방어했습니다. 보상 하나를 선택하면 다음 웨이브를 준비할 수 있습니다. 화력·장전·센서는 누적됩니다.</p><div class="ops-cards">${v.pending.map(k => `<article><small>FIELD REWARD</small><h2>${REWARDS[k].name}</h2><p>${REWARDS[k].desc}</p>${button('reward', k, REWARDS[k].name + ' 획득')}</article>`).join('')}</div>`;
+    return `<p class="ops-reward-hint">하나를 골라 더 강해지세요.</p><div class="ops-rewards">${v.pending.map(k => button('reward', k, `${icon(rewardIcons[k])}<strong>${rewardValues[k]}</strong><b>${REWARDS[k].name}</b><span>${REWARDS[k].desc}</span>`, REWARDS[k].name + ' 획득', { hint: `${REWARDS[k].name} · ${REWARDS[k].desc}`, className: `ops-reward ops-reward-${k}` })).join('')}</div>`;
   }
   private stats(v: OperationsView): string {
-    const units = [...v.stats.units].sort((a, b) => b.damage - a.damage), top = units[0];
-    return `<div class="ops-metrics"><div><small>누적 피해</small><b>${Math.round(v.stats.damage).toLocaleString()}</b></div><div><small>처치</small><b>${v.stats.kills}</b></div><div><small>기지 피해</small><b>${v.stats.lost}</b></div><div><small>교전 시간</small><b>${Math.floor(v.stats.seconds / 60)}분 ${Math.floor(v.stats.seconds % 60)}초</b></div></div><p>MVP: ${top && top.damage > 0 ? `${TOWER_DEFS[top.k].name} #${top.id}` : '교전 기록 없음'} · 지휘관 피해 ${Math.round(v.stats.commanderDamage).toLocaleString()}</p><h2>병력별 전과</h2><div class="ops-table"><table><thead><tr><th>병력</th><th>누적 피해</th><th>처치</th></tr></thead><tbody>${units.map(u => `<tr><td>${TOWER_DEFS[u.k].name} #${u.id}${v.units.some(t => t.id === u.id) ? '' : ' (회수)'}</td><td>${Math.round(u.damage).toLocaleString()}</td><td>${u.kills}</td></tr>`).join('')}</tbody></table></div><h2>웨이브 기록</h2><div class="ops-table"><table><thead><tr><th>웨이브</th><th>처치</th><th>기지 피해</th><th>시간</th></tr></thead><tbody>${[...v.stats.waves].reverse().map(w => `<tr><td>${w.wave}</td><td>${w.kills}</td><td>${w.lost}</td><td>${w.seconds.toFixed(1)}초</td></tr>`).join('')}</tbody></table></div>`;
+    const units = [...v.stats.units].filter(u => u.damage > 0).sort((a, b) => b.damage - a.damage), top = units[0];
+    const metrics = [{ icon: 'siege', label: '누적 피해', value: Math.round(v.stats.damage).toLocaleString() }, { icon: 'tactics', label: '처치', value: v.stats.kills }, { icon: 'weak', label: '기지 피해', value: v.stats.lost }, { icon: 'clock', label: '교전 시간', value: `${Math.floor(v.stats.seconds / 60)}:${String(Math.floor(v.stats.seconds % 60)).padStart(2, '0')}` }];
+    return `<div class="ops-metrics">${metrics.map(m => `<div title="${m.label}" aria-label="${m.label} ${m.value}">${icon(m.icon)}<b>${m.value}</b><small>${m.label}</small></div>`).join('')}</div>${top ? `<section class="ops-mvp">${this.art(top.k)}<div><small>MVP</small><h2>${TOWER_DEFS[top.k].name}</h2><p>${Math.round(top.damage).toLocaleString()} 피해 · ${top.kills} 처치</p></div>${icon('medal')}</section><div class="ops-damage-list">${units.slice(0, 5).map(u => `<div title="${TOWER_DEFS[u.k].name} #${u.id} · ${u.kills} 처치" aria-label="${TOWER_DEFS[u.k].name} #${u.id} · ${Math.round(u.damage)} 피해 · ${u.kills} 처치">${this.art(u.k)}<span><span>${TOWER_DEFS[u.k].name}</span><i style="--damage:${u.damage / top.damage * 100}%"></i></span><b>${Math.round(u.damage).toLocaleString()}</b></div>`).join('')}</div>` : `<div class="ops-empty">${icon('stats')}<p>첫 전투를 기다리고 있어요.</p></div>`}${v.stats.waves.length ? `<div class="ops-section-heading"><h2>최근 웨이브</h2><span>처치 / 기지 피해</span></div><div class="ops-wave-history">${v.stats.waves.slice(-10).map(w => `<span class="${w.lost ? 'has-loss' : ''}" title="${w.wave}웨이브 · ${w.kills} 처치 · 기지 피해 ${w.lost} · ${w.seconds.toFixed(1)}초"><b>${String(w.wave).padStart(2, '0')}</b><small>${w.kills} / ${w.lost}</small></span>`).join('')}</div>` : ''}`;
   }
-  private codex(v: OperationsView): string {
-    return `<h2>지휘관 훈련</h2><ol>${tutorialSteps.map((s, i) => `<li>${i < v.tutorial || v.profile.tutorialDone ? '✓ ' : ''}${s}</li>`).join('')}</ol>${button('tutorial', '', '훈련 다시 보기')}<p>T 테란 · R 프로토스 · 1~9 선택 종족 보급 · Space 웨이브 시작 · P 정지 · B 보급 · O 작전실 · U 강화 · Z/X 스킬 · S 회수 · Esc 명령 취소. 모바일은 명령 아이콘과 상단 버튼을 사용하세요.</p><h2>적 도감</h2><div class="ops-cards">${Object.entries(ENEMY_INFO).map(([k, d]) => `<article><h3>${d.name}</h3><p>${d.desc}</p><small>기본 체력 ${ENEMY_DEFS[k as keyof typeof ENEMY_DEFS].hp} · 속도 ${ENEMY_DEFS[k as keyof typeof ENEMY_DEFS].speed}</small></article>`).join('')}</div><h2>보스 전술</h2><ul>${[10, 20, 30, 40, 50].map(w => `<li>${w}웨이브: ${bossPattern(w)}</li>`).join('')}</ul>${(Object.keys(FACTIONS) as Faction[]).map(faction => `<h2>${FACTIONS[faction].name} / 9종</h2><div class="ops-cards">${FACTION_TOWERS[faction].map(k => `<article><img class="ops-art" src="${this.images.get(k)}" alt=""><h3>${TOWER_DEFS[k].name}</h3><p>${TOWER_DEFS[k].desc}</p>${Object.values(SKILL_DEFS).filter(s => s.unit === k).map(s => `<p><b>${s.name}</b> · ${s.desc}</p>`).join('')}</article>`).join('')}</div>`).join('')}<p>지원 효과는 같은 종류끼리 중첩되지 않습니다. 보호막은 체력 위 파란 막대로 표시됩니다.</p>`;
+  private codex(): string {
+    const enemies = (Object.keys(ENEMY_INFO) as EnemyKey[]).map(k => `<details class="ops-codex-entry"><summary>${icon(enemyIcons[k])}<b>${ENEMY_INFO[k].name}</b></summary><p>${ENEMY_INFO[k].desc}</p><small>체력 ${ENEMY_DEFS[k].hp} · 속도 ${ENEMY_DEFS[k].speed}</small></details>`).join('');
+    return `<details id="ops-training" class="ops-disclosure"><summary>${icon('help')}<b>플레이 방법</b></summary><ol class="ops-training">${tutorialSteps.map((s, i) => `<li>${icon(tutorialIcons[i])}<span>${s}</span></li>`).join('')}</ol><div class="ops-hotkeys">${[['T / R', '종족'], ['1–9', '병력'], ['Space', '웨이브'], ['U', '강화'], ['Z / X', '스킬'], ['S', '회수'], ['B', '보급'], ['P', '정지']].map(([key, label]) => `<span><kbd>${key}</kbd>${label}</span>`).join('')}</div>${button('tutorial', '', `${icon('resume')}<span>훈련 다시 보기</span>`, '훈련 다시 보기', { className: 'ops-retrain' })}</details>
+      <details id="ops-enemy-codex" class="ops-disclosure" open><summary>${icon('tactics')}<b>적 도감</b><small>${Object.keys(ENEMY_INFO).length}</small></summary><div class="ops-codex-grid">${enemies}</div></details>
+      <details id="ops-boss-codex" class="ops-disclosure"><summary>${icon('boss')}<b>보스</b></summary><div class="ops-boss-list">${[10, 20, 30, 40, 50].map(w => `<p><b>${w}</b>${bossPattern(w)}</p>`).join('')}</div><p class="ops-danger">보스가 기지에 도달하면 즉시 패배합니다.</p></details>
+      ${(Object.keys(FACTIONS) as Faction[]).map(faction => `<details id="ops-${faction}-codex" class="ops-disclosure"><summary>${icon(faction)}<b>${FACTIONS[faction].name}</b><small>9</small></summary><div class="ops-codex-grid">${FACTION_TOWERS[faction].map(k => `<details class="ops-codex-entry"><summary>${this.art(k)}<b>${TOWER_DEFS[k].name}</b></summary><p>${TOWER_DEFS[k].desc}</p>${Object.values(SKILL_DEFS).filter(s => s.unit === k).map(s => `<p><b>${s.name}</b> · ${s.desc}</p>`).join('')}</details>`).join('')}</div></details>`).join('')}`;
   }
   private medals(v: OperationsView): string {
-    return `<p>최고 기록 ${v.profile.bestWave}웨이브 · 승리 ${v.profile.wins}회 · 외형은 전투 수치에 영향을 주지 않습니다.</p><div class="ops-cards">${Object.entries(ACHIEVEMENTS).map(([k, d]) => `<article class="${v.profile.achievements.includes(k) ? 'earned' : ''}"><small>${v.profile.achievements.includes(k) ? '✓ 달성' : '미달성'}</small><h3>${d.name}</h3><p>${d.desc}</p>${d.skin ? `<p>보상: ${d.skin === 'gold' ? '황금 부대 / 기지' : '이온 부대 / 기지'} 외형</p>` : ''}</article>`).join('')}</div><h2>부대 / 기지 외형</h2><div class="ops-buttons">${button('skin', 'standard', '기본 외형', false, v.profile.skin === 'standard')}${button('skin', 'gold', '황금 외형', !v.profile.achievements.includes('victory'), v.profile.skin === 'gold')}${button('skin', 'ion', '이온 외형', !v.profile.achievements.includes('flawless'), v.profile.skin === 'ion')}</div>`;
+    const earned = v.profile.achievements;
+    return `<div class="ops-personal-best"><span>${icon('flag')}<b>${v.profile.bestWave}</b><small>최고 웨이브</small></span><span>${icon('medal')}<b>${v.profile.wins}</b><small>승리</small></span></div><div class="ops-medals">${Object.entries(ACHIEVEMENTS).map(([k, d]) => `<div class="ops-medal ${earned.includes(k) ? 'is-earned' : ''}" title="${d.name} · ${d.desc}${d.skin ? ' · ' + (d.skin === 'gold' ? '황금' : '이온') + ' 외형 해금' : ''}">${icon(earned.includes(k) ? 'medal' : 'lock')}<b>${d.name}</b><small>${d.desc}</small></div>`).join('')}</div><div class="ops-section-heading"><h2>부대 외형</h2><span>능력치는 그대로</span></div><div class="ops-skins" role="group" aria-label="부대 외형">${(['standard', 'gold', 'ion'] as Profile['skin'][]).map((k, i) => button('skin', k, `${this.art(v.faction === 'terran' ? 'marine' : 'zealot')}<span>${['기본', '황금', '이온'][i]}</span>${k !== 'standard' && !earned.includes(k === 'gold' ? 'victory' : 'flawless') ? icon('lock') : ''}`, ['기본 외형', '황금 외형', '이온 외형'][i], { disabled: k !== 'standard' && !earned.includes(k === 'gold' ? 'victory' : 'flawless'), selected: v.profile.skin === k, className: `ops-skin-${k}`, hint: k === 'standard' ? '기본 외형' : `${k === 'gold' ? '50웨이브 승리' : '기지 피해 없이 50웨이브 승리'} 시 해금` })).join('')}</div>`;
   }
 }

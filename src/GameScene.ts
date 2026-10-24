@@ -254,14 +254,12 @@ export class GameScene extends Phaser.Scene {
       branch: key => this.specialize(key),
       move: () => this.beginRelocate(),
       select: id => this.selectUnit(id),
-      choose: key => this.chooseBuild(key, true),
       faction: key => this.selectFaction(key),
       commander: key => this.useCommander(key),
       reward: key => this.takeReward(key),
       skin: key => { this.profile.skin = key; this.applySkin(); this.persistProfile(); },
       volume: value => { this.profile.volume = value; this.audio.volume = value; this.audio.unlock(); this.audio.play('build'); this.persistProfile(); },
       tutorial: skip => { this.profile.tutorialDone = skip; this.tutorial = skip ? 4 : 0; this.persistProfile(); },
-      save: () => { this.runLaunched = true; this.saveCheckpoint(true); },
     });
     const unlock = () => this.audio.unlock();
     const save = () => this.saveCheckpoint(false);

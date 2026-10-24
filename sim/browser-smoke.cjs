@@ -30,6 +30,13 @@ async function cellClick(page, c, r, mobile = false) {
   if (mobile) await page.touchscreen.tap(x, y); else await page.mouse.click(x, y);
 }
 async function shot(page, name) { await page.screenshot({ path: path.join(artifacts, name + '.png') }); }
+async function dialogFits(page) {
+  assert.ok(await page.locator('dialog[open]').evaluate(d => {
+    const r = d.getBoundingClientRect(), content = d.querySelector('.ops-content');
+    return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight
+      && content.scrollWidth <= content.clientWidth + 1;
+  }), 'Operations dialog and content fit the viewport');
+}
 
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -39,7 +46,13 @@ async function shot(page, name) { await page.screenshot({ path: path.join(artifa
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
     const page = await context.newPage(); lastPage = page; await instrument(page, errors); page.setDefaultTimeout(7000);
     await page.goto(base); await page.getByRole('heading', { name: '작전실', exact: true }).waitFor();
-    await page.locator('#run-map').selectOption('junction'); await page.locator('#run-difficulty').selectOption('easy');
+    await page.getByRole('button', { name: '합류 지대', exact: true }).click();
+    await page.getByRole('button', { name: '쉬움', exact: true }).click();
+    await page.getByRole('button', { name: '도감 / 훈련', exact: true }).click();
+    await page.getByRole('button', { name: '작전 설정', exact: true }).click();
+    assert.equal(await page.locator('button[data-action="map"][data-key="junction"]').getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.locator('button[data-action="difficulty"][data-key="easy"]').getAttribute('aria-pressed'), 'true');
+    await dialogFits(page);
     await shot(page, 'desktop-setup');
     await page.getByRole('button', { name: '새 작전 시작', exact: true }).click();
     await page.waitForFunction(() => !document.querySelector('dialog[open]'));
@@ -76,13 +89,17 @@ async function shot(page, name) { await page.screenshot({ path: path.join(artifa
     await shot(page, 'desktop-tactics');
     await page.getByRole('button', { name: '선택 병력 재배치 · ◆ 20', exact: true }).click();
     await cellClick(page, 8, 3); assert.equal(await scene(page, s => s.selected.c), 8);
-    await press(page, 'o');
-    await page.getByRole('button', { name: '배치 · ◆ 160', exact: true }).click();
+    await scene(page, s => s.openShop('units'));
+    await page.locator('button[data-action="choose"][data-key="support"]').click();
     await cellClick(page, 9, 3); assert.equal(await scene(page, s => s.towers.at(-1).k), 'support');
     // Exercise an actual wave-completion boundary without waiting five full battles.
     await scene(page, s => { s.wave = 4; s.startWave(); s.spawnQ = []; for (const e of s.enemies) e.sprite.destroy(); s.enemies = []; s.step(1 / 60); });
     await page.getByRole('heading', { name: '전장 보상 선택', exact: true }).waitFor();
     assert.equal(await scene(page, s => s.pending.length), 3);
+    await press(page, 'Escape'); await press(page, 'o');
+    assert.equal(await scene(page, s => s.pending.length), 3);
+    assert.equal(await scene(page, s => s.operationsOpen), true);
+    await dialogFits(page);
     await shot(page, 'desktop-reward');
     const pendingBefore = await scene(page, s => s.pending);
     await page.reload(); await page.getByRole('button', { name: '저장된 작전 이어하기', exact: true }).click();
@@ -119,7 +136,10 @@ async function shot(page, name) { await page.screenshot({ path: path.join(artifa
     const mobileContext = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
     const mobile = await mobileContext.newPage(); lastPage = mobile; await instrument(mobile, errors); mobile.setDefaultTimeout(7000);
     await mobile.goto(base + '/?layout=mobile'); await mobile.getByRole('heading', { name: '작전실', exact: true }).waitFor();
-    await mobile.locator('#run-map').selectOption('canyon'); await mobile.locator('#run-difficulty').selectOption('hard'); await mobile.locator('#run-mode').selectOption('bunker');
+    await mobile.getByRole('button', { name: '협곡', exact: true }).click();
+    await mobile.getByRole('button', { name: '어려움', exact: true }).click();
+    await mobile.getByRole('button', { name: '벙커 부대', exact: true }).click();
+    await dialogFits(mobile);
     await shot(mobile, 'mobile-setup');
     await mobile.getByRole('button', { name: '새 작전 시작', exact: true }).click();
     await mobile.waitForFunction(() => !document.querySelector('dialog[open]'));
@@ -132,7 +152,7 @@ async function shot(page, name) { await page.screenshot({ path: path.join(artifa
     assert.equal(await scene(mobile, s => s.towers[0].k), 'bunker');
     await mobile.getByRole('button', { name: '작전실 [O]', exact: true }).click();
     await mobile.getByRole('button', { name: '도감 / 훈련', exact: true }).click(); await shot(mobile, 'mobile-codex');
-    assert.ok(await mobile.evaluate(() => { const r = document.querySelector('dialog[open]').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight; }));
+    await dialogFits(mobile);
     await mobile.getByRole('button', { name: '전장 복귀', exact: true }).click(); await shot(mobile, 'mobile-battlefield');
     await mobileContext.close();
     assert.deepEqual(errors, []);
