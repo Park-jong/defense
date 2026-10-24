@@ -7,6 +7,8 @@ import { MAX_UNIT_LEVEL, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgra
 import { allowedUnit, RunOptions } from './campaign';
 import './shop.css';
 
+const icon = (key: string): string => `<img class="shop-icon" src="${commandIconUrl(key)}" width="32" height="32" alt="" aria-hidden="true">`;
+
 export interface ShopUnit {
   id: string; k: TowerKey; lvl: number; skills: EquippedSkill[]; c: number; r: number;
   hostId?: string; passengers: (string | null)[];
@@ -120,6 +122,12 @@ export class SupplyShop {
     const selected = state.units.find(u => u.id === state.selectedId);
     const combatUnits = state.units.filter(u => u.k !== 'bunker');
     const unitCount = (k: TowerKey) => state.units.filter(u => u.k === k).length;
+    const tabs = [
+      { key: 'units', name: '보급', label: `유닛 보급 · ${TOWER_KEYS.length}종`, art: icon('deploy') },
+      { key: 'skills', name: '스킬', label: `자동 스킬 · ${SKILL_KEYS.length}종`, art: icon('storm') },
+      { key: 'garrison', name: '벙커', label: '벙커 주둔 · 4칸', art: `<img class="shop-icon shop-unit-icon" src="${this.images.get('bunker')}" alt="" aria-hidden="true">` },
+      { key: 'manage', name: '일괄', label: '일괄 관리', art: icon('manage') },
+    ];
     const button = (action: string, key: string, label: string, active = false) =>
       `<button type="button" data-action="${action}" data-key="${key}" class="${active ? 'is-active' : ''}" aria-pressed="${active}">${label}</button>`;
     const roster = this.tab === 'skills' ? `<section class="shop-roster" aria-label="스킬을 장착할 유닛">
@@ -152,14 +160,14 @@ export class SupplyShop {
       </article>`;
     }).join('');
     this.dialog.innerHTML = `
-      <header class="shop-header"><div><span class="shop-eyebrow">FRONTIER / SUPPLY TERMINAL</span><h2>보급 상점 <small>전투 일시정지</small></h2></div><div class="shop-wallet"><span>보유 미네랄</span><strong>◆ ${state.gold.toLocaleString()}</strong></div><button type="button" class="shop-close" data-action="close" aria-label="상점 닫기">×</button></header>
-      <nav class="shop-tabs" aria-label="상점 메뉴">${button('tab', 'units', `유닛 보급 <small>${TOWER_KEYS.length}</small>`, this.tab === 'units')}${button('tab', 'skills', `자동 스킬 <small>${SKILL_KEYS.length}</small>`, this.tab === 'skills')}${button('tab', 'garrison', '벙커 주둔 <small>4칸</small>', this.tab === 'garrison')}${button('tab', 'manage', '일괄 관리', this.tab === 'manage')}<span>보급 · 강화 · 자동 스킬</span></nav>
+      <header class="shop-header"><div class="shop-heading">${icon('supply')}<div><h1>보급 상점</h1><p>전투 일시정지</p></div></div><span class="shop-wallet" aria-label="미네랄 ${state.gold}">${icon('mineral')}${state.gold.toLocaleString()}</span><button type="button" class="shop-close" data-action="close" aria-label="전장 복귀" title="전장 복귀 [Esc / B]">${icon('close')}</button></header>
+      <nav class="shop-tabs" aria-label="상점 메뉴">${tabs.map(t => `<button type="button" data-action="tab" data-key="${t.key}" class="${this.tab === t.key ? 'is-active' : ''}" aria-pressed="${this.tab === t.key}" aria-label="${t.label}" title="${t.label}">${t.art}<span>${t.name}</span></button>`).join('')}</nav>
       <div class="shop-content">
-        ${this.tab === 'manage' ? `<p class="shop-notice" role="status">${this.notice || '전장과 모든 벙커의 병력을 함께 관리합니다. 유닛 종류별로도 강화·스킬을 적용할 수 있습니다.'}</p>${this.batchControls(state, {}, '전체 부대 일괄 관리')}` : this.tab === 'garrison' ? this.garrisonView(state) : this.tab === 'units' ? `<div class="shop-filter" role="group" aria-label="보급 종족 선택">${(Object.keys(FACTIONS) as Faction[]).map(k => `<button type="button" data-action="filter" data-key="${k}" class="faction-filter ${this.faction === k ? 'is-active' : ''}" aria-pressed="${this.faction === k}" aria-label="${FACTIONS[k].name} 병력 9종" title="${FACTIONS[k].name} 병력 9종" ${state.mode === 'bunker' && k === 'protoss' ? 'disabled' : ''}><img src="${commandIconUrl(k)}" alt="" width="32" height="32"><small>9</small></button>`).join('')}<span>${FACTIONS[this.faction].name} · 9종<br>배치 시 미네랄 차감</span></div>` : `${roster}<div class="shop-skill-context">${selected && selected.k !== 'bunker' ? `<img src="${this.images.get(selected.k)}" alt="" width="54" height="54"><div><b>${TOWER_DEFS[selected.k].name} <span>Lv.${selected.lvl}${selected.hostId ? ' · 벙커 탑승' : ''}</span></b><p>장착 ${selected.skills.length}/${SKILL_SLOTS} · 스킬은 적이 사거리 안에 있을 때 자동 사용</p></div>${this.upgradeButton(selected, state.gold)}` : '<div><b>병력을 선택하면 전용 스킬을 구매할 수 있습니다.</b><p>벙커에 탑승한 병력도 스킬을 각각 장착합니다.</p></div>'}</div>`}
-        ${this.tab === 'skills' ? `<p class="shop-notice ${this.notice ? 'is-success' : ''}" role="status">${this.notice ? '✓ ' + this.notice : '전용 스킬을 장착하면 적 탐지와 재사용 대기시간에 따라 자동으로 발동합니다.'}</p>` : ''}
+        ${this.tab === 'manage' ? `<p class="shop-notice" role="status">${icon(this.notice ? 'saved' : 'help')}${this.notice || '전장과 모든 벙커의 병력을 함께 관리합니다. 유닛 종류별로도 강화·스킬을 적용할 수 있습니다.'}</p>${this.batchControls(state, {}, '전체 부대 일괄 관리')}` : this.tab === 'garrison' ? this.garrisonView(state) : this.tab === 'units' ? `<div class="shop-filter" role="group" aria-label="보급 종족 선택">${(Object.keys(FACTIONS) as Faction[]).map(k => `<button type="button" data-action="filter" data-key="${k}" class="faction-filter ${this.faction === k ? 'is-active' : ''}" aria-pressed="${this.faction === k}" aria-label="${FACTIONS[k].name} 병력 9종" title="${FACTIONS[k].name} 병력 9종" ${state.mode === 'bunker' && k === 'protoss' ? 'disabled' : ''}><img src="${commandIconUrl(k)}" alt="" width="32" height="32"><small>9</small></button>`).join('')}<span>${FACTIONS[this.faction].name} · 9종<br>배치 시 미네랄 차감</span></div>` : `${roster}<div class="shop-skill-context">${selected && selected.k !== 'bunker' ? `<img src="${this.images.get(selected.k)}" alt="" width="54" height="54"><div><b>${TOWER_DEFS[selected.k].name} <span>Lv.${selected.lvl}${selected.hostId ? ' · 벙커 탑승' : ''}</span></b><p>장착 ${selected.skills.length}/${SKILL_SLOTS} · 스킬은 적이 사거리 안에 있을 때 자동 사용</p></div>${this.upgradeButton(selected, state.gold)}` : '<div><b>병력을 선택하면 전용 스킬을 구매할 수 있습니다.</b><p>벙커에 탑승한 병력도 스킬을 각각 장착합니다.</p></div>'}</div>`}
+        ${this.tab === 'skills' ? `<p class="shop-notice ${this.notice ? 'is-success' : ''}" role="status">${icon(this.notice ? 'saved' : 'help')}${this.notice ? this.notice : '전용 스킬을 장착하면 적 탐지와 재사용 대기시간에 따라 자동으로 발동합니다.'}</p>` : ''}
         ${this.tab === 'units' || this.tab === 'skills' ? `<div class="shop-grid ${this.tab === 'units' ? 'units-grid' : selected && selected.k !== 'bunker' ? 'focused-skills' : ''}">${cards}</div>` : ''}
       </div>
-      <footer class="shop-footer"><span>${this.tab === 'garrison' ? '강화·스킬 아이콘을 누르면 즉시 적용 · 체크 표시는 장착 완료 · 스킬은 자동 사용' : '유닛당 스킬 2개 · 추가 조작 없이 자동 발동 · 회수 시 스킬 비용도 70% 환급'}</span><button type="button" data-action="close">전장 복귀 <kbd>ESC</kbd></button></footer>`;
+      <footer class="shop-footer"><span class="shop-hint">${icon('help')}<span>${this.tab === 'garrison' ? '강화·스킬 아이콘을 누르면 즉시 적용 · 체크 표시는 장착 완료 · 스킬은 자동 사용' : '유닛당 스킬 2개 · 추가 조작 없이 자동 발동 · 회수 시 스킬 비용도 70% 환급'}</span></span><kbd>ESC</kbd></footer>`;
     this.dialog.querySelector<HTMLElement>('.shop-content')!.scrollTop = scrollTop;
     for (const { selector, left } of strips) this.dialog.querySelector<HTMLElement>(selector)?.scrollTo({ left });
   }
