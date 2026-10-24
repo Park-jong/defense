@@ -378,6 +378,14 @@ export class GameScene extends Phaser.Scene {
     return { c: Math.floor(x / T), r: Math.floor((y - MAP_Y) / T) };
   }
 
+  /** 미리보기용 칸: 맵 아래 덤 땅(r ≥ ROWS)까지 잡아 빨간 설치 불가 표시를 띄운다. 실제 칸은 cellAt과 같다. */
+  private hoverAt(p: Phaser.Input.Pointer): Cell | null {
+    if (!this.inMapView(p)) return null;
+    const { x, y } = this.mapPoint(p.x, p.y);
+    if (y < MAP_Y || y >= MAP_Y + VIEW_H || x < 0 || x >= W) return null;
+    return { c: Math.floor(x / T), r: Math.min(Math.floor((y - MAP_Y) / T), ROWS) };
+  }
+
   // ---------- 맵 확대·이동 ----------
   /** 포인터(캔버스 픽셀)가 맵 영역 위에 있는가. */
   private inMapView(p: { x: number; y: number }): boolean {
@@ -435,7 +443,7 @@ export class GameScene extends Phaser.Scene {
 
   private onPointerMove(p: Phaser.Input.Pointer): void {
     // 터치에는 호버가 없다: 손가락이 움직여도 미리보기 칸은 탭으로만 바뀐다.
-    if (!p.wasTouch) this.hover = this.cellAt(p);
+    if (!p.wasTouch) this.hover = this.hoverAt(p);
     const a = this.input.pointer1, b = this.input.pointer2;
     if (b && a.isDown && b.isDown) {
       const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, d = Phaser.Math.Distance.Between(a.x, a.y, b.x, b.y);
@@ -795,7 +803,7 @@ export class GameScene extends Phaser.Scene {
 
   private onMapClick(p: Phaser.Input.Pointer): void {
     if (this.over || this.shopOpen || this.operationsOpen) return;
-    const cell = this.cellAt(p);
+    const cell = this.cellAt(p) ?? this.hoverAt(p); // 덤 땅은 hoverAt으로만 잡힌다
     if (!cell) return;
     const t = this.towers.find(t => !t.host && t.c === cell.c && t.r === cell.r);
     // 터치에는 호버가 없으므로, 첫 탭은 위치·사거리 미리보기만 하고 같은 칸을 다시 탭해야 확정한다.
@@ -803,6 +811,7 @@ export class GameScene extends Phaser.Scene {
       this.hover = cell;
       return;
     }
+    if (cell.r >= ROWS) { if (this.relocating || this.unloading || this.building) this.banner('설치 불가 구역'); return; }
     if (this.relocating) { this.finishRelocate(cell.c, cell.r); if (p.wasTouch) this.hover = null; return; }
     if (this.unloading) { this.finishUnload(cell.c, cell.r); if (p.wasTouch) this.hover = null; return; }
     if (t) {

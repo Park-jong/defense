@@ -256,6 +256,9 @@ export function drawMap(scene: Phaser.Scene, cols: number, rows: number, map: Ma
       ground.refresh();
     }
     scene.add.image(0, mapY + MAP_H, groundKey).setOrigin(0).setDisplaySize(W, bleed);
+    // 덤 땅은 설치 불가: 적의 길처럼 은은한 붉은 덮개와 칸 구분선으로 표시한다.
+    const deny = scene.add.graphics().fillStyle(0xe37962, .13).fillRect(0, mapY + MAP_H, W, bleed).lineStyle(1, 0xe37962, .22);
+    for (let c = 0; c < W / T; c++) deny.strokeRect(c * T + 2, mapY + MAP_H + 2, T - 4, T - 4);
   }
   const g = scene.add.graphics();
   // Landing-zone markings and a powered exit gate.
