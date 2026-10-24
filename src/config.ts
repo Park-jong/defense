@@ -24,7 +24,7 @@ export const CLEAR_BONUS_PER_WAVE = 4;
 /** 최종 보스(마지막 웨이브의 보스) 체력 배율. */
 export const FINAL_BOSS_HP_MULT = 1;
 /** 테스트 모드(`?test`): MAX_WAVE 스테이지를 반복하며, 아래의 고정 미네랄을 지급한다. */
-export const TEST_GOLD = 12000;
+export const TEST_GOLD = 100000;
 export const FONT = '"Malgun Gothic", system-ui, sans-serif';
 
 export interface Point { x: number; y: number }
