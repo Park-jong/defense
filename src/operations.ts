@@ -49,6 +49,12 @@ const compareHead = [
   ['overdrive', '초당 공격', '1초에 공격하는 횟수'], ['barrage', 'DPS', '초당 피해 · 공격력 × 초당 공격'],
   ['mineral', '미네랄 100당 DPS', '비용 대비 화력 · 높을수록 경제적'], ['storm', '전용 스킬', '보급 상점 부대 탭에서 장착 · 전투 중 자동 발동'],
 ];
+/** 비교표 설명 창과 도감 카드가 함께 쓰는 병력 특성 요약. */
+function unitTraits(k: TowerKey): string[] {
+  const d = TOWER_DEFS[k] as (typeof TOWER_DEFS)[TowerKey] & { splash?: number; slow?: number };
+  return [k === 'support' ? '주변 공격 속도 +20% · 레벨당 +5%' : '', k === 'observer' ? '약점 노출 · 받는 피해 +35%' : '',
+    d.splash ? `범위 피해 · 반경 ${d.splash}` : '', d.slow ? `둔화 ${Math.round(d.slow * 100)}%` : ''].filter(Boolean);
+}
 const tabs = {
   setup: { icon: 'flag', name: '출격', label: '작전 설정' },
   tactics: { icon: 'tactics', name: '병력', label: '전술 / 병력' },
@@ -150,10 +156,16 @@ export class OperationsCenter {
       const s = SKILL_DEFS[key as keyof typeof SKILL_DEFS];
       return `<header><img class="ops-icon" src="${commandIconUrl(key)}" width="32" height="32" alt=""><b>${s.name}<small>${TOWER_DEFS[s.unit as TowerKey].name} 전용</small></b></header><p>${s.desc}</p><footer><span>${icon('clock')}${s.cooldown}초</span><span>${icon('mineral')}${s.cost}</span></footer>`;
     }
-    const k = key as TowerKey, d = TOWER_DEFS[k] as (typeof TOWER_DEFS)[TowerKey] & { splash?: number; slow?: number };
-    const traits = [k === 'support' ? '주변 공격 속도 +20% · 레벨당 +5%' : '', k === 'observer' ? '약점 노출 · 받는 피해 +35%' : '', d.splash ? `범위 피해 · 반경 ${d.splash}` : '', d.slow ? `둔화 ${Math.round(d.slow * 100)}%` : ''].filter(Boolean);
+    const k = key as TowerKey, d = TOWER_DEFS[k], traits = unitTraits(k);
     const skills = SKILL_KEYS.filter(s => SKILL_DEFS[s].unit === k);
     return `<header>${this.art(k)}<b>${d.name}<small>${d.role}</small></b><span class="ops-tip-cost">${icon('mineral')}${d.cost}</span></header><p>${d.desc}</p>${traits.length ? `<ul>${traits.map(t => `<li>${t}</li>`).join('')}</ul>` : ''}${skills.length ? `<div class="ops-tip-skills">${skills.map(s => `<span><img src="${commandIconUrl(s)}" width="20" height="20" alt=""><b>${SKILL_DEFS[s].name}</b><small>${SKILL_DEFS[s].cooldown}초</small></span>`).join('')}</div>` : ''}`;
+  }
+  /** 도감 병력 카드: 펼치지 않아도 역할·비용·특성·전용 스킬을 한눈에 읽는다. */
+  private unitCard(k: TowerKey): string {
+    const d = TOWER_DEFS[k], traits = unitTraits(k), skills = SKILL_KEYS.filter(s => SKILL_DEFS[s].unit === k);
+    return `<article class="ops-unit-card" aria-label="${escape(`${d.name} · ${d.role}`)}"><header>${this.art(k)}<div><h3>${d.name}</h3><small>${d.role}</small></div>${d.dmg ? `<span class="ops-unit-cost ops-unit-dmg" title="공격력 · Lv.1 한 번 공격의 피해" aria-label="공격력 ${d.dmg}">${icon('siege')}${d.dmg}</span>` : ''}<span class="ops-unit-cost" title="배치 비용" aria-label="비용 ${d.cost}">${icon('mineral')}${d.cost}</span></header>
+      <p>${d.desc}</p>${traits.length ? `<ul class="ops-unit-traits">${traits.map(t => `<li>${t}</li>`).join('')}</ul>` : ''}
+      ${skills.length ? `<ul class="ops-unit-skills">${skills.map(s => `<li><img src="${commandIconUrl(s)}" width="26" height="26" alt=""><div><b>${SKILL_DEFS[s].name}<small>${icon('clock')}${SKILL_DEFS[s].cooldown}초</small></b><span>${SKILL_DEFS[s].desc}</span></div></li>`).join('')}</ul>` : ''}</article>`;
   }
   private showTip(el: HTMLElement): void {
     this.tip.innerHTML = this.tipContent(el.dataset.tip!);
@@ -240,7 +252,7 @@ export class OperationsCenter {
     return `<div class="ops-metrics">${metrics.map(m => `<div title="${m.label}" aria-label="${m.label} ${m.value}">${icon(m.icon)}<b>${m.value}</b><small>${m.label}</small></div>`).join('')}</div>${top ? `<section class="ops-mvp">${this.art(top.k)}<div><small>MVP</small><h2>${TOWER_DEFS[top.k].name}</h2><p>${Math.round(top.damage).toLocaleString()} 피해 · ${top.kills} 처치</p></div>${icon('medal')}</section><div class="ops-damage-list">${units.slice(0, 5).map(u => `<div title="${TOWER_DEFS[u.k].name} #${u.id} · ${u.kills} 처치" aria-label="${TOWER_DEFS[u.k].name} #${u.id} · ${Math.round(u.damage)} 피해 · ${u.kills} 처치">${this.art(u.k)}<span><span>${TOWER_DEFS[u.k].name}</span><i style="--damage:${u.damage / top.damage * 100}%"></i></span><b>${Math.round(u.damage).toLocaleString()}</b></div>`).join('')}</div>` : `<div class="ops-empty">${icon('stats')}<p>첫 전투를 기다리고 있어요.</p></div>`}${v.stats.waves.length ? `<div class="ops-section-heading"><h2>최근 웨이브</h2><span>처치 / 기지 피해</span></div><div class="ops-wave-history">${v.stats.waves.slice(-10).map(w => `<span class="${w.lost ? 'has-loss' : ''}" title="${w.wave}웨이브 · ${w.kills} 처치 · 기지 피해 ${w.lost} · ${w.seconds.toFixed(1)}초"><b>${String(w.wave).padStart(2, '0')}</b><small>${w.kills} / ${w.lost}</small></span>`).join('')}</div>` : ''}`;
   }
   private codex(current: Faction): string {
-    // 순서: 배우고(플레이 방법) → 내 병력을 알고(현재 종족 먼저, 도감 뒤에 비교표) → 적과 보스를 대비한다.
+    // 순서: 배우고(플레이 방법) → 내 병력을 알고(현재 종족 먼저, 도감 뒤에 비교표) → 적과 보스를 대비한다. 모든 항목은 접힌 채 연다.
     const order = [current, ...(Object.keys(FACTIONS) as Faction[]).filter(f => f !== current)];
     const enemies = (Object.keys(ENEMY_INFO) as EnemyKey[]).map(k => `<details class="ops-codex-entry"><summary>${icon(enemyIcons[k])}<b>${ENEMY_INFO[k].name}</b></summary><p>${ENEMY_INFO[k].desc}</p><small>체력 ${ENEMY_DEFS[k].hp} · 속도 ${ENEMY_DEFS[k].speed}</small></details>`).join('');
     const compare = (faction: Faction): string => {
@@ -253,7 +265,7 @@ export class OperationsCenter {
       return `<details id="ops-${faction}-compare" class="ops-disclosure"><summary>${icon(faction)}<b>${FACTIONS[faction].name} 병력 비교</b><small>Lv.1</small></summary><div class="ops-compare"><table><thead><tr><th scope="col"><span class="ops-sr">병력</span></th>${compareHead.map(([i, l], n) => `<th scope="col" class="${n === compareHead.length - 1 ? 'ops-compare-skills' : ''}" data-tip="stat:${n}" aria-label="${l}">${icon(i)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div></details>`;
     };
     return `<details id="ops-training" class="ops-disclosure"><summary>${icon('help')}<b>플레이 방법</b></summary><ol class="ops-training">${tutorialSteps.map((s, i) => `<li>${icon(tutorialIcons[i])}<span>${s}</span></li>`).join('')}</ol><div class="ops-hotkeys">${[['T / R', '종족'], ['1–9', '병력'], ['Space', '웨이브'], ['U', '강화'], ['Z / X', '스킬'], ['S', '회수'], ['B', '보급'], ['P', '정지']].map(([key, label]) => `<span><kbd>${key}</kbd>${label}</span>`).join('')}</div>${button('tutorial', '', `${icon('resume')}<span>훈련 다시 보기</span>`, '훈련 다시 보기', { className: 'ops-retrain' })}</details>
-      ${order.map(faction => `<details id="ops-${faction}-codex" class="ops-disclosure" ${faction === current ? 'open' : ''}><summary>${icon(faction)}<b>${FACTIONS[faction].name} 병력</b><small>9</small></summary><div class="ops-codex-grid">${FACTION_TOWERS[faction].map(k => `<details class="ops-codex-entry"><summary>${this.art(k)}<b>${TOWER_DEFS[k].name}</b></summary><p>${TOWER_DEFS[k].desc}</p>${Object.values(SKILL_DEFS).filter(s => s.unit === k).map(s => `<p><b>${s.name}</b> · ${s.desc}</p>`).join('')}</details>`).join('')}</div></details>` + compare(faction)).join('')}
+      ${order.map(faction => `<details id="ops-${faction}-codex" class="ops-disclosure"><summary>${icon(faction)}<b>${FACTIONS[faction].name} 병력</b><small>9</small></summary><div class="ops-unit-cards">${FACTION_TOWERS[faction].map(k => this.unitCard(k)).join('')}</div></details>` + compare(faction)).join('')}
       <details id="ops-enemy-codex" class="ops-disclosure"><summary>${icon('tactics')}<b>적 도감</b><small>${Object.keys(ENEMY_INFO).length}</small></summary><div class="ops-codex-grid">${enemies}</div></details>
       <details id="ops-boss-codex" class="ops-disclosure"><summary>${icon('boss')}<b>보스</b></summary><div class="ops-boss-list">${[10, 20, 30, 40, 50].map(w => `<p><b>${w}</b>${bossPattern(w)}</p>`).join('')}</div><p class="ops-danger">보스가 기지에 도달하면 즉시 패배합니다.</p></details>`;
   }

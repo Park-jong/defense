@@ -341,3 +341,26 @@
 .ops-tip footer { display:flex; gap:12px; margin-top:7px; color:#9aaf89; font-variant-numeric:tabular-nums; }
 .ops-tip footer span { display:flex; align-items:center; gap:3px; }
 .ops-sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+/* 도감 병력 카드: 펼침 없이 바로 읽히도록 글자를 키우고 스킬은 아이콘 행으로 나눈다. */
+.ops-unit-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:8px; padding:0 12px 12px; }
+.ops-unit-card { display:flex; flex-direction:column; gap:8px; padding:10px 12px 12px; border:1px solid #354b31; border-radius:9px; background:linear-gradient(#15271c,#112018); }
+.ops-unit-card header { display:flex; align-items:center; gap:10px; padding-bottom:8px; border-bottom:1px solid #2b3d2b; }
+.ops-unit-card header .ops-unit-art { width:44px; height:44px; flex:none; filter:drop-shadow(0 3px 5px #0008); }
+.ops-unit-card header div { min-width:0; }
+.ops-unit-card h3 { margin:0; font-size:13px; color:#e4f3c6; }
+.ops-unit-card header small { display:block; font-size:10px; color:#9aaf89; word-break:keep-all; }
+.ops-unit-cost { display:flex; align-items:center; gap:3px; margin-left:auto; padding:2px 8px 2px 4px; color:#9fd8e8; font-size:12px; font-variant-numeric:tabular-nums; border:1px solid #2f4a4a; border-radius:999px; background:#0f1d1c; }
+.ops-unit-cost .ops-icon { width:18px; height:18px; }
+.ops-unit-dmg { color:#f2c48a; border-color:#5a4630; background:#1f1912; }
+.ops-unit-dmg+.ops-unit-cost { margin-left:0; }
+.ops-unit-card>p { margin:0; font-size:11.5px; line-height:1.6; color:#c8d5ba; word-break:keep-all; }
+.ops-unit-traits { display:flex; flex-wrap:wrap; gap:4px; margin:0; padding:0; list-style:none; }
+.ops-unit-traits li { padding:2px 8px; font-size:10px; color:#bddb8c; border:1px solid #4a6338; border-radius:999px; background:#1c2f1f; }
+.ops-unit-skills { display:grid; gap:6px; margin:auto 0 0; padding:8px 0 0; list-style:none; border-top:1px dashed #354b31; }
+.ops-unit-skills li { display:flex; align-items:flex-start; gap:8px; }
+.ops-unit-skills img { flex:none; border-radius:5px; }
+.ops-unit-skills b { display:flex; align-items:center; gap:6px; font-size:11px; color:#e0e8d6; }
+.ops-unit-skills b small { display:inline-flex; align-items:center; gap:2px; font-size:9.5px; font-weight:400; color:#9aaf89; font-variant-numeric:tabular-nums; }
+.ops-unit-skills b small .ops-icon { width:12px; height:12px; }
+.ops-unit-skills span { display:block; font-size:10.5px; line-height:1.5; color:#a5b995; word-break:keep-all; }
+@media(max-width:480px) { .ops-unit-cards { grid-template-columns:1fr; } }
