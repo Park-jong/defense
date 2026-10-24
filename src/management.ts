@@ -13,6 +13,12 @@ export interface OrderResult { count: number; cost: number }
 export const unitUpgradeCost = (unit: Pick<ManagedUnit, 'k' | 'lvl'>): number =>
   Math.round(TOWER_DEFS[unit.k].cost * .8 * unit.lvl);
 
+/** 레벨별 기본 능력치(보너스·특화 제외). 게임 씬의 실제 계산과 보급 상점 비교가 같은 식을 쓴다. */
+export const levelStats = (k: TowerKey, lvl: number): { dmg: number; range: number; rate: number } => {
+  const d = TOWER_DEFS[k], l = lvl - 1;
+  return { dmg: d.dmg * Math.pow(1.6, l), range: d.range * (1 + .08 * l), rate: d.rate * Math.pow(.92, l) };
+};
+
 /** The shop and scene quote the same eligible units; execution always makes a fresh plan. */
 export function planOrder(units: ManagedUnit[], order: UnitOrder, scope: UnitScope = {}): { ids: string[]; cost: number } {
   const eligible = units.filter(unit => {

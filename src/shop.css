@@ -1,4 +1,4 @@
-.supply-shop { box-sizing:border-box; width:min(1040px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); padding:0; border:1px solid #70825a; border-radius:16px; color:#e0e8d6; background:#111e18; font-family:'Malgun Gothic',system-ui,sans-serif; box-shadow:0 0 0 4px #26342666,0 24px 100px #000b; overflow:hidden; }
+.supply-shop { box-sizing:border-box; width:min(1040px,calc(100vw - 32px)); height:min(720px,calc(100dvh - 32px)); max-height:calc(100dvh - 32px); padding:0; border:1px solid #70825a; border-radius:16px; color:#e0e8d6; background:#111e18; font-family:'Malgun Gothic',system-ui,sans-serif; box-shadow:0 0 0 4px #26342666,0 24px 100px #000b; overflow:hidden; }
 .supply-shop[open] { display:flex; flex-direction:column; }
 .supply-shop::backdrop { background:#030a08bd; backdrop-filter:blur(5px); }
 .supply-shop * { box-sizing:border-box; }
@@ -20,52 +20,11 @@
 .supply-shop .shop-close { display:grid; place-items:center; width:40px; height:40px; flex-shrink:0; padding:3px; background:#102017; border-color:#455b40; }
 .shop-close .shop-icon { width:100%; height:100%; }
 .shop-tabs { display:flex; justify-content:center; gap:6px; flex-shrink:0; padding:5px 24px 12px; background:#19291f; border-bottom:1px solid #35492f; }
-.shop-tabs button { display:flex; flex:1; justify-content:center; align-items:center; gap:8px; min-height:48px; padding:7px 9px; background:transparent; border-color:transparent; }
+.shop-tabs button { display:flex; flex:1 1 0; max-width:160px; justify-content:center; align-items:center; gap:8px; min-height:48px; padding:7px 9px; background:transparent; border-color:transparent; }
 .shop-tabs .shop-icon { width:28px; height:28px; }
 .shop-tabs span { font-size:11px; }
-.shop-filter .is-active,.shop-roster .is-active { border-color:#9bbb72; color:#d5edac; background:#30422a; }
 .shop-content { min-height:0; padding:22px 24px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#5f744e transparent; }
-.shop-filter { display:flex; gap:6px; align-items:center; margin-bottom:18px; }
-.shop-filter[role="group"] { display:flex; }
-.shop-filter button { font-size:11px; padding:7px 12px; }
-.shop-filter>span { margin-left:auto; font-size:10px; color:#82947a; }
-.shop-filter .faction-filter { display:flex; align-items:center; justify-content:center; gap:8px; min-width:60px; min-height:44px; padding:4px 10px; }
-.faction-filter img { display:block; }
-.faction-filter small { font:12px monospace; color:#bacc9e; }
-.shop-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
-.shop-grid.units-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
-.shop-card { overflow:hidden; border-radius:10px; min-width:0; display:flex; flex-direction:column; background:linear-gradient(145deg,#233029,#141f19); border:1px solid #46503b; padding:13px; position:relative; }
-.shop-card::before { content:''; position:absolute; top:0; left:0; width:34px; height:2px; background:#8baf74; }
-.shop-card.protoss::before { background:#b9a267; }
-.shop-card-top { display:flex; align-items:center; gap:6px; font-size:8px; color:#8d9c83; }
-.shop-card-top b { margin-left:auto; white-space:nowrap; font:12px monospace; color:#acd9db; }
-.shop-unit-art { position:relative; height:115px; display:grid; place-items:center; margin:6px 0; background:radial-gradient(ellipse,#6876532b,transparent 65%),repeating-linear-gradient(0deg,transparent 0 18px,#73835e0d 18px 19px),repeating-linear-gradient(90deg,transparent 0 18px,#73835e0d 18px 19px); }
-.shop-unit-art img { width:112px; height:112px; filter:drop-shadow(0 6px 7px #0008); }
-.shop-unit-art>span { position:absolute; right:0; bottom:3px; font:10px monospace; color:#5e7258; }
-.shop-card h3 { margin:4px 0 8px; font-size:16px; color:#e0e6ce; }
-.shop-card>p { font-size:11px; line-height:1.7; color:#9dad94; margin:0 0 14px; min-height:56px; }
-.shop-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; padding:10px 0; margin:auto 0 10px; border-top:1px solid #3b4834; border-bottom:1px solid #3b4834; }
-.shop-stats dt { font-size:8px; color:#819576; }
-.shop-unit-skills { display:flex; flex-wrap:wrap; gap:4px; margin:0 0 12px; }
-.shop-unit-skills span { padding:4px 5px; border:1px solid #3f5036; background:#1a2a1b; color:#a3ba8d; font-size:8px; }
-.shop-stats dd { margin:5px 0 0; font:16px monospace; color:#c9d3b7; }
-.shop-card-note { font-size:9px; color:#7f9473; margin:0 0 10px; display:flex; gap:6px; align-items:center; }
-.shop-card-note span { margin-left:auto; font-size:8px; color:#a4b393; }
 .supply-shop .shop-purchase { width:100%; min-height:37px; font-size:11px; color:#c8e2a2; border-color:#6b8051; background:linear-gradient(#34462b,#22301f); }
-.shop-roster { display:flex; align-items:center; gap:7px; flex-wrap:wrap; padding-bottom:14px; border-bottom:1px solid #34442f; margin-bottom:12px; }
-.shop-roster>span { color:#94ab85; font-size:10px; margin-right:5px; }
-.shop-roster button { font-size:10px; padding:7px 10px; }
-.shop-roster button small { color:#8ea17d; margin-left:8px; font:9px monospace; }
-.shop-roster p { margin:0; color:#8c9d7f; font-size:11px; }
-.shop-skill-context { display:flex; align-items:center; gap:12px; margin-bottom:18px; min-height:55px; }
-.shop-skill-context b { font-size:15px; color:#d3e2be; }
-.shop-skill-context b span { font:11px monospace; margin-left:8px; color:#8faa7d; }
-.shop-skill-context p { color:#8fa080; font-size:10px; margin:8px 0 0; }
-.focused-skills { grid-template-columns:repeat(2,minmax(0,1fr)); }
-.shop-skill-art { display:flex; align-items:center; justify-content:center; gap:15px; height:100px; color:var(--skill-color); background:radial-gradient(ellipse,color-mix(in srgb,var(--skill-color) 12%,transparent),transparent 65%); }
-.shop-skill-art>span { font:55px Georgia,serif; text-shadow:0 0 25px color-mix(in srgb,var(--skill-color) 40%,transparent); }
-.shop-skill-art>small { writing-mode:vertical-rl; font:8px monospace; letter-spacing:2px; opacity:.6; }
-.shop-skill-meta { display:flex; justify-content:space-between; gap:10px; font-size:10px; color:#adbd9b; padding:11px 0; margin:auto 0 12px; border-top:1px solid #3b4834; border-bottom:1px solid #3b4834; }
 .is-equipped { border-color:#8ca464; }
 .is-equipped .shop-purchase { opacity:.8!important; }
 .shop-notice { display:flex; align-items:center; gap:8px; min-height:44px; margin:0 0 16px; padding:10px 12px; font-size:11px; line-height:1.6; color:#a5b995; background:#1b2b1d; border:1px solid #3c5034; border-radius:10px; }
@@ -94,27 +53,27 @@
 .bunker-empty p { font-size:12px; color:#9cad8d; line-height:1.8; }
 .shop-batch { border-radius:10px; padding:16px; margin-bottom:18px; border:1px solid #667b50; background:linear-gradient(135deg,#28372a,#16221b); }
 .shop-batch-header { display:flex; align-items:center; gap:16px; margin-bottom:12px; }
+.shop-batch-header>div { flex:1; min-width:0; }
 .shop-batch h3,.shop-batch h4 { margin:0; color:#d7e9bd; font-size:14px; }
 .shop-batch p { margin:7px 0 0; color:#9eb48d; font-size:10px; line-height:1.7; }
 .shop-batch-header>.shop-purchase { flex:0 0 250px; width:auto; min-height:44px; padding:8px; }
-.shop-batch-groups { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.shop-batch-groups { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px; }
 .shop-batch-group { border-radius:10px; min-width:0; padding:12px; border:1px solid #425b3a; background:#111f18; display:flex; flex-direction:column; gap:8px; }
 .shop-batch-group header { display:flex; align-items:center; gap:10px; }
 .shop-batch-group h4 { font-size:12px; }
 .shop-batch-group .shop-purchase { min-height:40px; padding:8px 4px; }
 .shop-batch-empty { padding:10px 0; }
-.shop-skill-context>.shop-purchase { width:auto; min-width:170px; margin-left:auto; padding:10px; }
 @media(max-width:800px) { .shop-batch-header { flex-wrap:wrap; } .shop-batch-header>.shop-purchase { flex:1 0 100%; } }
-@media(max-width:480px) { .shop-batch { padding:12px; } .shop-batch-groups { grid-template-columns:1fr; } .shop-skill-context { flex-wrap:wrap; } .shop-skill-context>.shop-purchase { width:100%; } }
+@media(max-width:480px) { .shop-batch { padding:12px; } .shop-batch-groups { grid-template-columns:1fr; } }
 @media(max-width:800px) { .bunker-slots { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:480px) { .bunker-slots { grid-template-columns:1fr; } .bunker-slot { padding:16px; } }
-@media(max-width:800px) { .shop-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .shop-filter>span { display:none; } .shop-header { padding:16px 18px 14px; gap:12px; } .shop-tabs { padding:5px 18px 10px; } .shop-content { padding:15px 18px; } .shop-footer { padding:10px 18px; } }
-@media(max-width:480px) { .supply-shop { width:calc(100vw - 16px); max-height:calc(100dvh - 16px); } .supply-shop h1 { font-size:18px; } .shop-heading>.shop-icon { width:36px; height:36px; } .shop-wallet { font-size:15px; } .shop-grid { gap:8px; } .shop-card { padding:10px; } .shop-card h3 { font-size:14px; } .shop-card-top { flex-wrap:wrap; } .shop-card>p { font-size:10px; min-height:68px; } .focused-skills { grid-template-columns:1fr; } .shop-hint>span { font-size:9px; } .shop-tabs { gap:4px; padding:5px 12px 10px; } .shop-tabs button { flex-direction:column; gap:2px; min-height:52px; padding:5px 2px; } .shop-tabs .shop-icon { width:26px; height:26px; } .shop-tabs span { font-size:10px; } }
+@media(max-width:800px) { .shop-header { padding:16px 18px 14px; gap:12px; } .shop-tabs { padding:5px 18px 10px; } .shop-content { padding:15px 18px; } .shop-footer { padding:10px 18px; } }
+@media(max-width:480px) { .supply-shop { width:calc(100vw - 16px); height:min(720px,calc(100dvh - 16px)); max-height:calc(100dvh - 16px); } .supply-shop h1 { font-size:18px; } .shop-heading>.shop-icon { width:36px; height:36px; } .shop-wallet { font-size:15px; } .shop-hint>span { font-size:9px; } .shop-tabs { gap:4px; padding:5px 12px 10px; } .shop-tabs button { flex-direction:column; gap:2px; min-height:52px; padding:5px 2px; } .shop-tabs .shop-icon { width:26px; height:26px; } .shop-tabs span { font-size:10px; } }
 @media(max-width:480px) { .shop-notice { min-height:56px; } }
-/* 가로 휴대폰처럼 낮은 화면: 작전실과 같은 구조(상단 머리글 + 좌측 세로 탭 + 우측 내용). 카드는 그림 왼쪽·정보 오른쪽의 가로형으로 줄인다. */
+/* 가로 휴대폰처럼 낮은 화면: 작전실과 같은 구조(상단 머리글 + 좌측 세로 탭 + 우측 내용 + 한 줄 바닥글). */
 @media(max-height:550px) and (min-width:600px),(max-height:520px) and (max-width:599px) {
   .supply-shop { width:calc(100dvw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)); max-width:none; height:calc(100dvh - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); max-height:none; box-shadow:0 0 0 3px #26342666,0 10px 40px #000c; }
-  .supply-shop[open] { display:grid; grid-template-columns:126px minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); }
+  .supply-shop[open] { display:grid; grid-template-columns:126px minmax(0,1fr); grid-template-rows:auto minmax(0,1fr) auto; }
   .shop-header { grid-column:1 / -1; padding:8px 14px; gap:10px; }
   .shop-heading { gap:8px; }
   .shop-heading>.shop-icon { width:32px; height:32px; }
@@ -125,37 +84,11 @@
   .shop-tabs { grid-column:1; grid-row:2; flex-direction:column; justify-content:flex-start; padding:8px; gap:3px; border-right:1px solid #35492f; border-bottom:0; overflow:auto; }
   .shop-tabs button { flex:0 0 auto; flex-direction:row; min-height:39px; justify-content:flex-start; gap:10px; padding:4px 8px; }
   .shop-tabs .shop-icon { width:26px; height:26px; }
-  .shop-footer, .shop-filter { display:none; }
+  .shop-tabs button { max-width:none; }
+  .shop-footer { grid-column:1 / -1; padding:3px 14px; gap:8px; }
+  .shop-hint { font-size:9px; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .shop-hint .shop-icon { width:16px; height:16px; }
   .shop-content { grid-column:2; grid-row:2; align-self:stretch; padding:8px 10px 10px; }
-  .shop-grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
-  .focused-skills { grid-template-columns:repeat(2,minmax(0,1fr)); }
-
-  /* 가로형 카드: [그림 | 이름 · 가격] / [그림 | 능력치·설명] / [구매 버튼] */
-  .shop-card { display:grid; grid-template-columns:48px minmax(0,1fr) auto; grid-template-areas:"art name cost" "art info info" "art meta meta" "btn btn btn"; column-gap:8px; row-gap:3px; align-items:center; padding:7px 8px; }
-  .shop-card-top { grid-area:cost; font-size:0; }
-  .shop-card-top span { display:none; }
-  .shop-card-top b { font-size:11px; }
-  .shop-unit-art, .shop-skill-art { grid-area:art; align-self:start; height:48px; margin:0; gap:0; background:radial-gradient(ellipse,#6876532b,transparent 70%); }
-  .shop-unit-art img { width:46px; height:46px; }
-  .shop-unit-art>span, .shop-skill-art>small { display:none; }
-  .shop-skill-art>span { font-size:28px; }
-  .shop-card h3 { grid-area:name; margin:0; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .unit-card>p, .shop-unit-skills, .shop-card-note { display:none; }
-  .shop-stats { grid-area:info; margin:0; padding:3px 0; gap:2px; border-bottom:0; }
-  .shop-stats dt { font-size:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .shop-stats dd { font-size:12px; margin-top:1px; }
-  .skill-card>p { grid-area:info; margin:0; font-size:10px; line-height:1.4; min-height:0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-  .shop-skill-meta { grid-area:meta; margin:0; padding:2px 0 0; font-size:9px; border:0; }
-  .supply-shop .shop-purchase { grid-area:btn; min-height:32px; font-size:11px; margin-top:3px; }
-
-  /* 스킬 탭: 장착 대상 목록은 한 줄로, 유닛 소개는 이름·강화 버튼만 남긴 한 줄로, 안내 문구도 한 줄로 */
-  .shop-roster { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; padding-bottom:6px; margin-bottom:6px; gap:5px; }
-  .shop-roster>span { white-space:nowrap; }
-  .shop-roster button { min-height:32px; padding:4px 10px; white-space:nowrap; }
-  .shop-skill-context { min-height:0; margin-bottom:6px; gap:8px; }
-  .shop-skill-context>img, .shop-skill-context p { display:none; }
-  .shop-skill-context b { font-size:13px; }
-  .supply-shop .shop-skill-context>.shop-purchase { width:auto; min-width:0; margin:0 0 0 auto; padding:4px 12px; }
 
   /* 일괄 관리(전체·벙커): 머리말과 버튼을 줄이고 유닛 종류별 묶음은 3열로 */
   .shop-batch { padding:8px; margin-bottom:8px; }
@@ -263,10 +196,63 @@
   .garrison-batch .garrison-action { grid-template-columns:28px minmax(0,1fr); }
 }
 
+/* 부대 탭: 왼쪽 병력 초상화 목록, 오른쪽 선택 병력의 능력치·강화·스킬. */
+.army-console { display:grid; grid-template-columns:minmax(150px,210px) minmax(0,1fr); gap:14px; align-items:start; }
+.army-roster { display:grid; grid-template-columns:repeat(auto-fill,minmax(62px,1fr)); gap:6px; min-width:0; max-height:420px; overflow-y:auto; padding:2px; scrollbar-width:thin; }
+.supply-shop .army-unit { position:relative; display:grid; justify-items:center; gap:1px; min-width:0; padding:4px 2px 5px; background:radial-gradient(ellipse at 50% 35%,#4b64482b,transparent 75%),#0f1b15; border-color:#3f5342; }
+.army-unit img { object-fit:contain; filter:drop-shadow(0 3px 4px #0008); }
+.army-unit b { font:10px monospace; color:#c9dcb2; }
+.army-dots { display:flex; gap:3px; }
+.army-dots i { width:7px; height:7px; border-radius:50%; border:1px solid #6d8458; }
+.army-dots i.on { background:#b8dc7e; border-color:#d3f1a0; }
+.army-unit .army-host { position:absolute; right:2px; top:2px; width:16px; height:16px; }
+.army-detail { display:grid; gap:12px; min-width:0; padding:14px; border-radius:10px; border:1px solid #46503b; background:linear-gradient(145deg,#233029,#141f19); }
+.army-head { display:flex; align-items:center; gap:12px; min-width:0; }
+.army-head img { flex-shrink:0; object-fit:contain; filter:drop-shadow(0 4px 6px #0008); }
+.army-head>div { min-width:0; flex:1; }
+.army-head h3 { margin:0 0 5px; font-size:17px; color:#e0e6ce; }
+.army-head h3 small { margin-left:6px; font:12px monospace; color:#9fbb85; }
+.army-head p { margin:0; font-size:11px; color:#9dad94; }
+.army-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(104px,1fr)); gap:6px; }
+.army-stat { display:grid; grid-template-columns:24px minmax(0,1fr); grid-template-rows:auto auto; column-gap:6px; align-items:center; min-width:0; padding:6px 8px; border:1px solid #3b4834; border-radius:8px; background:#111f18; }
+.army-stat .shop-icon { grid-row:1 / 3; width:24px; height:24px; }
+.army-stat b { font:15px monospace; color:#c9d3b7; white-space:nowrap; }
+.army-stat i { font:11px monospace; font-style:normal; color:#a4e08a; margin-left:5px; }
+.army-stat small { grid-column:2; font-size:9px; color:#819576; }
+.army-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+.army-skill-notes { display:grid; gap:5px; margin:0; padding:0; list-style:none; }
+.army-skill-notes li { display:flex; align-items:flex-start; gap:7px; font-size:10px; line-height:1.5; color:#97aa8b; }
+.army-skill-notes img { flex-shrink:0; }
+.army-skill-notes b { color:#c4d8ac; }
+.army-empty,.army-pointer { display:grid; justify-items:center; gap:10px; padding:26px 12px; text-align:center; color:#9cad8d; }
+.army-empty .shop-icon { width:56px; height:56px; opacity:.8; }
+.army-empty p,.army-pointer p { margin:0; font-size:12px; line-height:1.7; }
+.supply-shop .army-head .garrison-unload,.supply-shop .army-pointer .garrison-unload { display:flex; align-items:center; justify-content:center; gap:5px; min-height:34px; min-width:38px; padding:3px 10px; font-size:11px; border-color:#3c5147; background:#15231d; }
+@media(max-width:700px) {
+  .army-console { grid-template-columns:1fr; }
+  .army-roster { display:flex; max-height:none; overflow:auto hidden; padding-bottom:6px; }
+  .supply-shop .army-unit { flex:0 0 62px; }
+}
 @media(max-width:480px) {
-  .units-grid .shop-unit-art { height:72px; }
-  .units-grid .shop-unit-art img { width:64px; height:64px; }
-  .units-grid .shop-card-top>span,.units-grid .unit-card>p,.units-grid .shop-unit-skills,.units-grid .shop-stats,.units-grid .shop-card-note { display:none; }
-  .units-grid .shop-card h3 { font-size:11px; text-align:center; word-break:keep-all; }
-  .units-grid .shop-purchase { min-height:44px; padding:4px; font-size:10px; }
+  .army-head img { width:56px; height:56px; }
+  .army-detail { padding:10px; }
+}
+@media(max-height:550px) and (min-width:600px),(max-height:520px) and (max-width:599px) {
+  .army-console { grid-template-columns:1fr; gap:6px; }
+  .army-roster { display:flex; max-height:none; overflow:auto hidden; padding-bottom:4px; scrollbar-width:none; }
+  .supply-shop .army-unit { flex:0 0 54px; padding:2px; }
+  .army-unit img { width:34px; height:34px; }
+  .army-detail { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px 10px; padding:8px; }
+  .army-head { grid-column:1 / -1; }
+  .army-head img { width:44px; height:44px; }
+  .army-head h3 { font-size:14px; margin-bottom:2px; }
+  .army-stats { grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; }
+  .army-stat { padding:3px 6px; }
+  .army-stat small { display:none; }
+  .army-stat .shop-icon { grid-row:auto; }
+  .army-actions { grid-template-columns:repeat(3,minmax(0,1fr)); align-content:start; gap:4px; }
+  .supply-shop .army-actions .garrison-action { min-height:62px; }
+  .army-actions .garrison-action>span { font-size:9px; line-height:1.2; white-space:normal; }
+  .army-skill-notes { display:none; }
+  .army-empty,.army-pointer { padding:10px; gap:6px; }
 }

@@ -306,3 +306,38 @@
 }
 @media(prefers-reduced-motion:reduce) { .operations-center button { transition:none; } }
 @media(pointer:coarse) { .field-tutorial button { width:40px; height:40px; flex-basis:40px; } .ops-close { min-width:44px; min-height:44px; } }
+
+/* 병력 비교표: 표는 자체 래퍼 안에서만 가로 스크롤한다. */
+.ops-compare { overflow-x:auto; scrollbar-width:thin; }
+.ops-compare table { width:100%; min-width:520px; border-collapse:collapse; font-size:11px; }
+.ops-compare th,.ops-compare td { padding:4px 6px; text-align:center; vertical-align:middle; border-bottom:1px solid #2b3d2b; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.ops-compare thead th { font-weight:400; cursor:help; }
+.ops-compare thead .ops-icon { width:20px; height:20px; display:inline-block; vertical-align:middle; }
+.ops-compare tbody tr { cursor:help; outline:none; }
+.ops-compare tbody tr:hover,.ops-compare tbody tr:focus-visible { background:#1d3024; }
+.ops-compare tbody tr:focus-visible th { box-shadow:inset 2px 0 #bddb8c; }
+.ops-compare tbody th { text-align:left; font-weight:400; min-width:112px; }
+.ops-compare-unit { display:flex; align-items:center; gap:6px; }
+.ops-compare-unit .ops-unit-art { width:32px; height:32px; }
+.ops-compare .ops-compare-skills { text-align:left; }
+.ops-compare-skills img { display:inline-block; margin-right:3px; vertical-align:middle; }
+/* 비교표 설명 창: 작전실과 같은 녹색 장갑판, 모서리를 깎은 액정 느낌. */
+.ops-tip { position:fixed; z-index:10; width:max-content; max-width:min(280px,calc(100vw - 16px)); padding:9px 11px 10px; color:#e0e8d6; background:linear-gradient(#18291f,#0f1c16); border:1px solid #8fa86c; border-radius:10px; box-shadow:0 0 0 3px #26342699,0 12px 32px #000c; pointer-events:none; font-size:11px; line-height:1.45; }
+.ops-tip[hidden] { display:none; }
+.ops-tip header { display:flex; align-items:center; gap:8px; padding-bottom:6px; margin-bottom:6px; border-bottom:1px solid #354b31; }
+.ops-tip header .ops-icon,.ops-tip header .ops-unit-art { width:28px; height:28px; flex:none; }
+.ops-tip header b { display:flex; flex-direction:column; font-size:12px; color:#e4f3c6; }
+.ops-tip header small { font-size:9px; font-weight:400; color:#9aaf89; }
+.ops-tip-cost { display:flex; align-items:center; gap:2px; margin-left:auto; padding-left:8px; color:#9fd8e8; font-variant-numeric:tabular-nums; }
+.ops-tip-cost .ops-icon,.ops-tip footer .ops-icon { width:16px; height:16px; }
+.ops-tip p { margin:0; color:#c8d5ba; }
+.ops-tip ul { margin:6px 0 0; padding:0; list-style:none; }
+.ops-tip li { padding-left:12px; position:relative; color:#bddb8c; }
+.ops-tip li::before { content:'▸'; position:absolute; left:0; color:#8fa86c; }
+.ops-tip-skills { display:grid; gap:3px; margin-top:7px; padding-top:6px; border-top:1px dashed #354b31; }
+.ops-tip-skills span { display:flex; align-items:center; gap:6px; }
+.ops-tip-skills b { font-weight:400; }
+.ops-tip-skills small { margin-left:auto; padding-left:8px; color:#9aaf89; font-variant-numeric:tabular-nums; }
+.ops-tip footer { display:flex; gap:12px; margin-top:7px; color:#9aaf89; font-variant-numeric:tabular-nums; }
+.ops-tip footer span { display:flex; align-items:center; gap:3px; }
+.ops-sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }

@@ -11,7 +11,7 @@ import { loadCommandIcons } from './commandIcons';
 import { addConsoleChrome, CONSOLE_RISE, consoleContains, loadConsoleChrome } from './consoleChrome';
 import { DamageKind, DamageNumbers } from './damageNumbers';
 import { ShopState, SupplyShop } from './shop';
-import { MAX_UNIT_LEVEL, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
+import { levelStats, MAX_UNIT_LEVEL, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
 import { BUNKER_BARREL_LENGTH, BUNKER_CAPACITY, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
 import { createMapRuntime, type MapRuntime, type Point } from './game/map';
 import { ACHIEVEMENTS, allowedUnit, awardAchievements, Bonuses, bossPattern, Branch, COMMANDERS, CommanderKey, DEFAULT_OPTIONS, DIFFICULTIES, newStats, Profile, PROFILE_KEY, readProfile, readSave, REWARDS, RewardKey, rewardChoices, RunOptions, RunSave, RunStats, SavedUnit, SAVE_KEY, clearSave, TargetMode, validateSave, wavePlan, writeStored } from './campaign';
@@ -203,7 +203,6 @@ export class GameScene extends Phaser.Scene {
       state: () => this.shopState(),
       select: id => this.selectUnit(id),
       choose: k => this.chooseBuild(k, true),
-      faction: key => this.selectFaction(key),
       equip: (k, id) => this.equipSkill(k, id),
       upgrade: id => this.upgradeUnit(id),
       order: (order, scope) => this.applyOrder(order, scope),
@@ -594,10 +593,11 @@ export class GameScene extends Phaser.Scene {
     this.add.rectangle(582, y + 82, 108, 94, 0x0a1710).setOrigin(0).setStrokeStyle(1, 0x52634b).setDepth(27);
     this.unitImage = this.add.image(636, y + 129, 'portrait').setDisplaySize(78, 92).setDepth(28);
     text(595, y + 185, '● ONLINE', 9, '#9cbd85').setFontFamily('monospace');
-    this.commandTitle = text(728, y + 26, '', 10, '#cedfb1').setFontStyle('bold');
+    // 제목·버튼은 장갑 윗단 금속 띠(y+4..y+38) 가운데에 한 줄로 맞춘다 (액정 테두리 y+38, 모서리 나사 x 735·941 회피).
+    this.commandTitle = text(746, y + 21, '', 10, '#cedfb1').setFontStyle('bold').setOrigin(0, .5);
     this.commandTip = this.add.rectangle(648, y - 122, 304, 114, 0x0a1710, .97).setOrigin(0).setStrokeStyle(1, 0x8aab69).setDepth(34).setVisible(false);
     this.commandHint = text(660, y - 110, '', 11, '#c0d5a7').setLineSpacing(4).setWordWrapWidth(278).setDepth(35).setVisible(false);
-    this.shopBtn = mkBtn(this, 836, y + 21, 102, 22, '', () => this.selected ? this.cancelCommand() : this.openShop('manage'), 9);
+    this.shopBtn = mkBtn(this, 834, y + 10, 98, 22, '', () => this.selected ? this.cancelCommand() : this.openShop('manage'), 9);
     this.commandCard = new CommandCard(this, 728, y + 49, 210, 132, command => this.describeCommand(command));
     this.goBtn = mkBtn(this, 24, y + 12, 162, 26, `▶  웨이브 시작${this.kb('  [SPACE]')}`, () => this.startWave(), 11);
     this.goBtn.act(true);
@@ -764,7 +764,7 @@ export class GameScene extends Phaser.Scene {
     if (e.key.toLowerCase() === 'o' && !this.shopOpen) { if (this.operations?.open) this.operations.close(); else this.operations?.show(); return; }
     if (this.operationsOpen) return;
     if (this.shopOpen) { if (e.key === 'Escape' || e.key.toLowerCase() === 'b') this.shop.close(); return; }
-    if (e.key.toLowerCase() === 'b') { this.openShop(this.selected?.k === 'bunker' ? 'garrison' : this.selected ? 'skills' : 'manage'); return; }
+    if (e.key.toLowerCase() === 'b') { this.openShop(this.selected?.k === 'bunker' ? 'garrison' : this.selected ? 'army' : 'manage'); return; }
     if ((e.key.toLowerCase() === 'z' || e.key.toLowerCase() === 'x') && this.selected && this.selected.k !== 'bunker') {
       const skills = SKILL_KEYS.filter(key => SKILL_DEFS[key].unit === this.selected!.k);
       this.equipSkill(skills[e.key.toLowerCase() === 'z' ? 0 : 1]); return;
@@ -823,12 +823,12 @@ export class GameScene extends Phaser.Scene {
 
   // ---------- 타워 ----------
   private shopState(): ShopState {
-    return { gold: this.gold, selectedId: this.selected?.id ?? null, mode: this.options.mode, faction: this.faction,
+    return { gold: this.gold, selectedId: this.selected?.id ?? null, mode: this.options.mode,
       units: this.towers.map(t => ({ id: t.id, k: t.k, lvl: t.lvl, skills: t.skills, c: t.c, r: t.r,
         hostId: t.host?.id, passengers: t.passengers.map(p => p?.id ?? null) })) };
   }
 
-  private openShop(tab: 'units' | 'skills' | 'garrison' | 'manage' = 'units'): void {
+  private openShop(tab: 'army' | 'garrison' | 'manage' = 'army'): void {
     if (this.over || this.shopOpen || this.operationsOpen) return;
     this.shopOpen = true; this.hover = null;
     this.shopInputEnabled = this.input.enabled;
@@ -858,21 +858,21 @@ export class GameScene extends Phaser.Scene {
 
   private stats(t: Tower): TowerStats {
     const d: { dmg: number; range: number; rate: number; splash?: number; slow?: number } = TOWER_DEFS[t.k];
-    const l = t.lvl - 1;
+    const l = t.lvl - 1, base = levelStats(t.k, t.lvl);
     let aura = 1;
     for (const ally of this.towers) if (ally !== t && ally.k === 'support' && Math.hypot(ally.x - t.x, ally.y - t.y) <= this.supportRange(ally)) aura = Math.max(aura, 1.2 + (ally.lvl - 1) * .05);
     const haste = t.buffs.reduce((v, b) => v * b.haste, 1) * aura * (1 + this.bonuses.haste) * (t.branch === 'rapid' ? 1.4 : 1);
     const power = t.buffs.reduce((v, b) => v * b.power, 1);
     return {
-      dmg: d.dmg * Math.pow(1.6, l) * power * (1 + this.bonuses.power) * (t.branch === 'power' ? 1.7 : 1),
+      dmg: base.dmg * power * (1 + this.bonuses.power) * (t.branch === 'power' ? 1.7 : 1),
       range: this.supportRange(t) + (t.host ? BUNKER_RANGE_BONUS : 0),
-      rate: d.rate * Math.pow(.92, l) * (t.branch === 'power' ? 1.15 : 1) / haste,
+      rate: base.rate * (t.branch === 'power' ? 1.15 : 1) / haste,
       splash: d.splash ? d.splash * (1 + .1 * l) * (t.branch === 'rapid' ? 1.35 : 1) : 0,
       slow: d.slow ? Math.max(.2, d.slow - .08 * l) : 0,
     };
   }
   private supportRange(t: Tower): number {
-    return TOWER_DEFS[t.k].range * (1 + .08 * (t.lvl - 1)) + this.bonuses.range + (['support', 'observer'].includes(t.k) && t.branch ? t.branch === 'power' ? 45 : 25 : 0);
+    return levelStats(t.k, t.lvl).range + this.bonuses.range + (['support', 'observer'].includes(t.k) && t.branch ? t.branch === 'power' ? 45 : 25 : 0);
   }
   private upgradeCost(t: Tower): number { return unitUpgradeCost(t); }
   private sellValue(t: Tower): number { return Math.round(t.spent * .7); }
