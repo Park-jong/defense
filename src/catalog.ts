@@ -22,6 +22,20 @@ export const SKILL_DEFS = {
   warp: { name: '에너지 공명', unit: 'templar', cost: 140, cooldown: 15, color: 0x9cefff, icon: '◉', desc: '자신과 반경 150의 아군에게 6초간 공격력 30%, 공격 속도 30% 증가.' },
   yamato: { name: '야마토 포', unit: 'cruiser', cost: 230, cooldown: 12, color: 0xffb681, icon: '⊕', desc: '사거리 안의 보스를 우선해 공격력 1200% 포격. 보스가 없으면 현재 체력이 가장 높은 적을 공격합니다.' },
   bombard: { name: '융단 폭격', unit: 'cruiser', cost: 200, cooldown: 10, color: 0xff8d78, icon: '⋮', desc: '최대 3기의 적 위치에 각각 반경 70, 공격력 300% 범위 폭격.' },
+  lockdown: { name: '락다운', unit: 'ghost', cost: 120, cooldown: 10, color: 0x9cdecf, icon: '⊗', desc: '표적을 3초간 정지시키고 공격력 200% 피해. 보스는 0.8초 정지.' },
+  c10: { name: 'C-10 집중 사격', unit: 'ghost', cost: 130, cooldown: 9, color: 0xd0eee2, icon: '⌖', desc: '표적에 공격력 500%의 정밀 사격.' },
+  hellfire: { name: '헬파이어 미사일', unit: 'goliath', cost: 140, cooldown: 10, color: 0xffc67b, icon: '↗', desc: '최대 3기의 적 위치에 반경 50, 공격력 220% 미사일 폭격.' },
+  autocannon: { name: '기관포 연속 사격', unit: 'goliath', cost: 120, cooldown: 12, color: 0xe6d59d, icon: '»', desc: '5초 동안 자신의 공격 속도 80% 증가.' },
+  psiBlades: { name: '사이오닉 검 난격', unit: 'zealot', cost: 95, cooldown: 7, color: 0x8eeaff, icon: '✦', desc: '가까운 표적에 공격력 400%의 양날 베기.' },
+  zeal: { name: '칼라의 분노', unit: 'zealot', cost: 110, cooldown: 12, color: 0xffd77f, icon: '»', desc: '5초 동안 자신의 공격 속도 70%, 공격력 20% 증가.' },
+  psionicStorm: { name: '사이오닉 스톰', unit: 'highTemplar', cost: 170, cooldown: 12, color: 0xa9bfff, icon: 'ϟ', desc: '표적 위치 반경 95에 4초간 폭풍. 0.5초마다 공격력 140% 피해.' },
+  khaydarin: { name: '케이다린 부적', unit: 'highTemplar', cost: 140, cooldown: 15, color: 0xcbb0ff, icon: '◇', desc: '6초 동안 자신의 폭풍 피해 50%, 시전 속도 30% 증가.' },
+  scarab: { name: '스캐럽 폭격', unit: 'reaver', cost: 180, cooldown: 11, color: 0xffd88a, icon: '◎', desc: '표적 반경 110에 공격력 280%의 스캐럽 폭발.' },
+  scarabUpgrade: { name: '스캐럽 강화', unit: 'reaver', cost: 150, cooldown: 14, color: 0xe8bd67, icon: '▲', desc: '6초 동안 자신의 공격력 60% 증가.' },
+  scoutVolley: { name: '반물질 미사일', unit: 'scout', cost: 145, cooldown: 9, color: 0x9ed9ff, icon: '↗', desc: '사거리 안의 적 최대 3기에게 각각 공격력 250% 피해.' },
+  photonDrive: { name: '광자포 과충전', unit: 'scout', cost: 125, cooldown: 12, color: 0x7dcaff, icon: '»', desc: '5초 동안 자신의 공격 속도 80% 증가.' },
+  interceptors: { name: '인터셉터 집중 공격', unit: 'carrier', cost: 220, cooldown: 10, color: 0xb5ecff, icon: '✦', desc: '표적에 8기의 인터셉터가 각각 공격력 200%의 집중 공격.' },
+  carrierCapacity: { name: '인터셉터 재출격', unit: 'carrier', cost: 200, cooldown: 14, color: 0xffdf9f, icon: '»', desc: '6초 동안 인터셉터 출격 속도 100% 증가.' },
 } satisfies Record<string, SkillDef>;
 
 export type SkillKey = keyof typeof SKILL_DEFS;

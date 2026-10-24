@@ -1,5 +1,6 @@
 import type { TowerKey } from './config';
 import type Phaser from 'phaser';
+import { classicUnitLayers } from './classicUnitArt';
 
 // Layered, hand-drawn unit art. Each unit has a fixed chassis and a rotating weapon.
 const defs = `<defs>
@@ -587,11 +588,10 @@ const layers: Record<TowerKey, { base: string; head: string }> = {
   templar: { base: archonBase, head: archonHead },
   cruiser: { base: cruiserBase, head: cruiserHead },
   bunker: { base: bunkerBase, head: '' },
-  support: { base: '<ellipse cx="32" cy="49" rx="21" ry="7" fill="#071610" opacity=".5"/><path d="M6 33 23 18h18l17 15-16 13H22Z" fill="#29483f" stroke="#9ecfba" stroke-width="2"/><path d="m10 32 15 3-3 8-15-6m47-5-15 3 3 8 15-6" fill="#577c6c"/>', head: '<circle cx="32" cy="29" r="11" fill="#142e27" stroke="#82cead" stroke-width="2"/><path d="M32 21v16m-8-8h16" stroke="#c5ffe1" stroke-width="4"/><circle cx="15" cy="34" r="3" fill="#8efbd2"/><circle cx="49" cy="34" r="3" fill="#8efbd2"/>' },
-  observer: { base: '<ellipse cx="32" cy="49" rx="20" ry="6" fill="#071610" opacity=".5"/><path d="m32 9 23 25-9 12H18L9 34Z" fill="#51446d" stroke="#bcade0" stroke-width="2"/><path d="M12 32 4 44l18-4m30-8 8 12-18-4" fill="#9b86bc" stroke="#d8c8f5"/>', head: '<circle cx="32" cy="30" r="12" fill="#1b2447" stroke="#bba3ff" stroke-width="3"/><ellipse cx="32" cy="29" rx="8" ry="5" fill="#c4f1ff"/><circle cx="32" cy="29" r="3" fill="#6347b2"/>' },
+  ...classicUnitLayers,
 };
 
-export const UNIT_WORLD_SCALE: Partial<Record<TowerKey, number>> = { cannon: 1.15, cruiser: 1.3 };
+export const UNIT_WORLD_SCALE: Partial<Record<TowerKey, number>> = { cannon: 1.15, cruiser: 1.3, carrier: 1.2 };
 
 export function unitImageUrl(key: TowerKey): string {
   const art = layers[key];

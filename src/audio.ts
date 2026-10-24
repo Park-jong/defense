@@ -20,7 +20,7 @@ export class BattleAudio {
     this.last.set(kind, now); this.last.set('*', now);
     this.gain.gain.value = this.volume * .22;
     const osc = ctx.createOscillator(), env = ctx.createGain();
-    const tones: Record<string, number> = { marine: 640, cannon: 95, firebat: 160, arrow: 290, sniper: 460, frost: 880, templar: 720, cruiser: 120, boss: 70, warning: 1050, clear: 660, build: 520, skill: 940 };
+    const tones: Record<string, number> = { marine: 640, cannon: 95, firebat: 160, arrow: 290, sniper: 460, frost: 880, templar: 720, cruiser: 120, ghost: 810, goliath: 260, zealot: 1150, highTemplar: 950, reaver: 130, scout: 570, carrier: 690, boss: 70, warning: 1050, clear: 660, build: 520, skill: 940 };
     const freq = tones[kind] ?? 400, duration = kind === 'boss' ? .6 : kind === 'warning' ? .3 : .1;
     osc.type = ['cannon', 'boss', 'firebat'].includes(kind) ? 'sawtooth' : 'sine';
     osc.frequency.setValueAtTime(freq, now); osc.frequency.exponentialRampToValueAtTime(Math.max(30, freq * .45), now + duration);

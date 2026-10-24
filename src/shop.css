@@ -21,9 +21,14 @@
 .shop-tabs>span { margin-left:auto; font-size:10px; color:#77866c; }
 .shop-content { min-height:0; padding:18px 28px 26px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#596b49 #152018; }
 .shop-filter { display:flex; gap:6px; align-items:center; margin-bottom:18px; }
+.shop-filter[role="group"] { display:flex; }
 .shop-filter button { font-size:11px; padding:7px 12px; }
 .shop-filter>span { margin-left:auto; font-size:10px; color:#82947a; }
+.shop-filter .faction-filter { display:flex; align-items:center; justify-content:center; gap:8px; min-width:60px; min-height:44px; padding:4px 10px; }
+.faction-filter img { display:block; }
+.faction-filter small { font:12px monospace; color:#bacc9e; }
 .shop-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+.shop-grid.units-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
 .shop-card { min-width:0; display:flex; flex-direction:column; background:linear-gradient(145deg,#233029,#141f19); border:1px solid #46503b; padding:13px; position:relative; }
 .shop-card::before { content:''; position:absolute; top:0; left:0; width:34px; height:2px; background:#8baf74; }
 .shop-card.protoss::before { background:#b9a267; }
@@ -252,4 +257,12 @@
   .garrison-action>span { font-size:9px; }
   .garrison-batch,.garrison-transfer { padding:7px; }
   .garrison-batch .garrison-action { grid-template-columns:28px minmax(0,1fr); }
+}
+
+@media(max-width:480px) {
+  .units-grid .shop-unit-art { height:72px; }
+  .units-grid .shop-unit-art img { width:64px; height:64px; }
+  .units-grid .shop-card-top>span,.units-grid .unit-card>p,.units-grid .shop-unit-skills,.units-grid .shop-stats,.units-grid .shop-card-note { display:none; }
+  .units-grid .shop-card h3 { font-size:11px; text-align:center; word-break:keep-all; }
+  .units-grid .shop-purchase { min-height:44px; padding:4px; font-size:10px; }
 }

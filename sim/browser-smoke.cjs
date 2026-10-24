@@ -46,6 +46,11 @@ async function shot(page, name) { await page.screenshot({ path: path.join(artifa
     await page.waitForFunction(() => window.__frontierQA?.scene.getScene('game').options.map === 'junction');
     assert.deepEqual(await scene(page, s => s.options), { map: 'junction', difficulty: 'easy', mode: 'standard' });
     await page.getByRole('button', { name: '훈련 건너뛰기', exact: true }).click();
+    await page.getByRole('button', { name: '프로토스 병력 9종 [R]', exact: true }).click();
+    assert.deepEqual(await scene(page, s => s.commands().map(c => c.id)), ['frost', 'sniper', 'zealot', 'highTemplar', 'templar', 'reaver', 'scout', 'carrier', 'observer'].map(k => 'build:' + k));
+    await press(page, '9'); assert.equal(await scene(page, s => s.building), 'observer');
+    await page.getByRole('button', { name: '테란 병력 9종 [T]', exact: true }).click();
+    assert.deepEqual(await scene(page, s => s.commands().map(c => c.id)), ['arrow', 'cannon', 'marine', 'firebat', 'ghost', 'goliath', 'cruiser', 'bunker', 'support'].map(k => 'build:' + k));
     await press(page, '1'); await cellClick(page, 6, 3);
     assert.equal(await scene(page, s => s.towers.length), 1);
     await cellClick(page, 6, 3);
@@ -119,6 +124,7 @@ async function shot(page, name) { await page.screenshot({ path: path.join(artifa
     await mobile.getByRole('button', { name: '새 작전 시작', exact: true }).click();
     await mobile.waitForFunction(() => !document.querySelector('dialog[open]'));
     await mobile.getByRole('button', { name: '훈련 건너뛰기', exact: true }).click();
+    assert.equal(await mobile.getByRole('button', { name: '프로토스 병력 9종 [R]', exact: true }).isDisabled(), true);
     await scene(mobile, s => s.openShop('units'));
     assert.equal(await mobile.locator('button[data-action="choose"]').count(), 3);
     await mobile.locator('button[data-action="choose"][data-key="bunker"]').click();
@@ -130,7 +136,7 @@ async function shot(page, name) { await page.screenshot({ path: path.join(artifa
     await mobile.getByRole('button', { name: '전장 복귀', exact: true }).click(); await shot(mobile, 'mobile-battlefield');
     await mobileContext.close();
     assert.deepEqual(errors, []);
-    console.log('Browser QA passed: desktop/mobile setup, targeting, specialization, relocation, support, reward, resume, commander, pause, statistics, medals, skin persistence, bunker restriction, touch placement; no page errors.');
+    console.log('Browser QA passed: faction icons, nine units per faction, faction hotkeys, desktop/mobile setup, targeting, specialization, relocation, support, reward, resume, commander, pause, statistics, medals, skin persistence, bunker restriction, touch placement; no page errors.');
     console.log('Screenshots:', artifacts);
   } finally {
     if (lastPage && !lastPage.isClosed()) {

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import {
-  CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE, COLS, CONSOLE_Y, ENEMY_DEFS, EnemyKey, FINAL_BOSS_HP_MULT, FONT, GAME_W, H, MAP_H, MAP_Y, MAX_CATCHUP_SEC, MAX_WAVE, MOBILE_LAYOUT, RENDER_SCALE, ROWS, SIDE_W, STEP_SEC, T, TEST_GOLD, TOWER_DEFS, TOWER_KEYS, TowerKey, W, WP, pathCells,
+  CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE, COLS, CONSOLE_Y, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, FINAL_BOSS_HP_MULT, FONT, GAME_W, H, MAP_H, MAP_Y, MAX_CATCHUP_SEC, MAX_WAVE, MOBILE_LAYOUT, RENDER_SCALE, ROWS, SIDE_W, STEP_SEC, T, TEST_GOLD, TOWER_DEFS, TowerKey, W, WP, pathCells,
 } from './config';
 import { drawMap, makeTextures } from './textures';
 import { Btn, mkBtn } from './ui';
@@ -63,6 +63,7 @@ export class GameScene extends Phaser.Scene {
   private spawnT = 0;
   private waveActive = false;
   private building: TowerKey | null = null;
+  private faction: Faction = 'terran';
   private selected: Tower | null = null;
   private hover: Cell | null = null;
   private speed = 1;
@@ -165,7 +166,7 @@ export class GameScene extends Phaser.Scene {
     this.towers = []; this.enemies = []; this.projs = [];
     this.nextUnitId = 0; this.unloading = null;
     this.spawnQ = []; this.spawnT = 0; this.waveActive = false;
-    this.building = null; this.selected = null; this.hover = null;
+    this.building = null; this.selected = null; this.hover = null; this.faction = 'terran';
     this.speed = 1; this.paused = false; this.over = false; this.bossLeaked = false;
     this.lastTick = 0; this.stepAcc = 0;
     this.touchUI = window.matchMedia('(pointer: coarse)').matches;
@@ -200,6 +201,7 @@ export class GameScene extends Phaser.Scene {
       state: () => this.shopState(),
       select: id => this.selectUnit(id),
       choose: k => this.chooseBuild(k, true),
+      faction: key => this.selectFaction(key),
       equip: (k, id) => this.equipSkill(k, id),
       upgrade: id => this.upgradeUnit(id),
       order: (order, scope) => this.applyOrder(order, scope),
@@ -239,7 +241,7 @@ export class GameScene extends Phaser.Scene {
     const units = this.savedUnits();
     return { options: this.options, wave: this.wave, gold: this.gold, lives: this.lives, active: this.waveActive, over: this.over,
       selected: units.find(u => u.id === this.selected?.id), units, stats: this.runStats, profile: this.profile,
-      commander: this.commander, pending: this.pending, checkpoint: this.checkpoint, tutorial: this.tutorial, notice: this.opsNotice, test: this.testMode, paused: this.paused };
+      commander: this.commander, pending: this.pending, checkpoint: this.checkpoint, tutorial: this.tutorial, notice: this.opsNotice, test: this.testMode, paused: this.paused, faction: this.faction };
   }
 
   private setupOperations(): void {
@@ -253,6 +255,7 @@ export class GameScene extends Phaser.Scene {
       move: () => this.beginRelocate(),
       select: id => this.selectUnit(id),
       choose: key => this.chooseBuild(key, true),
+      faction: key => this.selectFaction(key),
       commander: key => this.useCommander(key),
       reward: key => this.takeReward(key),
       skin: key => { this.profile.skin = key; this.applySkin(); this.persistProfile(); },
@@ -590,7 +593,7 @@ export class GameScene extends Phaser.Scene {
     this.pauseBtn = mkBtn(this, 384, y + 172, 158, 25, `정지${this.kb(' [P]')}`, () => this.togglePause(), 11);
     text(16, H - 17, this.touchUI
       ? '유닛 선택 → 명령 아이콘    /    빈 땅 → 유닛 보급    /    건설은 같은 칸을 두 번 탭    /    스킬 자동 사용'
-      : '1–9 유닛 보급    /    U 강화    /    Z·X 스킬 장착    /    S 회수    /    ESC 선택 해제    /    B 상세 관리', 9, '#7d8b73');
+      : 'T·R 종족    /    1–9 유닛 보급    /    U 강화    /    Z·X 스킬    /    S 회수    /    ESC 해제    /    B 관리', 9, '#7d8b73');
     text(W - 16, H - 17, `FRONTIER  /  v${__APP_VERSION__}`, 9, '#616f5b').setOrigin(1, 0).setFontFamily('monospace');
     this.pauseTxt = this.add.text(W / 2, MAP_Y + MAP_H / 2, this.touchUI ? '전술 일시정지\n재개 버튼으로 작전 재개' : '전술 일시정지\n[ P ] 작전 재개', {
       fontFamily: FONT, fontSize: '28px', align: 'center', lineSpacing: 18, color: '#c5e49e',
@@ -665,7 +668,7 @@ export class GameScene extends Phaser.Scene {
     cancel.hotkey = this.kb('ESC');
     if (this.unloading || this.relocating) { cells[8] = cancel; return cells; }
     const t = this.selected;
-    if (!t) return TOWER_KEYS.slice(0, 9).map((key, i) => ({
+    if (!t) return FACTION_TOWERS[this.faction].map((key, i) => ({
       ...make('build:' + key, TOWER_DEFS[key].name, 'unit_' + key, TOWER_DEFS[key].desc + '\n아이콘 선택 후 빈 구역에 배치하세요.',
         () => this.chooseBuild(key), allowedUnit(key, this.options.mode) && (this.gold >= TOWER_DEFS[key].cost || this.building === key), TOWER_DEFS[key].cost),
       active: this.building === key, hotkey: this.kb(String(i + 1)),
@@ -723,7 +726,7 @@ export class GameScene extends Phaser.Scene {
 
   private describeCommand(command?: UnitCommand): void {
     const t = this.selected;
-    this.commandTitle.setText(this.relocating ? '재배치 위치 지정' : this.unloading ? '하차 위치 지정' : t ? TOWER_DEFS[t.k].name + ' 명령' : '유닛 보급 / 지원기는 상점');
+    this.commandTitle.setText(this.relocating ? '재배치 위치 지정' : this.unloading ? '하차 위치 지정' : t ? TOWER_DEFS[t.k].name + ' 명령' : FACTIONS[this.faction].name + ' / 9종 보급');
     this.commandHint.setVisible(MOBILE_LAYOUT || !!command);
     this.commandTip?.setVisible(!!command);
     const detail = command ? `${command.title}${command.price !== undefined ? ' · ◆ ' + command.price : ''}${!command.enabled && !command.active ? ' · 사용 불가' : ''}\n${MOBILE_LAYOUT ? command.detail.replace(/\n/g, ' ').slice(0, 48) : command.detail}`
@@ -731,7 +734,7 @@ export class GameScene extends Phaser.Scene {
       : t ? t.k === 'bunker' ? '병력 초상화를 누르면 해당 병력의 강화·스킬 명령으로 전환됩니다.'
         : '강화·스킬 아이콘을 누르면 바로 적용됩니다.\n장착한 스킬은 자동으로 사용합니다.'
       : this.building ? `${TOWER_DEFS[this.building].name} 배치 대기\n빈 구역을 지정하세요.\nESC 또는 우클릭으로 취소`
-      : '구매할 유닛 아이콘을 선택한 뒤 빈 구역에 배치하세요.\n\n유닛을 선택하면 해당 유닛의 강화·스킬 명령이 표시됩니다.';
+      : '상단 종족 아이콘으로 테란 / 프로토스 전환\n유닛 아이콘을 선택한 뒤 빈 구역에 배치하세요.';
     this.commandHint.setText(detail);
   }
 
@@ -752,7 +755,9 @@ export class GameScene extends Phaser.Scene {
       const skills = SKILL_KEYS.filter(key => SKILL_DEFS[key].unit === this.selected!.k);
       this.equipSkill(skills[e.key.toLowerCase() === 'z' ? 0 : 1]); return;
     }
-    if (e.key >= '1' && e.key <= '9') this.chooseBuild(TOWER_KEYS[+e.key - 1], true);
+    if (e.key.toLowerCase() === 't') { this.selectFaction('terran'); return; }
+    if (e.key.toLowerCase() === 'r') { this.selectFaction('protoss'); return; }
+    if (e.key >= '1' && e.key <= '9') this.chooseBuild(FACTION_TOWERS[this.faction][+e.key - 1], true);
     else if (e.key === 'Escape') this.cancelCommand();
     else if (e.key === ' ') this.startWave();
     else if (e.key === 'p' || e.key === 'P') this.togglePause();
@@ -763,8 +768,16 @@ export class GameScene extends Phaser.Scene {
   private chooseBuild(k: TowerKey, force = false): void {
     if (!allowedUnit(k, this.options.mode)) return;
     if (this.over) return;
+    this.faction = TOWER_DEFS[k].faction;
     this.building = (!force && this.building === k) ? null : k;
     this.selected = null; this.unloading = null; this.relocating = null;
+  }
+
+  private selectFaction(faction: Faction): void {
+    if (this.over || this.options.mode === 'bunker' && faction !== 'terran') return;
+    this.cancelCommand(); this.faction = faction;
+    this.commandCard?.update(this.commands());
+    this.operations?.update();
   }
 
   private togglePause(): void {
@@ -795,7 +808,7 @@ export class GameScene extends Phaser.Scene {
 
   // ---------- 타워 ----------
   private shopState(): ShopState {
-    return { gold: this.gold, selectedId: this.selected?.id ?? null, mode: this.options.mode,
+    return { gold: this.gold, selectedId: this.selected?.id ?? null, mode: this.options.mode, faction: this.faction,
       units: this.towers.map(t => ({ id: t.id, k: t.k, lvl: t.lvl, skills: t.skills, c: t.c, r: t.r,
         hostId: t.host?.id, passengers: t.passengers.map(p => p?.id ?? null) })) };
   }
@@ -1179,14 +1192,14 @@ export class GameScene extends Phaser.Scene {
       if (skill.cd > 0) continue;
       if (best.dead) best = this.findTarget(t);
       if (!best) break;
-      t.barrel.rotation = t.k === 'frost' || t.k === 'sniper' || t.k === 'templar' ? 0 : Math.atan2(best.y - t.y, best.x - t.x);
+      t.barrel.rotation = ['frost', 'sniper', 'templar', 'highTemplar'].includes(t.k) ? 0 : Math.atan2(best.y - t.y, best.x - t.x);
       this.autoSkill(t, skill.key, best);
       skill.cd = SKILL_DEFS[skill.key].cooldown;
     }
     if (best?.dead) best = this.findTarget(t);
     if (!best) return;
     const st = this.stats(t);
-    t.barrel.rotation = t.k === 'frost' || t.k === 'sniper' || t.k === 'templar' ? 0 : Math.atan2(best.y - t.y, best.x - t.x);
+    t.barrel.rotation = ['frost', 'sniper', 'templar', 'highTemplar'].includes(t.k) ? 0 : Math.atan2(best.y - t.y, best.x - t.x);
     if (t.cd > 0) return;
     t.cd = st.rate;
     if (t.k === 'sniper') { t.charge = { target: best, left: DRAGOON_CHARGE_TIME }; return; }
@@ -1197,6 +1210,25 @@ export class GameScene extends Phaser.Scene {
     this.audio.play(t.k);
     const d = TOWER_DEFS[t.k];
     const angle = Math.atan2(best.y - t.y, best.x - t.x);
+    if (t.k === 'zealot') {
+      for (const offset of [-7, 7]) this.skillBeam({ x: t.x - Math.sin(angle) * offset, y: t.y + Math.cos(angle) * offset }, best, d.proj, 3);
+      this.damageEnemy(best, st.dmg, 'normal', t.id); return;
+    }
+    if (t.k === 'highTemplar') {
+      this.fields.push({ x: best.x, y: best.y, radius: st.splash, left: 2, tick: .5, dmg: st.dmg, color: d.proj, source: t.id });
+      this.skillRing(best.x, best.y, st.splash, d.proj); return;
+    }
+    if (t.k === 'carrier' || t.k === 'goliath' || t.k === 'scout') {
+      const count = t.k === 'carrier' ? 4 : 2;
+      for (let i = 0; i < count; i++) {
+        const offset = (i - (count - 1) / 2) * 9;
+        const x = t.x + Math.cos(angle) * 18 - Math.sin(angle) * offset;
+        const y = t.y + Math.sin(angle) * 18 + Math.cos(angle) * offset;
+        const s = this.add.image(x, y, 'shot_' + t.k).setDepth(9).setRotation(angle);
+        this.projs.push({ s, x, y, tgt: best, k: t.k, st: { ...st, dmg: st.dmg / (t.k === 'carrier' ? 1 : count) }, source: t.id });
+      }
+      return;
+    }
     const reach = t.host ? BUNKER_BARREL_LENGTH : t.k === 'cruiser' ? 29 * (UNIT_WORLD_SCALE.cruiser ?? 1) : t.k === 'cannon' ? SIEGE_MUZZLE.x * (UNIT_WORLD_SCALE.cannon ?? 1) : t.k === 'marine' ? 31 : t.k === 'firebat' ? FIREBAT_MUZZLES[0].x : t.k === 'arrow' ? 15 : 8;
     const port = t.k === 'arrow' ? TURRET_LAUNCH_PORTS[t.shotPort++ % TURRET_LAUNCH_PORTS.length] : null;
     const muzzleX = t.k === 'templar' ? t.x + 18 : t.k === 'sniper' ? t.x + DRAGOON_EMITTER.x : port ? t.x + port.x * Math.cos(angle) - port.y * Math.sin(angle) : t.k === 'frost' ? t.x : t.x + Math.cos(angle) * reach;
@@ -1378,6 +1410,39 @@ export class GameScene extends Phaser.Scene {
       case 'bombard':
         for (const e of nearby.slice(0, 3)) area(e.x, e.y, 70, 3);
         break;
+      case 'lockdown':
+        target.stunT = Math.max(target.stunT, target.type === 'boss' ? .8 : 3);
+        this.skillBeam(t, target, d.color); this.damageEnemy(target, st.dmg * 2, 'skill', t.id); break;
+      case 'c10':
+        this.skillBeam(t, target, d.color, 4); this.damageEnemy(target, st.dmg * 5, 'skill', t.id); break;
+      case 'hellfire':
+        for (const e of nearby.slice(0, 3)) area(e.x, e.y, 50, 2.2);
+        break;
+      case 'autocannon': case 'photonDrive':
+        t.buffs.push({ left: 5, haste: 1.8, power: 1 }); this.skillRing(t.x, t.y, 35, d.color); break;
+      case 'psiBlades':
+        this.skillBeam(t, target, d.color, 5); this.damageEnemy(target, st.dmg * 4, 'skill', t.id); break;
+      case 'zeal':
+        t.buffs.push({ left: 5, haste: 1.7, power: 1.2 }); this.skillRing(t.x, t.y, 35, d.color); break;
+      case 'psionicStorm':
+        this.fields.push({ x: target.x, y: target.y, radius: 95, left: 4, tick: .5, dmg: st.dmg * 1.4, color: d.color, source: t.id });
+        this.skillRing(target.x, target.y, 95, d.color); break;
+      case 'khaydarin':
+        t.buffs.push({ left: 6, haste: 1.3, power: 1.5 }); this.skillRing(t.x, t.y, 35, d.color); break;
+      case 'scarab': area(target.x, target.y, 110, 2.8); this.fxBoom.explode(24, target.x, target.y); break;
+      case 'scarabUpgrade':
+        t.buffs.push({ left: 6, haste: 1, power: 1.6 }); this.skillRing(t.x, t.y, 35, d.color); break;
+      case 'scoutVolley':
+        for (const e of nearby.slice(0, 3)) { this.skillBeam(t, e, d.color); this.damageEnemy(e, st.dmg * 2.5, 'skill', t.id); }
+        break;
+      case 'interceptors':
+        for (let i = 0; i < 8; i++) {
+          this.skillBeam({ x: t.x, y: t.y + (i - 3.5) * 4 }, target, d.color);
+          this.damageEnemy(target, st.dmg * 2, 'skill', t.id);
+        }
+        break;
+      case 'carrierCapacity':
+        t.buffs.push({ left: 6, haste: 2, power: 1 }); this.skillRing(t.x, t.y, 45, d.color); break;
     }
   }
 

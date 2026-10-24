@@ -130,7 +130,7 @@ test('지원기 공속 오라는 같은 효과를 중첩하지 않고 강화한 
   assert.equal(s.runStats.damage, 0);
 });
 
-test('관측기는 직접 피해 없이 취약을 부여하며 재사용 대기시간을 지킨다', () => {
+test('옵저버는 직접 피해 없이 취약을 부여하며 재사용 대기시간을 지킨다', () => {
   const s = setup(), o = place(s, 'observer'), e = spawn(s, 'tank', o.x, o.y + 30);
   s.towerAct(o, .01); assert.equal(e.vulnerableT, 3); assert.equal(s.projs.length, 0);
   e.vulnerableT = 0; s.towerAct(o, .01); assert.equal(e.vulnerableT, 0);
@@ -320,4 +320,114 @@ test('테스트 모드는 실제 작전 저장과 영구 업적에 영향을 주
     const s = setup(); s.testMode = true; s.runLaunched = true; s.saveCheckpoint(true); s.wave = 50; s.endGame(true);
     assert.equal(store.getItem(rules.SAVE_KEY), before); assert.equal(store.getItem(rules.PROFILE_KEY), null);
   } finally { if (oldStorage === undefined) delete global.localStorage; else global.localStorage = oldStorage; }
+});
+
+test('테란과 프로토스는 각각 고유한 9종을 제공하고 전체 18종에 누락·중복이 없다', () => {
+  const all = Object.values(config.FACTION_TOWERS).flat();
+  assert.equal(all.length, 18); assert.equal(new Set(all).size, 18);
+  assert.deepEqual([...all].sort(), [...config.TOWER_KEYS].sort());
+  for (const [faction, keys] of Object.entries(config.FACTION_TOWERS)) {
+    assert.equal(keys.length, 9);
+    for (const key of keys) assert.equal(config.TOWER_DEFS[key].faction, faction);
+  }
+  assert.equal(config.TOWER_DEFS.support.name, '사이언스 베슬');
+});
+
+test('종족 전환은 3×3 명령과 1~9 단축키를 같은 순서로 전환하고 지원 병력도 직접 배치한다', () => {
+  const s = setup();
+  for (const [faction, hotkey] of [['terran', 't'], ['protoss', 'r']]) {
+    s.onKey({ key: hotkey }); assert.equal(s.faction, faction);
+    assert.deepEqual(s.commands().map(c => c.id), config.FACTION_TOWERS[faction].map(k => 'build:' + k));
+    for (let i = 0; i < 9; i++) {
+      s.onKey({ key: String(i + 1) });
+      assert.equal(s.building, config.FACTION_TOWERS[faction][i]);
+    }
+    s.cancelCommand(); s.commands()[8].run(); assert.equal(s.building, config.FACTION_TOWERS[faction][8]);
+  }
+  assert.equal(s.building, 'observer');
+  s.chooseBuild('support', true); assert.equal(s.faction, 'terran'); assert.equal(s.building, 'support');
+});
+
+test('종족 선택은 진행 중 배치·하차·재배치를 비용 없이 취소하고 벙커 모드와 종료 상태를 지킨다', () => {
+  const s = setup(), unit = place(s, 'marine'), gold = s.gold;
+  s.selected = unit; s.relocating = unit; s.unloading = unit; s.building = 'marine';
+  s.selectFaction('protoss');
+  for (const key of ['selected', 'building', 'relocating', 'unloading']) assert.equal(s[key], null);
+  assert.equal(s.gold, gold); assert.equal(s.towers.length, 1);
+  const bunker = setup('bunker'); bunker.selectFaction('protoss');
+  assert.equal(bunker.faction, 'terran');
+  assert.deepEqual(bunker.commands().filter(c => c.enabled).map(c => c.id), ['build:marine', 'build:firebat', 'build:bunker']);
+  s.over = true; s.selectFaction('terran'); assert.equal(s.faction, 'protoss');
+});
+
+test('질럿은 사거리 밖을 공격하지 않고 근접 표적을 투사체 없이 즉시 베어 자신의 전과에 기록한다', () => {
+  const s = setup(), unit = place(s, 'zealot');
+  const enemy = spawn(s, 'tank', unit.x + 90, unit.y); enemy.hp = enemy.max = 10000;
+  s.towerAct(unit, .01); assert.equal(enemy.hp, 10000);
+  enemy.x = unit.x + 50; s.towerAct(unit, .01);
+  assert.equal(enemy.hp, 10000 - s.stats(unit).dmg); assert.equal(s.projs.length, 0);
+  assert.equal(s.runStats.units.find(u => u.id === unit.id).damage, s.stats(unit).dmg);
+});
+
+test('하이 템플러는 무기 대신 지속 폭풍을 시전하고 범위 안의 적만 시전자 전과로 타격한다', () => {
+  const s = setup(), unit = place(s, 'highTemplar');
+  const center = spawn(s, 'tank', unit.x + 60, unit.y), near = spawn(s, 'tank', unit.x + 70, unit.y), far = spawn(s, 'tank', unit.x + 200, unit.y);
+  for (const enemy of [center, near, far]) { enemy.hp = enemy.max = 10000; enemy.speed = 0; }
+  s.towerAct(unit, .01); assert.equal(s.fields.length, 1); assert.equal(s.projs.length, 0);
+  assert.equal(center.hp, 10000); s.step(.5);
+  assert.equal(center.hp, 10000 - s.stats(unit).dmg); assert.equal(near.hp, center.hp); assert.equal(far.hp, 10000);
+  assert.equal(s.runStats.units.find(u => u.id === unit.id).damage, s.stats(unit).dmg * 2);
+});
+
+test('골리앗·스카우트의 쌍열 사격은 피해를 분배하고 캐리어는 독립된 인터셉터 4기를 발사한다', () => {
+  for (const [key, count, multiplier] of [['goliath', 2, 1], ['scout', 2, 1], ['carrier', 4, 4]]) {
+    const s = setup(), unit = place(s, key), enemy = spawn(s, 'tank', unit.x + 60, unit.y);
+    enemy.hp = enemy.max = 10000;
+    s.towerAct(unit, .01); assert.equal(s.projs.length, count);
+    assert.equal(new Set(s.projs.map(p => p.y)).size, count);
+    for (const p of s.projs) { assert.equal(p.source, unit.id); s.hit(p); }
+    assert.ok(Math.abs(enemy.hp - (10000 - s.stats(unit).dmg * multiplier)) < 1e-8);
+  }
+});
+
+test('고스트의 락다운은 일반 적과 보스 정지 시간을 구분하고 리버의 스캐럽은 폭발 반경을 지킨다', () => {
+  const s = setup(), ghost = place(s, 'ghost'), enemy = spawn(s, 'tank', ghost.x + 50, ghost.y), boss = spawn(s, 'boss', ghost.x + 60, ghost.y);
+  for (const e of [enemy, boss]) e.hp = e.max = 10000;
+  s.autoSkill(ghost, 'lockdown', enemy); s.autoSkill(ghost, 'lockdown', boss);
+  assert.equal(enemy.stunT, 3); assert.equal(boss.stunT, .8);
+  const r = setup(), reaver = place(r, 'reaver'), target = spawn(r, 'tank', reaver.x + 80, reaver.y);
+  const inside = spawn(r, 'tank', target.x + 70, target.y), outside = spawn(r, 'tank', target.x + 90, target.y);
+  for (const e of [target, inside, outside]) e.hp = e.max = 10000;
+  r.fire(reaver, target, r.stats(reaver)); assert.equal(r.projs.length, 1); r.hit(r.projs[0]);
+  assert.equal(target.hp, 9915); assert.equal(inside.hp, 9915); assert.equal(outside.hp, 10000);
+});
+
+test('새 7종은 전용 자동 스킬 2종을 구매하고 중복·타 유닛 장착 없이 재사용 제한을 따른다', () => {
+  const { SKILL_DEFS, SKILL_KEYS } = load('./catalog');
+  for (const key of ['ghost', 'goliath', 'zealot', 'highTemplar', 'reaver', 'scout', 'carrier']) {
+    const s = setup(), unit = place(s, key), enemy = spawn(s, 'tank', unit.x + 50, unit.y);
+    enemy.hp = enemy.max = 1000000;
+    const skills = SKILL_KEYS.filter(k => SKILL_DEFS[k].unit === key), gold = s.gold;
+    assert.equal(skills.length, 2);
+    for (const skill of skills) { assert.equal(s.equipSkill(skill, unit.id), true); assert.equal(s.equipSkill(skill, unit.id), false); }
+    assert.equal(s.equipSkill('stim', unit.id), false);
+    assert.equal(s.gold, gold - skills.reduce((cost, skill) => cost + SKILL_DEFS[skill].cost, 0));
+    s.towerAct(unit, .01);
+    for (const skill of unit.skills) assert.equal(skill.cd, SKILL_DEFS[skill.key].cooldown);
+    const damage = s.runStats.damage; s.towerAct(unit, .01);
+    assert.equal(s.runStats.damage, damage);
+    for (const skill of unit.skills) assert.ok(skill.cd < SKILL_DEFS[skill.key].cooldown);
+  }
+});
+
+test('새 7종의 강화·특화·자동 스킬 저장은 기존 버전 형식으로 검증되고 손실 없이 복원된다', () => {
+  const { SKILL_DEFS, SKILL_KEYS } = load('./catalog');
+  for (const key of ['ghost', 'goliath', 'zealot', 'highTemplar', 'reaver', 'scout', 'carrier']) {
+    const save = checkpoint();
+    save.units = [{ ...save.units[0], k: key, lvl: 5, branch: 'power', skills: SKILL_KEYS.filter(k => SKILL_DEFS[k].unit === key).map(key => ({ key, cd: 2 })) }];
+    save.usedKinds = [key];
+    assert.equal(rules.validateSave(save), true);
+    const s = setup(); s.restoreCheckpoint(save);
+    assert.deepEqual(JSON.parse(JSON.stringify(s.savedUnits())), save.units);
+  }
 });

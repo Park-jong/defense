@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { activeMap, ENEMY_DEFS, FONT, MAP_H, MAP_Y, RENDER_SCALE, ROUTES, T, W, WP, pathCells } from './config';
+import { activeMap, ENEMY_DEFS, FONT, MAP_H, MAP_Y, RENDER_SCALE, ROUTES, T, TOWER_DEFS, W, WP, pathCells } from './config';
 
 /** All art is generated locally: no image downloads or external assets. */
 export function makeTextures(scene: Phaser.Scene): void {
@@ -130,6 +130,25 @@ export function makeTextures(scene: Phaser.Scene): void {
     g.fillStyle(0xff9276, .7).fillRoundedRect(3, 3, 20, 6, 3);
     g.fillStyle(0xffe1c3).fillRoundedRect(12, 4, 12, 4, 2);
   });
+  for (const k of ['ghost', 'goliath', 'reaver', 'scout', 'carrier'] as const) {
+    tex('shot_' + k, 28, 18, g => {
+      const color = TOWER_DEFS[k].proj;
+      g.fillStyle(color, .18).fillEllipse(13, 9, 27, 16);
+      if (k === 'carrier') {
+        g.fillStyle(0xe4c77d).fillTriangle(5, 2, 26, 9, 5, 16);
+        g.fillStyle(0x678b9b).fillTriangle(4, 5, 20, 9, 4, 13);
+        g.fillStyle(0xa6ecff).fillRect(2, 7, 10, 4);
+      } else if (k === 'reaver') {
+        g.fillStyle(0x9d8c5c).fillEllipse(16, 9, 20, 12);
+        g.fillStyle(color).fillEllipse(18, 8, 13, 7);
+        g.lineStyle(1, 0x594e37).lineBetween(12, 3, 12, 15).lineBetween(17, 3, 17, 15);
+        g.fillStyle(0xbdedff).fillCircle(24, 9, 2);
+      } else {
+        g.fillStyle(color, .65).fillRoundedRect(4, 6, 20, 6, 3);
+        g.fillStyle(0xf0ffff).fillRoundedRect(16, 7, 10, 4, 2);
+      }
+    });
+  }
   for (const [k, d] of Object.entries(ENEMY_DEFS)) {
     const s = d.r * 2 + 12, c = s / 2, r = d.r;
     tex('enemy_' + k, s, s, g => {

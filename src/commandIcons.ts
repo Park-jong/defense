@@ -2,6 +2,8 @@ import type Phaser from 'phaser';
 import { SKILL_DEFS, SKILL_KEYS } from './catalog';
 
 const glyphs: Record<string, string> = {
+  terran: '<path d="M12 15h40v10H38v27H26V25H12Z" fill="#648d82"/><path d="M8 11h48M21 55h22M17 31l-6 7 10 9m26-16 6 7-10 9"/>',
+  protoss: '<path d="m32 7 8 15 13 8-13 5-8 22-8-22-13-5 13-8Z" fill="#a57f36"/><path d="m32 14 5 15-5 19-5-19Z" fill="#b9efff"/><path d="M16 12 9 27l8 17m31-32 7 15-8 17"/>',
   upgrade: '<path d="M14 19 32 10l18 9-3 24-15 12-15-12Z" fill="#53737a"/><path d="m22 30 10-9 10 9m-20 9 10-9 10 9"/>',
   sell: '<path d="M13 38h13l6 7h15l6-6-3-4H38l-5-6H16Z" fill="#a5b87d"/><path d="M14 47h12m15-30v12m-8-6h16"/><circle cx="41" cy="23" r="13" fill="none"/>',
   manage: '<path d="M12 14h40v37H12Z" fill="#344d43"/><path d="M20 23h5m7 0h12m-24 9h5m7 0h12m-24 9h5m7 0h12"/>',
@@ -29,6 +31,13 @@ const glyphs: Record<string, string> = {
   bombard: '<path d="m13 14 9-3 6 20-9 3Zm23 4 9-3 6 20-9 3Z" fill="#c58b67"/><path d="m17 40 4 4-7 10m26-11 4 4-7 9m-8-20 3 6"/>',
 };
 
+const aliases: Record<string, string> = {
+  lockdown: 'freeze', c10: 'siege', hellfire: 'barrage', autocannon: 'burst',
+  psiBlades: 'shrapnel', zeal: 'overdrive', psionicStorm: 'storm', khaydarin: 'plasma',
+  scarab: 'siege', scarabUpgrade: 'upgrade', scoutVolley: 'bombard', photonDrive: 'overdrive',
+  interceptors: 'barrage', carrierCapacity: 'warp',
+};
+
 const urls = new Map<string, string>();
 
 /** The command panel and DOM garrison share the same icon artwork. */
@@ -36,12 +45,12 @@ export function commandIconUrl(key: string): string {
   if (urls.has(key)) return urls.get(key)!;
   const color = SKILL_KEYS.includes(key as typeof SKILL_KEYS[number])
     ? '#' + SKILL_DEFS[key as typeof SKILL_KEYS[number]].color.toString(16).padStart(6, '0') : '#b9d39a';
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><defs><radialGradient id="bg"><stop stop-color="${color}" stop-opacity=".23"/><stop offset="1" stop-color="#07100e"/></radialGradient></defs><rect x="1" y="1" width="62" height="62" rx="3" fill="url(#bg)"/><g stroke="${color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" fill="none">${glyphs[key] ?? glyphs.empty}</g></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><defs><radialGradient id="bg"><stop stop-color="${color}" stop-opacity=".23"/><stop offset="1" stop-color="#07100e"/></radialGradient></defs><rect x="1" y="1" width="62" height="62" rx="3" fill="url(#bg)"/><g stroke="${color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" fill="none">${glyphs[key] ?? glyphs[aliases[key]] ?? glyphs.empty}</g></svg>`;
   const url = 'data:image/svg+xml;base64,' + btoa(svg);
   urls.set(key, url);
   return url;
 }
 
 export function loadCommandIcons(scene: Phaser.Scene): void {
-  for (const key of Object.keys(glyphs)) scene.load.svg('cmd_' + key, commandIconUrl(key));
+  for (const key of [...Object.keys(glyphs), ...Object.keys(aliases)]) scene.load.svg('cmd_' + key, commandIconUrl(key));
 }
