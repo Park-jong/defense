@@ -1,4 +1,4 @@
-import type { TowerKey } from './config';
+import type { TowerKey } from './data/units';
 
 export const BUNKER_CAPACITY = 4;
 export const BUNKER_RANGE_BONUS = 24;

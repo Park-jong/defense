@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import {
-  CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE, COLS, CONSOLE_Y, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, FINAL_BOSS_HP_MULT, FONT, GAME_W, H, MAP_H, MAP_Y, MAX_CATCHUP_SEC, MAX_WAVE, MOBILE_LAYOUT, RENDER_SCALE, ROWS, SIDE_W, STEP_SEC, T, TEST_GOLD, TOWER_DEFS, TowerKey, W, WP, pathCells,
+  CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE, COLS, CONSOLE_Y, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, FINAL_BOSS_HP_MULT, FONT, GAME_W, H, MAP_H, MAP_Y, MAX_CATCHUP_SEC, MAX_WAVE, MOBILE_LAYOUT, RENDER_SCALE, ROWS, SIDE_W, STEP_SEC, T, TEST_GOLD, TOWER_DEFS, TowerKey, W,
 } from './config';
 import { drawMap, makeTextures } from './textures';
 import { Btn, mkBtn } from './ui';
@@ -13,7 +13,7 @@ import { DamageKind, DamageNumbers } from './damageNumbers';
 import { ShopState, SupplyShop } from './shop';
 import { MAX_UNIT_LEVEL, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
 import { BUNKER_BARREL_LENGTH, BUNKER_CAPACITY, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
-import { configureMap, ROUTES, Point } from './config';
+import { createMapRuntime, type MapRuntime, type Point } from './game/map';
 import { ACHIEVEMENTS, allowedUnit, awardAchievements, Bonuses, bossPattern, Branch, COMMANDERS, CommanderKey, DEFAULT_OPTIONS, DIFFICULTIES, newStats, Profile, PROFILE_KEY, readProfile, readSave, REWARDS, RewardKey, rewardChoices, RunOptions, RunSave, RunStats, SavedUnit, SAVE_KEY, clearSave, TargetMode, validateSave, wavePlan, writeStored } from './campaign';
 import { BattleAudio } from './audio';
 import { OperationsCenter, OperationsView } from './operations';
@@ -34,7 +34,7 @@ interface Enemy {
   x: number; y: number; seg: number; hp: number; max: number; speed: number;
   slow: number; slowT: number; reward: number; r: number; dead?: boolean;
   stunT: number; burnT: number; burnDps: number; vulnerableT: number;
-  route?: Point[]; shield?: number; pulse?: number; age?: number; hasteT?: number; spawned?: boolean; burnSource?: string;
+  route?: readonly Point[]; shield?: number; pulse?: number; age?: number; hasteT?: number; spawned?: boolean; burnSource?: string;
 }
 
 interface TowerStats { dmg: number; range: number; rate: number; splash: number; slow: number }
@@ -77,6 +77,7 @@ export class GameScene extends Phaser.Scene {
   private testMode = false;
   private repeat = 0;
   private options: RunOptions = { ...DEFAULT_OPTIONS };
+  private map: MapRuntime = createMapRuntime(this.options.map, MAP_Y);
   private profile: Profile = readProfile();
   private bonuses: Bonuses = { power: 0, haste: 0, range: 0 };
   private runStats: RunStats = newStats();
@@ -146,7 +147,7 @@ export class GameScene extends Phaser.Scene {
   // ---------- 생성 ----------
   create(data: { options?: RunOptions; resume?: RunSave; launched?: boolean } = {}): void {
     this.options = { ...(data.resume?.options ?? data.options ?? DEFAULT_OPTIONS) };
-    configureMap(this.options.map);
+    this.map = createMapRuntime(this.options.map, MAP_Y);
     makeTextures(this);
     // 캔버스는 RENDER_SCALE배 픽셀이므로 카메라를 같은 배율로 확대해 게임 좌표(GAME_W×H)를 화면에 꽉 채운다.
     // 기본 카메라는 맵 영역만 담당(mapCam)하고, 그 위에 전체 화면 uiCam을 얹어 UI를 그린다.
@@ -155,7 +156,7 @@ export class GameScene extends Phaser.Scene {
     this.uiCam = this.cameras.add(0, 0, GAME_W * rs, H * rs).setZoom(rs).centerOn(GAME_W / 2, H / 2);
     this.mapDown = null; this.gesture = false; this.pinch = { d: 0, x: 0, y: 0 };
     this.setMapView(1, W / 2, MAP_Y + MAP_H / 2);
-    drawMap(this, COLS, ROWS);
+    drawMap(this, COLS, ROWS, this.map);
 
     // scene.restart() 시 인스턴스가 재사용되므로 상태를 초기화한다.
     this.testMode = new URLSearchParams(location.search).has('test');
@@ -563,7 +564,7 @@ export class GameScene extends Phaser.Scene {
     text(140, y + 183, 'F-07', 9, '#72866a').setFontFamily('monospace');
     this.add.rectangle(24, y + 50, 162, 108, 0x0a1711).setOrigin(0).setStrokeStyle(1, 0x556447).setDepth(27);
     const mini = this.add.graphics().setDepth(28);
-    for (const cell of pathCells) {
+    for (const cell of this.map.pathCells) {
       const [c, r] = cell.split(',').map(Number);
       if (c >= 0 && c < COLS) mini.fillStyle(0x3f5941).fillRect(25 + c * 8, y + 53 + r * 8, 8, 8);
     }
@@ -861,7 +862,7 @@ export class GameScene extends Phaser.Scene {
   private sellValue(t: Tower): number { return Math.round(t.spent * .7); }
 
   private cellFree(c: number, r: number): boolean {
-    return c >= 0 && r >= 0 && c < COLS && r < ROWS && !pathCells.has(c + ',' + r)
+    return c >= 0 && r >= 0 && c < COLS && r < ROWS && !this.map.pathCells.has(c + ',' + r)
       && !this.towers.some(t => !t.host && t.c === c && t.r === r);
   }
 
@@ -994,7 +995,7 @@ export class GameScene extends Phaser.Scene {
     const d = ENEMY_DEFS[type];
     const finalBoss = type === 'boss' && this.wave >= MAX_WAVE;
     const hp = d.hp * Math.pow(1.17, Math.min(100, this.wave) - 1) * (1 + Math.max(0, this.wave - 100) * .1) * DIFFICULTIES[this.options.difficulty].hp * (finalBoss ? FINAL_BOSS_HP_MULT : 1);
-    const route = parent?.route ?? ROUTES[(this.waveSpawnIndex++) % ROUTES.length];
+    const route = parent?.route ?? this.map.routes[(this.waveSpawnIndex++) % this.map.routes.length];
     const sprite = this.add.image(parent?.x ?? route[0].x, parent?.y ?? route[0].y, 'enemy_' + type).setDepth(8);
     this.tweens.add({ targets: sprite, scale: { from: 0, to: 1 }, duration: 200 });
     this.enemies.push({
@@ -1079,7 +1080,7 @@ export class GameScene extends Phaser.Scene {
       e.stunT = Math.max(0, e.stunT - dt);
       e.slowT = Math.max(0, e.slowT - dt);
       if (!e.slowT) e.slow = 1;
-      const route = e.route ?? WP;
+      const route = e.route ?? this.map.waypoints;
       const accelerated = e.type === 'boss' && ((this.wave === 40 && (e.age ?? 0) % 10 >= 7) || (e.hasteT ?? 0) > 0);
       let mv = stunned ? 0 : e.speed * e.slow * dt * (accelerated ? 1.8 : 1);
       while (mv > 0 && e.seg < route.length) {
@@ -1286,7 +1287,7 @@ export class GameScene extends Phaser.Scene {
     let best: Enemy | null = null, bp = -Infinity;
     for (const e of this.enemies) {
       if (e.dead || Math.hypot(e.x - t.x, e.y - t.y) > range) continue;
-      const route = e.route ?? WP, nx = route[Math.min(e.seg, route.length - 1)];
+      const route = e.route ?? this.map.waypoints, nx = route[Math.min(e.seg, route.length - 1)];
       let remaining = Math.hypot(nx.x - e.x, nx.y - e.y);
       for (let i = e.seg; i < route.length - 1; i++) remaining += Math.hypot(route[i + 1].x - route[i].x, route[i + 1].y - route[i].y);
       const p = t.target === 'strong' ? e.hp : t.target === 'weak' ? -e.hp : t.target === 'boss' ? (e.type === 'boss' ? 1e9 : 0) - remaining : -remaining;
@@ -1474,7 +1475,7 @@ export class GameScene extends Phaser.Scene {
     const g = this.gfx;
     g.clear();
     const skinColor = this.profile.skin === 'gold' ? 0xffdb85 : this.profile.skin === 'ion' ? 0x9bcfff : 0x91bd7a;
-    const gate = WP[WP.length - 1];
+    const gate = this.map.waypoints[this.map.waypoints.length - 1];
     g.lineStyle(3, skinColor, .9).strokeRect(W - 35, gate.y - 29, 26, 58);
     if (this.relocating && this.hover) {
       const cell = this.hover;

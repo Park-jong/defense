@@ -1,29 +1,15 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
-const ts = require('typescript');
+const { createSourceLoader } = require('./helpers/load-source.cjs');
 
-// Exercise the actual scene's economy, transfers, combat and skill logic without WebGL.
-// Only Phaser rendering and the DOM shop are substituted.
-const modules = new Map();
-function load(name) {
-  if (name === 'phaser') return { Scene: class {} };
-  if (name === './unitArt') return { UNIT_WORLD_SCALE: { cannon: 1.15, cruiser: 1.3 } };
-  if (['./shop', './textures', './ui', './operations'].includes(name)) return {};
-  if (modules.has(name)) return modules.get(name);
-  const filename = path.resolve(__dirname, '../src', name.replace('./', '') + '.ts');
-  const code = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true },
-  }).outputText;
-  const mod = { exports: {} };
-  modules.set(name, mod.exports);
-  vm.runInThisContext(`(function(require,module,exports){${code}\n})`, { filename })(load, mod, mod.exports);
-  return mod.exports;
-}
+// Use production rules; only Phaser, artwork and DOM views are substituted.
+const load = createSourceLoader({
+  phaser: { Scene: class {} },
+  './unitArt': { UNIT_WORLD_SCALE: { cannon: 1.15, cruiser: 1.3 } },
+  ...Object.fromEntries(['./shop', './textures', './ui', './operations'].map(name => [name, {}])),
+});
 const { GameScene } = load('./GameScene');
-const { TOWER_DEFS, pathCells } = load('./config');
+const { TOWER_DEFS } = load('./config');
 const { DamageNumbers } = load('./damageNumbers');
 
 function sprite(x = 0, y = 0) {
@@ -140,7 +126,7 @@ test('하차할 빈 구역을 정하기 전에는 병력이 벙커에 남고 잘
   const gold = s.gold;
   assert.equal(s.beginUnload(marine.id), true);
   assert.equal(marine.host, b); assert.equal(b.passengers[0], marine);
-  const [pc, pr] = [...pathCells][0].split(',').map(Number);
+  const [pc, pr] = [...s.map.pathCells][0].split(',').map(Number);
   for (const [c, r] of [[b.c, b.r], [pc, pr], [-1, 1], [20, 12]]) {
     s.finishUnload(c, r); assert.equal(marine.host, b); assert.equal(s.unloading, marine);
   }
@@ -471,13 +457,13 @@ test('1~49 클리어 보상을 지급하고 50에서만 승리하며 51스테이
 });
 
 test('50스테이지 보스도 후반 체력 증가와 돌파 시 즉시 패배 규칙을 따른다', () => {
-  const { ENEMY_DEFS, FINAL_BOSS_HP_MULT, WP } = load('./config'), s = setup();
+  const { ENEMY_DEFS, FINAL_BOSS_HP_MULT } = load('./config'), s = setup();
   s.wave = 40; s.spawn('boss'); const previous = s.enemies[0].hp;
   s.enemies = []; s.wave = 50; s.spawn('boss'); const boss = s.enemies[0];
   assert.ok(Number.isFinite(boss.hp) && boss.hp > previous);
   assert.equal(boss.hp, ENEMY_DEFS.boss.hp * Math.pow(1.17, 49) * FINAL_BOSS_HP_MULT);
   const results = []; s.endGame = win => { s.over = true; results.push(win); };
-  s.shakeAll = () => {}; s.uiCam = { flash() {} }; boss.seg = WP.length;
+  s.shakeAll = () => {}; s.uiCam = { flash() {} }; boss.seg = s.map.waypoints.length;
   s.step(1 / 60);
   assert.equal(s.bossLeaked, true); assert.equal(s.lives, 0); assert.deepEqual(results, [false]);
 });

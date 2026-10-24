@@ -1,24 +1,15 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
-const ts = require('typescript');
+const { createSourceLoader } = require('./helpers/load-source.cjs');
 
-// Use the production scene and rules. Only rendering/DOM are replaced.
-const modules = new Map();
-function load(name) {
-  if (name === 'phaser') return { Scene: class {} };
-  if (['./shop', './textures', './ui', './operations'].includes(name)) return {};
-  if (name === './unitArt') return { UNIT_WORLD_SCALE: {} };
-  if (modules.has(name)) return modules.get(name);
-  const filename = path.resolve(__dirname, '../src', name.slice(2) + '.ts');
-  const code = ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true } }).outputText;
-  const mod = { exports: {} }; modules.set(name, mod.exports);
-  vm.runInThisContext(`(function(require,module,exports){${code}\n})`, { filename })(load, mod, mod.exports);
-  return mod.exports;
-}
+// Use production rules; only Phaser, artwork and DOM views are substituted.
+const load = createSourceLoader({
+  phaser: { Scene: class {} },
+  './unitArt': { UNIT_WORLD_SCALE: {} },
+  ...Object.fromEntries(['./shop', './textures', './ui', './operations'].map(name => [name, {}])),
+});
 const rules = load('./campaign'), config = load('./config'), { GameScene } = load('./GameScene');
+const { createMapRuntime } = load('./game/map');
 function sprite(x = 0, y = 0) {
   const s = { x, y, visible: true, tint: 0xffffff };
   for (const k of ['setDepth', 'setOrigin', 'setScale', 'setRotation', 'setStrokeStyle', 'setAlpha', 'setLetterSpacing', 'setInteractive', 'on', 'destroy', 'setText']) s[k] = () => s;
@@ -27,10 +18,9 @@ function sprite(x = 0, y = 0) {
   s.setTint = t => { s.tint = t; return s; }; s.clearTint = () => s;
   return s;
 }
-function setup(mode = 'standard') {
-  config.configureMap('frontier');
+function setup(mode = 'standard', map = 'frontier') {
   const s = new GameScene();
-  s.options = { ...rules.DEFAULT_OPTIONS, mode }; s.gold = 10000;
+  s.options = { ...rules.DEFAULT_OPTIONS, mode, map }; s.map = createMapRuntime(map, config.MAP_Y); s.gold = 10000;
   s.add = { image: sprite, circle: sprite, rectangle: sprite, text: sprite };
   s.tweens = { add() {}, killTweensOf() {} }; s.fxPlace = s.fxBoom = s.fxDie = s.fxFrost = { explode() {} };
   s.banner = s.floatText = s.skillRing = s.skillBeam = s.shakeAll = s.archonBurst = () => {};
@@ -59,23 +49,52 @@ test('예고와 실제 편성은 1~100웨이브에서 같고 특수 적과 보�
   assert.ok(rules.wavePlan(10000).length <= 161);
 });
 
-test('각 전장의 경로 전체가 건설 금지이고 전장 변경 시 이전 경로를 비운다', () => {
+test('각 전장의 경로 전체가 건설 금지이고 전장 인스턴스 사이에 경로를 공유하지 않는다', () => {
   for (const key of Object.keys(config.MAP_DEFS)) {
-    config.configureMap(key);
-    assert.equal(config.ROUTES.length, key === 'junction' ? 2 : 1);
-    for (const route of config.ROUTES) for (let i = 1; i < route.length; i++) {
+    const map = createMapRuntime(key, config.MAP_Y);
+    assert.equal(map.routes.length, key === 'junction' ? 2 : 1);
+    for (const route of map.routes) for (let i = 1; i < route.length; i++) {
       const a = route[i - 1], b = route[i]; assert.ok(a.x === b.x || a.y === b.y);
       for (let c = Math.min(a.x, b.x) / config.T - .5; c <= Math.max(a.x, b.x) / config.T - .5; c++)
-        for (let r = (Math.min(a.y, b.y) - config.MAP_Y) / config.T - .5; r <= (Math.max(a.y, b.y) - config.MAP_Y) / config.T - .5; r++) assert.ok(config.pathCells.has(`${c},${r}`));
+        for (let r = (Math.min(a.y, b.y) - config.MAP_Y) / config.T - .5; r <= (Math.max(a.y, b.y) - config.MAP_Y) / config.T - .5; r++) assert.ok(map.pathCells.has(`${c},${r}`));
     }
   }
-  config.configureMap('frontier'); assert.ok(!config.pathCells.has('10,1'));
+  assert.ok(!createMapRuntime('frontier').pathCells.has('10,1'));
+});
+
+test('서로 다른 장면의 건설 금지 칸·적 진입 경로·이동은 서로 영향을 주지 않는다', () => {
+  const frontier = setup(), original = frontier.map;
+  frontier.spawn('grunt');
+  const junction = setup('standard', 'junction');
+  junction.spawn('grunt'); junction.spawn('grunt');
+  assert.equal(frontier.map, original);
+  assert.equal(frontier.cellFree(10, 1), true);
+  assert.equal(junction.cellFree(10, 1), false);
+  frontier.spawn('grunt');
+  for (const e of frontier.enemies) assert.equal(e.route, original.routes[0]);
+  assert.equal(junction.enemies[1].route, junction.map.routes[1]);
+  const before = frontier.enemies[0].x;
+  frontier.step(.1);
+  assert.ok(frontier.enemies[0].x > before);
+  assert.equal(frontier.enemies[0].y, 176);
+  assert.equal(junction.enemies[0].x, -24);
+});
+
+test('다른 전장을 만들어도 기존 저장의 경로 검증과 복원 위치는 유지된다', () => {
+  const save = checkpoint(), s = setup('standard', 'junction');
+  assert.equal(s.map.pathCells.has('6,1'), true);
+  assert.equal(rules.validateSave(save), true);
+  const restored = setup(); restored.restoreCheckpoint(save);
+  assert.equal(restored.map.key, 'frontier');
+  assert.equal(restored.towers[0].y, config.MAP_Y + 1.5 * config.T);
+  assert.equal(restored.towers[1].host, restored.towers[0]);
+  assert.equal(s.map.key, 'junction');
 });
 
 test('합류 지대의 적은 두 입구를 번갈아 사용하고 자신의 경로를 따라 이동한다', () => {
-  const s = setup(); config.configureMap('junction'); s.spawn('grunt'); s.spawn('grunt');
+  const s = setup('standard', 'junction'); s.spawn('grunt'); s.spawn('grunt');
   const [a, b] = s.enemies; assert.notEqual(a.y, b.y); assert.notEqual(a.route, b.route);
-  const bx = b.x; s.step(.1); assert.ok(b.x > bx); assert.equal(b.y, config.ROUTES[1][0].y);
+  const bx = b.x; s.step(.1); assert.ok(b.x > bx); assert.equal(b.y, s.map.routes[1][0].y);
 });
 
 test('타겟 우선순위는 체력·보스·도착까지 남은 거리로 적을 고르고 범위 밖은 제외한다', () => {
@@ -86,8 +105,8 @@ test('타겟 우선순위는 체력·보스·도착까지 남은 거리로 적�
   t.target = 'weak'; assert.equal(s.findTarget(t), b);
   t.target = 'boss'; assert.equal(s.findTarget(t), b);
   b.x = 2000; assert.equal(s.findTarget(t), a);
-  config.configureMap('junction'); a.route = config.ROUTES[0]; a.seg = 1; a.x = 0; a.y = config.ROUTES[0][0].y;
-  b.route = config.ROUTES[1]; b.seg = 1; b.x = 0; b.y = config.ROUTES[1][0].y;
+  s.map = createMapRuntime('junction', config.MAP_Y); a.route = s.map.routes[0]; a.seg = 1; a.x = 0; a.y = s.map.routes[0][0].y;
+  b.route = s.map.routes[1]; b.seg = 1; b.x = 0; b.y = s.map.routes[1][0].y;
   t.x = 0; t.y = 290; t.target = 'first'; s.bonuses.range = 1000;
   assert.equal(s.findTarget(t), b);
 });

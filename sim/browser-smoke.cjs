@@ -58,6 +58,8 @@ async function dialogFits(page) {
     await page.waitForFunction(() => !document.querySelector('dialog[open]'));
     await page.waitForFunction(() => window.__frontierQA?.scene.getScene('game').options.map === 'junction');
     assert.deepEqual(await scene(page, s => s.options), { map: 'junction', difficulty: 'easy', mode: 'standard' });
+    assert.deepEqual(await scene(page, s => ({ key: s.map.key, entrances: s.map.routes.map(r => r[0].y), buildable: s.cellFree(10, 1) })),
+      { key: 'junction', entrances: [128, 512], buildable: false });
     await page.getByRole('button', { name: '훈련 건너뛰기', exact: true }).click();
     await page.getByRole('button', { name: '프로토스 병력 9종 [R]', exact: true }).click();
     assert.deepEqual(await scene(page, s => s.commands().map(c => c.id)), ['frost', 'sniper', 'zealot', 'highTemplar', 'templar', 'reaver', 'scout', 'carrier', 'observer'].map(k => 'build:' + k));
@@ -143,6 +145,8 @@ async function dialogFits(page) {
     await shot(mobile, 'mobile-setup');
     await mobile.getByRole('button', { name: '새 작전 시작', exact: true }).click();
     await mobile.waitForFunction(() => !document.querySelector('dialog[open]'));
+    assert.deepEqual(await scene(mobile, s => ({ key: s.map.key, entrances: s.map.routes.map(r => r[0].y), buildable: s.cellFree(10, 1) })),
+      { key: 'canyon', entrances: [72], buildable: false });
     await mobile.getByRole('button', { name: '훈련 건너뛰기', exact: true }).click();
     assert.equal(await mobile.getByRole('button', { name: '프로토스 병력 9종 [R]', exact: true }).isDisabled(), true);
     await scene(mobile, s => s.openShop('units'));

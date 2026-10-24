@@ -1,13 +1,21 @@
 // 헤드리스 밸런스 시뮬레이션 (Phaser 없이 Node에서 실행)
 //
 // 실행 방법 (프로젝트 루트에서):
-//   node --experimental-strip-types sim/balance.mjs
-// (Node v22.14: .ts import를 위해 --experimental-strip-types 필요. config.ts는 phaser를 import하지 않음)
+//   node sim/balance.mjs
+// 공유 소스 로더로 실제 TypeScript 데이터와 경로를 읽는다 (Phaser/DOM 불필요).
 //
 // 게임 로직 출처: src/GameScene.ts (startWave / spawn / step / towerAct / hit / stats / upgradeCost / sellValue)
-// 고정 dt = 1/60 스텝. 상수와 경로는 ../src/config.ts 에서 직접 import.
+// 고정 dt = 1/60 스텝. 데이터는 src/data, 경로는 독립된 MapRuntime을 사용한다.
 
-import { T, COLS, ROWS, MAX_UNIT_LEVEL, MAX_WAVE, WP, pathCells, TOWER_DEFS, ENEMY_DEFS, CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE } from '../src/config.ts';
+import { createSourceLoader } from './helpers/load-source.cjs';
+
+const load = createSourceLoader();
+const { T, COLS, ROWS, MAX_UNIT_LEVEL, MAX_WAVE, CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE } = load('./data/rules');
+const { TOWER_DEFS } = load('./data/units');
+const { ENEMY_DEFS } = load('./data/enemies');
+const { createMapRuntime } = load('./game/map');
+const { createLayoutConfig } = load('./interface/layout');
+const { waypoints: WP, pathCells } = createMapRuntime('frontier', createLayoutConfig('desktop').mapY);
 
 const DT = 1 / 60;
 

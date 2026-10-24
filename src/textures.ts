@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { activeMap, ENEMY_DEFS, FONT, MAP_H, MAP_Y, RENDER_SCALE, ROUTES, T, TOWER_DEFS, W, WP, pathCells } from './config';
+import type { MapRuntime } from './game/map';
+import { ENEMY_DEFS, FONT, MAP_H, RENDER_SCALE, T, TOWER_DEFS, W } from './config';
 
 /** All art is generated locally: no image downloads or external assets. */
 export function makeTextures(scene: Phaser.Scene): void {
@@ -192,8 +193,9 @@ export function makeTextures(scene: Phaser.Scene): void {
   });
 }
 
-export function drawMap(scene: Phaser.Scene, cols: number, rows: number): void {
-  const key = 'battlefield_' + activeMap;
+export function drawMap(scene: Phaser.Scene, cols: number, rows: number, map: MapRuntime): void {
+  const { key: mapKey, mapY, routes, waypoints, pathCells } = map;
+  const key = 'battlefield_' + mapKey;
   if (!scene.textures.exists(key)) {
     // 고밀도 화면에서도 선명하도록 RENDER_SCALE배 크기로 그리고, 화면에는 W×MAP_H로 표시한다.
     const texture = scene.textures.createCanvas(key, W * RENDER_SCALE, MAP_H * RENDER_SCALE)!;
@@ -242,18 +244,18 @@ export function drawMap(scene: Phaser.Scene, cols: number, rows: number): void {
     ctx.fillStyle = shade; ctx.fillRect(0, 0, W, MAP_H);
     texture.refresh();
   }
-  scene.add.image(0, MAP_Y, key).setOrigin(0).setDisplaySize(W, MAP_H);
+  scene.add.image(0, mapY, key).setOrigin(0).setDisplaySize(W, MAP_H);
   const g = scene.add.graphics();
   // Landing-zone markings and a powered exit gate.
-  g.lineStyle(1, 0x859274, .2).strokeCircle(480, MAP_Y + 357, 59).strokeCircle(480, MAP_Y + 357, 66);
-  g.lineBetween(410, MAP_Y + 357, 550, MAP_Y + 357).lineBetween(480, MAP_Y + 287, 480, MAP_Y + 427);
-  scene.add.text(480, MAP_Y + 347, 'F-07', { fontFamily: 'monospace', fontSize: '24px', color: '#6b7560' }).setOrigin(.5).setAlpha(.35);
+  g.lineStyle(1, 0x859274, .2).strokeCircle(480, mapY + 357, 59).strokeCircle(480, mapY + 357, 66);
+  g.lineBetween(410, mapY + 357, 550, mapY + 357).lineBetween(480, mapY + 287, 480, mapY + 427);
+  scene.add.text(480, mapY + 347, 'F-07', { fontFamily: 'monospace', fontSize: '24px', color: '#6b7560' }).setOrigin(.5).setAlpha(.35);
   const label = (x: number, y: number, text: string, color: string) => scene.add.text(x, y, text, {fontFamily: FONT, fontSize: '10px', color}).setDepth(2);
-  ROUTES.forEach(route => label(16, route[0].y - 37, '▶  적 진입', '#c1a271'));
-  label(W - 103, WP[WP.length - 1].y + 30, '방어선  ▶', '#a7cd8d');
+  routes.forEach(route => label(16, route[0].y - 37, '▶  적 진입', '#c1a271'));
+  label(W - 103, waypoints[waypoints.length - 1].y + 30, '방어선  ▶', '#a7cd8d');
   for (const x of [W - 40, W - 12]) {
-    g.fillStyle(0x141d1b).fillRect(x, WP[WP.length - 1].y - 33, 10, 66);
-    g.fillStyle(0x89bf78).fillRect(x + 3, WP[WP.length - 1].y - 22, 3, 44);
+    g.fillStyle(0x141d1b).fillRect(x, waypoints[waypoints.length - 1].y - 33, 10, 66);
+    g.fillStyle(0x89bf78).fillRect(x + 3, waypoints[waypoints.length - 1].y - 22, 3, 44);
   }
-  g.lineStyle(2, 0x090f0c).strokeRect(1, MAP_Y + 1, W - 2, MAP_H - 2);
+  g.lineStyle(2, 0x090f0c).strokeRect(1, mapY + 1, W - 2, MAP_H - 2);
 }

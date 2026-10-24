@@ -1,4 +1,8 @@
-import { COLS, ENEMY_DEFS, EnemyKey, MAP_DEFS, MapKey, MAX_UNIT_LEVEL, MAX_WAVE, ROWS, TOWER_DEFS, TowerKey } from './config';
+import { COLS, MAX_UNIT_LEVEL, MAX_WAVE, ROWS } from './data/rules';
+import { ENEMY_DEFS, type EnemyKey } from './data/enemies';
+import { MAP_DEFS, type MapKey } from './data/maps';
+import { TOWER_DEFS, type TowerKey } from './data/units';
+import { createMapRuntime } from './game/map';
 import { EquippedSkill, SKILL_DEFS, SKILL_SLOTS, UnitBuff } from './catalog';
 
 export const DIFFICULTIES = {
@@ -113,11 +117,7 @@ export function validateSave(v: unknown): v is RunSave {
     || v.options.mode !== 'endless' && v.wave >= MAX_WAVE || !num(v.gold) || !integer(v.lives, 1, 20)
     || !Array.isArray(v.units) || v.units.length > COLS * ROWS * 5) return false;
   const ids = new Set<string>(), occupied = new Set<string>(), slots = new Set<string>();
-  const paths = new Set<string>();
-  for (const route of MAP_DEFS[v.options.map as MapKey].routes) for (let i = 1; i < route.length; i++) {
-    const [ac, ar] = route[i - 1], [bc, br] = route[i];
-    for (let c = Math.min(ac, bc); c <= Math.max(ac, bc); c++) for (let r = Math.min(ar, br); r <= Math.max(ar, br); r++) paths.add(`${c},${r}`);
-  }
+  const paths = createMapRuntime(v.options.map as MapKey).pathCells;
   for (const u of v.units) {
     if (!obj(u) || typeof u.id !== 'string' || !/^[1-9]\d*$/.test(u.id) || !num(Number(u.id), 1) || ids.has(u.id)
       || !has(TOWER_DEFS, u.k) || !allowedUnit(u.k, v.options.mode) || !integer(u.c, 0, COLS - 1) || !integer(u.r, 0, ROWS - 1)
