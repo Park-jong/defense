@@ -23,7 +23,7 @@
 .shop-tabs button { display:flex; flex:1 1 0; max-width:160px; justify-content:center; align-items:center; gap:8px; min-height:48px; padding:7px 9px; background:transparent; border-color:transparent; }
 .shop-tabs .shop-icon { width:28px; height:28px; }
 .shop-tabs span { font-size:11px; }
-.shop-content { min-height:0; padding:22px 24px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#5f744e transparent; }
+.shop-content { flex:1 1 auto; min-height:0; padding:22px 24px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#5f744e transparent; }
 .supply-shop .shop-purchase { width:100%; min-height:37px; font-size:11px; color:#c8e2a2; border-color:#6b8051; background:linear-gradient(#34462b,#22301f); }
 .is-equipped { border-color:#8ca464; }
 .is-equipped .shop-purchase { opacity:.8!important; }
