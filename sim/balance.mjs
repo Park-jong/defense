@@ -7,7 +7,7 @@
 // 게임 로직 출처: src/GameScene.ts (startWave / spawn / step / towerAct / hit / stats / upgradeCost / sellValue)
 // 고정 dt = 1/60 스텝. 상수와 경로는 ../src/config.ts 에서 직접 import.
 
-import { T, COLS, ROWS, MAX_WAVE, WP, pathCells, TOWER_DEFS, ENEMY_DEFS, CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE } from '../src/config.ts';
+import { T, COLS, ROWS, MAX_UNIT_LEVEL, MAX_WAVE, WP, pathCells, TOWER_DEFS, ENEMY_DEFS, CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE } from '../src/config.ts';
 
 const DT = 1 / 60;
 
@@ -46,7 +46,7 @@ class Game {
     return true;
   }
   upgrade(t) {
-    if (t.lvl >= 3 || this.gold < this.upgradeCost(t)) return false;
+    if (t.lvl >= MAX_UNIT_LEVEL || this.gold < this.upgradeCost(t)) return false;
     const c = this.upgradeCost(t);
     this.gold -= c; t.spent += c; t.lvl++;
     return true;
@@ -220,7 +220,7 @@ function spendAll(game, strat) {
       if (cell && game.placeTower(k, cell.c, cell.r)) continue;
     }
     const ups = game.towers
-      .filter(t => t.lvl < 3 && game.gold >= game.upgradeCost(t))
+      .filter(t => t.lvl < MAX_UNIT_LEVEL && game.gold >= game.upgradeCost(t))
       .sort((a, b) => a.lvl - b.lvl || game.upgradeCost(a) - game.upgradeCost(b));
     if (ups.length && game.upgrade(ups[0])) continue;
     break;

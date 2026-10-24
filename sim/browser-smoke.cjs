@@ -59,6 +59,15 @@ async function shot(page, name) { await page.screenshot({ path: path.join(artifa
     await page.getByRole('button', { name: '집중 화력 선택', exact: true }).click();
     assert.equal(await scene(page, s => s.selected.target), 'boss');
     assert.equal(await scene(page, s => s.selected.branch), 'power');
+    await page.getByRole('button', { name: '전장 복귀', exact: true }).click();
+    await press(page, 'u'); await press(page, 'u');
+    assert.equal(await scene(page, s => s.selected.lvl), 5);
+    assert.equal(await scene(page, s => s.selected.branch), 'power');
+    assert.equal(await scene(page, s => s.commands()[0].enabled), false);
+    const maxGold = await scene(page, s => s.gold); await press(page, 'u');
+    assert.equal(await scene(page, s => s.gold), maxGold);
+    await press(page, 'o');
+    await page.getByRole('button', { name: '미사일 터렛 #1 · Lv.5', exact: true }).waitFor();
     await shot(page, 'desktop-tactics');
     await page.getByRole('button', { name: '선택 병력 재배치 · ◆ 20', exact: true }).click();
     await cellClick(page, 8, 3); assert.equal(await scene(page, s => s.selected.c), 8);

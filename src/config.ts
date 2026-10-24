@@ -14,6 +14,7 @@ export let CONSOLE_Y = MAP_Y + MAP_H;
 export let GAME_W = W;
 export let H = 856;
 export const MAX_WAVE = 50;
+export const MAX_UNIT_LEVEL = 5;
 /** 게임 로직 고정 스텝(초). 실제 경과 시간을 이 단위로 나눠 진행한다. */
 export const STEP_SEC = 1 / 60;
 /** 창이 가려져 루프가 드물게 돌 때 한 번에 따라잡는 최대 시간(초). */

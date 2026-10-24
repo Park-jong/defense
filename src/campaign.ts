@@ -1,4 +1,4 @@
-import { COLS, ENEMY_DEFS, EnemyKey, MAP_DEFS, MapKey, MAX_WAVE, ROWS, TOWER_DEFS, TowerKey } from './config';
+import { COLS, ENEMY_DEFS, EnemyKey, MAP_DEFS, MapKey, MAX_UNIT_LEVEL, MAX_WAVE, ROWS, TOWER_DEFS, TowerKey } from './config';
 import { EquippedSkill, SKILL_DEFS, SKILL_SLOTS, UnitBuff } from './catalog';
 
 export const DIFFICULTIES = {
@@ -121,7 +121,7 @@ export function validateSave(v: unknown): v is RunSave {
   for (const u of v.units) {
     if (!obj(u) || typeof u.id !== 'string' || !/^[1-9]\d*$/.test(u.id) || !num(Number(u.id), 1) || ids.has(u.id)
       || !has(TOWER_DEFS, u.k) || !allowedUnit(u.k, v.options.mode) || !integer(u.c, 0, COLS - 1) || !integer(u.r, 0, ROWS - 1)
-      || !integer(u.lvl, 1, 3) || !num(u.spent) || !has(TARGETS, u.target) || u.hostId !== undefined && typeof u.hostId !== 'string' || u.branch !== undefined && (!has(BRANCHES, u.branch) || u.lvl !== 3 || u.k === 'bunker')
+      || !integer(u.lvl, 1, MAX_UNIT_LEVEL) || !num(u.spent) || !has(TARGETS, u.target) || u.hostId !== undefined && typeof u.hostId !== 'string' || u.branch !== undefined && (!has(BRANCHES, u.branch) || u.lvl < 3 || u.k === 'bunker')
       || !num(u.cd, 0, 60) || !Array.isArray(u.buffs) || !u.buffs.every((b: unknown) => obj(b) && num(b.left, 0, 60) && num(b.haste, 1, 10) && num(b.power, 1, 10))
       || !Array.isArray(u.skills) || u.skills.length > SKILL_SLOTS) return false;
     ids.add(u.id);

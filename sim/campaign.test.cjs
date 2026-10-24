@@ -146,6 +146,52 @@ test('Lv.3 특화는 한 번만 비용을 차감하고 화력·연사·지원 �
   const support = place(s, 'support', 8); support.lvl = 3; const range = s.supportRange(support); s.selected = support; s.specialize('power'); assert.equal(s.supportRange(support), range + 45);
 });
 
+test('모든 전투·지원 유닛은 Lv.5까지 강화되고 최대 단계에서는 추가 비용을 차감하지 않는다', () => {
+  assert.equal(config.MAX_UNIT_LEVEL, 5);
+  for (const key of config.TOWER_KEYS.filter(k => k !== 'bunker')) {
+    const s = setup(), t = place(s, key), gold = s.gold;
+    let cost = 0, previous = s.stats(t);
+    for (let level = 2; level <= 5; level++) {
+      cost += s.upgradeCost(t);
+      assert.equal(s.upgradeUnit(t.id), true); assert.equal(t.lvl, level);
+      const next = s.stats(t);
+      assert.ok(next.range > previous.range); assert.ok(next.rate < previous.rate);
+      if (config.TOWER_DEFS[key].dmg > 0) assert.ok(next.dmg > previous.dmg);
+      previous = next;
+    }
+    assert.equal(s.gold, gold - cost);
+    s.selected = t;
+    assert.equal(s.commands()[0].badge, 'MAX'); assert.equal(s.commands()[0].enabled, false);
+    assert.match(s.commands()[0].detail, /Lv\.5/);
+    assert.equal(s.upgradeUnit(t.id), false); assert.equal(s.gold, gold - cost);
+  }
+});
+
+test('Lv.3 특화는 Lv.4·5 강화 후에도 유지되고 특화를 미뤘다면 Lv.5에서도 선택할 수 있다', () => {
+  const s = setup(), t = place(s, 'marine'); s.selected = t;
+  s.upgradeUnit(t.id); s.upgradeUnit(t.id); s.equipSkill('stim', t.id);
+  t.skills[0].cd = 6; assert.equal(s.specialize('rapid'), true);
+  s.upgradeUnit(t.id); s.upgradeUnit(t.id);
+  assert.equal(t.lvl, 5); assert.equal(t.branch, 'rapid'); assert.equal(t.skills[0].cd, 6);
+  assert.equal(s.specialize('power'), false);
+  const second = place(s, 'cannon', 7); s.selected = second;
+  for (let i = 0; i < 4; i++) s.upgradeUnit(second.id);
+  assert.equal(s.specialize('power'), true); assert.equal(second.branch, 'power');
+});
+
+test('기존 Lv.3 저장과 Lv.4·5 특화·주둔 저장을 복원하고 Lv.6은 거부한다', () => {
+  for (const level of [3, 4, 5]) {
+    const save = checkpoint(); save.units[1].lvl = level;
+    assert.equal(rules.validateSave(save), true);
+    const store = memory(); rules.writeStored(rules.SAVE_KEY, save, store);
+    const s = setup(); s.restoreCheckpoint(rules.readSave(store));
+    assert.equal(s.towers[1].lvl, level); assert.equal(s.towers[1].branch, 'rapid');
+    assert.equal(s.towers[0].passengers[2], s.towers[1]);
+    assert.deepEqual(JSON.parse(JSON.stringify(s.savedUnits())), save.units);
+  }
+  const save = checkpoint(); save.units[1].lvl = 6; assert.equal(rules.validateSave(save), false);
+});
+
 test('5웨이브 보상은 세 개의 서로 다른 선택지를 제공하고 선택 전 시작·중복 수령을 막는다', () => {
   const s = setup(); s.wave = 5; s.pending = ['power', 'range', 'repair']; s.lives = 19;
   s.startWave(); assert.equal(s.wave, 5); s.takeReward('supply'); assert.equal(s.pending.length, 3);

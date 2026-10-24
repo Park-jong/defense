@@ -213,14 +213,17 @@ test('벙커 일괄 강화는 각 병력의 다음 단계 비용을 합산하고
   const s = setup(10000), b = place(s, 'bunker');
   s.recruit(b.id, 0, 'marine'); s.recruit(b.id, 1, 'marine'); s.recruit(b.id, 2, 'firebat');
   const [a, m, f] = b.passengers;
-  s.upgradeUnit(m.id); s.upgradeUnit(f.id); s.upgradeUnit(f.id);
+  s.upgradeUnit(m.id); for (let level = 1; level < 5; level++) s.upgradeUnit(f.id);
   const other = place(s, 'bunker', 10, 1); s.recruit(other.id, 0, 'marine');
   const outside = place(s, 'marine', 8, 1), gold = s.gold;
   assert.deepEqual(s.applyOrder({ type: 'upgrade' }, { bunkerId: b.id }), { count: 2, cost: 156 });
-  assert.equal(s.gold, gold - 156); assert.deepEqual([a.lvl, m.lvl, f.lvl], [2, 3, 3]);
+  assert.equal(s.gold, gold - 156); assert.deepEqual([a.lvl, m.lvl, f.lvl], [2, 3, 5]);
   assert.equal(outside.lvl, 1); assert.equal(other.passengers[0].lvl, 1);
   assert.equal(a.host, b); assert.equal(a.base.visible, false);
-  assert.deepEqual(s.applyOrder({ type: 'upgrade' }, { bunkerId: b.id }), { count: 1, cost: 104 });
+  assert.deepEqual(s.applyOrder({ type: 'upgrade' }, { bunkerId: b.id }), { count: 2, cost: 260 });
+  assert.deepEqual(s.applyOrder({ type: 'upgrade' }, { bunkerId: b.id }), { count: 2, cost: 364 });
+  assert.deepEqual(s.applyOrder({ type: 'upgrade' }, { bunkerId: b.id }), { count: 1, cost: 208 });
+  assert.deepEqual([a.lvl, m.lvl, f.lvl], [5, 5, 5]);
   assert.deepEqual(s.applyOrder({ type: 'upgrade' }, { bunkerId: b.id }), { count: 0, cost: 0 });
 });
 
@@ -343,7 +346,7 @@ test('선택 변경 후 스킬 단축키는 현재 유닛에 적용되고 중복
   assert.deepEqual(f.skills.map(s => s.key), ['inferno', 'ignite']); assert.equal(m.skills.length, 0);
   const gold = s.gold; s.onKey({ key: 'z', repeat: false }); assert.equal(s.gold, gold);
   s.selectUnit(m.id); s.gold = 0; assert.equal(s.commands()[0].enabled, false); assert.equal(s.commands()[1].enabled, false);
-  s.gold = 1000; s.commands()[0].run(); s.commands()[0].run();
+  s.gold = 1000; for (let level = 1; level < 5; level++) s.commands()[0].run();
   assert.equal(s.commands()[0].enabled, false); assert.equal(s.commands()[0].badge, 'MAX');
   s.over = true; assert.ok(s.commands().filter(Boolean).every(c => !c.enabled));
 });

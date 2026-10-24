@@ -313,7 +313,7 @@ export class GameScene extends Phaser.Scene {
 
   private specialize(key: Branch): boolean {
     const t = this.selected;
-    if (!t || this.over || t.k === 'bunker' || t.lvl !== 3 || t.branch || this.gold < TOWER_DEFS[t.k].cost) return false;
+    if (!t || this.over || t.k === 'bunker' || t.lvl < 3 || t.branch || this.gold < TOWER_DEFS[t.k].cost) return false;
     const cost = TOWER_DEFS[t.k].cost; this.gold -= cost; t.spent += cost; t.branch = key;
     this.audio.play('build'); this.opsNotice = '특화가 적용되었습니다.'; this.saveCheckpoint(false); return true;
   }
@@ -689,7 +689,7 @@ export class GameScene extends Phaser.Scene {
       cells[7] = make('garrison:' + t.id, '주둔 상세 관리', 'cmd_manage', '병력 이동·하차와 벙커별 일괄 스킬을 관리합니다.', () => this.openShop('garrison'));
     } else {
       const cost = this.upgradeCost(t), max = t.lvl >= MAX_UNIT_LEVEL;
-      cells[0] = { ...make('upgrade:' + t.id, '일반 강화', 'cmd_upgrade', max ? '최대 Lv.3 강화가 완료되었습니다.'
+      cells[0] = { ...make('upgrade:' + t.id, '일반 강화', 'cmd_upgrade', max ? `최대 Lv.${MAX_UNIT_LEVEL} 강화가 완료되었습니다.`
         : `Lv.${t.lvl} → Lv.${t.lvl + 1}\n공격력 ×1.6 · 기본 사거리 +8% · 공격 간격 감소`,
         () => this.upgradeUnit(t.id), !max && this.gold >= cost, max ? undefined : cost), hotkey: this.kb('U'), badge: max ? 'MAX' : 'Lv' + t.lvl, active: max };
       SKILL_KEYS.filter(key => SKILL_DEFS[key].unit === t.k).forEach((key, i) => {
@@ -704,7 +704,7 @@ export class GameScene extends Phaser.Scene {
         () => { if (this.selected?.id === t.id) this.sell(); });
       cells[3].hotkey = this.kb('S');
       cells[4] = make('manage', '부대 일괄 관리', 'cmd_manage', '전장과 모든 벙커의 병력을 함께 강화하거나 스킬을 일괄 장착합니다.', () => this.openShop('manage'));
-      cells[5] = make('tactics', '전술 / 특화', 'cmd_manage', '공격 대상 우선순위와 Lv.3 특화를 선택합니다.', () => this.operations?.show('tactics'));
+      cells[5] = make('tactics', '전술 / 특화', 'cmd_manage', '공격 대상 우선순위와 Lv.3 이상 특화를 선택합니다.', () => this.operations?.show('tactics'));
       if (!t.host) cells[7] = make('relocate', '재배치', 'cmd_unload', '준비 시간에 빈 칸을 지정하면 20미네랄로 이동합니다.', () => this.beginRelocate(), !this.waveActive && this.gold >= 20, 20);
       if (t.host) {
         const hostId = t.host.id;

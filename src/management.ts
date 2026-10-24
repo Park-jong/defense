@@ -1,7 +1,7 @@
-import { TOWER_DEFS, TowerKey } from './config';
+import { MAX_UNIT_LEVEL, TOWER_DEFS, TowerKey } from './config';
 import { EquippedSkill, SKILL_DEFS, SKILL_SLOTS, SkillKey } from './catalog';
 
-export const MAX_UNIT_LEVEL = 3;
+export { MAX_UNIT_LEVEL } from './config';
 export interface ManagedUnit {
   id: string; k: TowerKey; lvl: number; skills: EquippedSkill[]; hostId?: string;
 }
