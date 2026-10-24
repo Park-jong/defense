@@ -1,20 +1,24 @@
 .mission-ribbon,.operations-center { font-family:'Malgun Gothic',system-ui,sans-serif; color:#d9e6ce; }
 .mission-ribbon { position:fixed; z-index:5; pointer-events:none; }
-.mission-strip { display:flex; gap:5px; align-items:center; padding:5px 7px; background:#0b1513ed; border:1px solid #5a6c59; border-radius:5px; pointer-events:auto; box-shadow:0 4px 15px #0005; }
-.mission-forecast { flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:11px; color:#bbd2b4; }
+.mission-strip { box-sizing:border-box; display:flex; flex-direction:column; gap:4px; align-items:center; width:fit-content; max-width:min(420px,100%); margin:0 auto; padding:5px 7px; background:#0b1513ed; border:1px solid #5a6c59; border-radius:5px; pointer-events:auto; box-shadow:0 4px 15px #0005; }
+.mission-actions { display:flex; justify-content:center; gap:5px; }
+.mission-forecast { width:100%; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; text-align:center; font-size:11px; color:#bbd2b4; }
 .mission-ribbon button,.operations-center button { font:inherit; color:#dcebc8; background:#263d32; border:1px solid #617a59; border-radius:4px; cursor:pointer; min-height:34px; padding:6px 11px; }
 .mission-ribbon button { font-size:11px; padding:5px 7px; white-space:nowrap; }
 .mission-ribbon button:disabled,.operations-center button:disabled { opacity:.42; cursor:default; }
+.mission-ribbon .mission-actions button { position:relative; display:grid; place-items:center; box-sizing:border-box; flex:0 0 44px; width:44px; height:44px; min-height:44px; padding:4px; }
+.mission-actions img { display:block; }
+.mission-ribbon .mission-actions button:disabled { opacity:1; background:#1a2a22; border-color:#3b5040; }
+.mission-actions button:disabled img { opacity:.35; }
+.mission-cooldown { position:absolute; inset:0; display:grid; place-items:center; border-radius:3px; background:#07100ec9; color:#e4edc7; font:bold 13px monospace; }
 .mission-ribbon button:hover:enabled,.operations-center button:hover:enabled { background:#3b5642; }
 .mission-ribbon button:focus-visible,.operations-center :focus-visible { outline:2px solid #c3e693; outline-offset:3px; }
-.field-tutorial { display:flex; align-items:center; gap:6px; max-width:660px; margin-top:5px; padding:8px 10px; border-left:3px solid #b1cd7f; background:#17241bef; font-size:11px; line-height:1.6; pointer-events:auto; }
+.field-tutorial { display:flex; align-items:center; gap:6px; max-width:660px; margin:5px auto 0; padding:8px 10px; border-left:3px solid #b1cd7f; background:#17241bef; font-size:11px; line-height:1.6; pointer-events:auto; }
 .field-tutorial span { flex:1; }
-.short-label { display:none; }
 .mission-ribbon.compact .mission-strip { gap:3px; padding:2px 4px; }
 .mission-ribbon.compact .mission-forecast { font-size:10px; }
-.mission-ribbon.compact button { min-height:26px; font-size:10px; padding:3px 6px; }
-.mission-ribbon.compact .wide-label,.mission-ribbon.compact .training-detail { display:none; }
-.mission-ribbon.compact .short-label { display:inline; }
+.mission-ribbon.compact .field-tutorial button { min-height:26px; font-size:10px; padding:3px 6px; }
+.mission-ribbon.compact .training-detail { display:none; }
 .mission-ribbon.compact .field-tutorial { font-size:10px; padding:5px; }
 .operations-center { padding:0; width:min(960px,94vw); max-width:94vw; max-height:90dvh; border:1px solid #7a8d67; border-radius:10px; background:#101d18; box-shadow:0 20px 100px #000b; }
 .operations-center::backdrop { background:#030a08c9; backdrop-filter:blur(4px); }

@@ -1,6 +1,7 @@
 import { ENEMY_DEFS, GAME_W, MAP_DEFS, MAP_Y, MAX_WAVE, TOWER_DEFS, TOWER_KEYS, TowerKey, W } from './config';
 import { SKILL_DEFS } from './catalog';
 import { unitImageUrl } from './unitArt';
+import { commandIconUrl } from './commandIcons';
 import { ACHIEVEMENTS, allowedUnit, bossPattern, BRANCHES, COMMANDERS, CommanderKey, DIFFICULTIES, ENEMY_INFO, MODES, Profile, REWARDS, RewardKey, RunOptions, RunSave, RunStats, SavedUnit, TARGETS, TargetMode, wavePlan } from './campaign';
 import './operations.css';
 
@@ -28,7 +29,8 @@ export interface OperationsActions {
   save(): void;
 }
 const button = (action: string, key: string, label: string, disabled = false, selected = false, accessible = ''): string =>
-  `<button type="button" data-action="${action}" data-key="${key}" ${accessible ? `aria-label="${accessible}"` : ''} ${disabled ? 'disabled' : ''} ${selected ? 'aria-pressed="true" class="selected"' : ''}>${label}</button>`;
+  `<button type="button" data-action="${action}" data-key="${key}" ${accessible ? `aria-label="${accessible}" title="${accessible}"` : ''} ${disabled ? 'disabled' : ''} ${selected ? 'aria-pressed="true" class="selected"' : ''}>${label}</button>`;
+const missionIcon = (key: string): string => `<img src="${commandIconUrl(key)}" width="32" height="32" alt="" aria-hidden="true">`;
 const tutorialSteps = ['보급 상점(B) 또는 유닛 명령에서 병력을 고르고, 길 옆 빈 칸에 배치하세요. 터치는 같은 칸을 두 번 탭합니다.', '배치한 유닛을 선택하고 강화(U)를 한 번 적용하세요.', '유닛 전용 자동 스킬(Z/X)을 하나 장착하세요. 적이 사거리 안에 들어오면 자동으로 발동합니다.', '벙커를 배치하고 빈 사격구에 마린 또는 파이어뱃을 구매하세요. 벙커는 보병 4기를 수용하며 사거리를 늘립니다.'];
 
 export class OperationsCenter {
@@ -73,18 +75,18 @@ export class OperationsCenter {
     const plan = wavePlan(next), counts = this.counts(plan);
     const forecast = v.over ? '작전 종료 · 통계와 업적 확인' : v.active ? `교전 ${v.wave} · 기지 ${v.lives}/20` : `다음 ${next} · ${counts}`;
     const tutorial = !v.profile.tutorialDone && v.tutorial < 4 && !v.test && !v.active && !v.over ? `<div class="field-tutorial"><span><b>훈련 ${v.tutorial + 1}/4</b><span class="training-detail"> · ${tutorialSteps[v.tutorial]}</span></span>${button('open', 'codex', '도움말')}${button('skip', '', '훈련 건너뛰기')}</div>` : '';
-    const html = `<div class="mission-strip"><span class="mission-forecast" title="${forecast}">${forecast}</span>${button('open', 'tactics', '<span class="wide-label">작전실 [O]</span><span class="short-label">작전실</span>', false, false, '작전실 [O]')}${(['strike', 'slow', 'supply'] as CommanderKey[]).map(k => {
+    const html = `<div class="mission-strip"><div class="mission-actions" role="group" aria-label="사령관 패널">${button('open', 'tactics', missionIcon('manage'), false, false, '작전실 [O]')}${(['strike', 'slow', 'supply'] as CommanderKey[]).map(k => {
       const cooldown = v.commander[k] > 0 ? ` ${Math.ceil(v.commander[k])}초` : '';
       const label = COMMANDERS[k].name + cooldown;
-      return button('commander', k, `<span class="wide-label">${label}</span><span class="short-label">${({ strike: '폭격', slow: '감속', supply: '보급' })[k]}${cooldown}</span>`, v.over || v.paused || !v.active || v.commander[k] > 0 || v.options.mode === 'budget' && k === 'supply', false, label);
-    }).join('')}</div>${tutorial}`;
+      return button('commander', k, `${missionIcon(k)}${cooldown ? `<span class="mission-cooldown" aria-hidden="true">${Math.ceil(v.commander[k])}초</span>` : ''}`, v.over || v.paused || !v.active || v.commander[k] > 0 || v.options.mode === 'budget' && k === 'supply', false, label);
+    }).join('')}</div><span class="mission-forecast" title="${forecast}">${forecast}</span></div>${tutorial}`;
     if (html !== this.cache) { this.ribbon.innerHTML = html; this.cache = html; }
     this.position();
   }
   private position(): void {
     const canvas = document.querySelector('canvas'); if (!canvas) return;
     const r = canvas.getBoundingClientRect(), scale = r.width / GAME_W;
-    Object.assign(this.ribbon.style, { left: `${r.left + 8 * scale}px`, top: `${r.top + (MAP_Y + 6) * scale}px`, width: `${(W - 112) * scale}px` });
+    Object.assign(this.ribbon.style, { left: `${r.left + 8 * scale}px`, top: `${r.top + (MAP_Y + 6) * scale}px`, width: `${(W - 16) * scale}px` });
     this.ribbon.classList.toggle('compact', W * scale < 650);
   }
   private counts(plan: (keyof typeof ENEMY_DEFS)[]): string {
