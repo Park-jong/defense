@@ -8,7 +8,7 @@ import { DRAGOON_EMITTER, FIREBAT_MUZZLES, loadUnitArt, SIEGE_MUZZLE, TURRET_LAU
 import { EquippedSkill, SKILL_DEFS, SKILL_KEYS, SKILL_SLOTS, SkillKey, UnitBuff } from './catalog';
 import { CommandCard, UnitCommand } from './commandCard';
 import { loadCommandIcons } from './commandIcons';
-import { addConsoleChrome, CONSOLE_RISE, consoleContains, loadConsoleChrome } from './consoleChrome';
+import { addConsoleChrome, loadConsoleChrome } from './consoleChrome';
 import { DamageKind, DamageNumbers } from './damageNumbers';
 import { ShopState, SupplyShop } from './shop';
 import { MAX_UNIT_LEVEL, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
@@ -373,7 +373,7 @@ export class GameScene extends Phaser.Scene {
     // 맵 카메라 줌·스크롤이 있으므로 화면 좌표(p.x)가 아니라 mapCam 기준 세계 좌표로 칸을 찾는다.
     if (!this.inMapView(p)) return null;
     const { x, y } = this.mapPoint(p.x, p.y);
-    if (y < MAP_Y || y >= CONSOLE_Y || x < 0 || x >= W) return null;
+    if (y < MAP_Y || y >= MAP_Y + MAP_H || x < 0 || x >= W) return null;
     return { c: Math.floor(x / T), r: Math.floor((y - MAP_Y) / T) };
   }
 
@@ -381,7 +381,6 @@ export class GameScene extends Phaser.Scene {
   /** 포인터(캔버스 픽셀)가 맵 영역 위에 있는가. */
   private inMapView(p: { x: number; y: number }): boolean {
     const x = p.x / RENDER_SCALE, y = p.y / RENDER_SCALE;
-    if (!MOBILE_LAYOUT && consoleContains(x, y - CONSOLE_Y + CONSOLE_RISE)) return false;
     return x >= 0 && x < W && y >= MAP_Y && y < MAP_Y + MAP_H;
   }
 
@@ -546,7 +545,7 @@ export class GameScene extends Phaser.Scene {
     const text = (x: number, top: number, value: string, size = 12, color = '#a0ad92') =>
       this.add.text(x, top, value, { fontFamily: FONT, fontSize: size + 'px', color }).setDepth(30);
     panel(0, 0, W, MAP_Y);
-    addConsoleChrome(this, y);
+    addConsoleChrome(this, y, 'battlefield_' + this.map.key);
     text(21, 10, 'FRONTIER', 21, '#d2d7be').setFontStyle('bold').setLetterSpacing(3);
     text(23, 36, '기지 방어   /   SECTOR 07', 9, '#8a967b').setLetterSpacing(1);
     text(316, 10, 'OPERATION', 8, '#77876d').setLetterSpacing(2);

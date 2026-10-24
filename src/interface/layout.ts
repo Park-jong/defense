@@ -2,6 +2,8 @@ import { MAP_H, W } from '../data/rules';
 
 export const SIDE_W = 320;
 export const FONT = '"Malgun Gothic", system-ui, sans-serif';
+/** consoleChrome의 CONSOLE_RISE(32) - 최고 능선 y(6): 콘솔 기준선과 맵 아래 가장자리 사이 간격. */
+const CONSOLE_PEAK_GAP = 26;
 export type LayoutMode = 'desktop' | 'mobile';
 export interface LayoutConfig {
   readonly mobile: boolean;
@@ -14,7 +16,9 @@ export interface LayoutConfig {
 /** Build a layout without changing the active app or any battlefield. */
 export function createLayoutConfig(mode: LayoutMode): LayoutConfig {
   const mobile = mode === 'mobile', mapY = mobile ? 0 : 56;
-  return { mobile, mapY, consoleY: mapY + MAP_H, gameW: mobile ? W + SIDE_W : W, height: mobile ? MAP_H : 856 };
+  // 데스크톱 콘솔 장갑은 가장 높은 능선(CONSOLE_PEAK_GAP)이 맵 아래 가장자리에 닿도록 내려 맵 칸을 가리지 않는다.
+  const consoleY = mapY + MAP_H + (mobile ? 0 : CONSOLE_PEAK_GAP);
+  return { mobile, mapY, consoleY, gameW: mobile ? W + SIDE_W : W, height: mobile ? MAP_H : 856 + CONSOLE_PEAK_GAP };
 }
 
 // Selected once before Phaser boots; existing UI imports keep their live bindings.
