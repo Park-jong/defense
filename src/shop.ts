@@ -5,6 +5,7 @@ import { commandIconUrl } from './commandIcons';
 import { BUNKER_CAPACITY, BUNKER_INFANTRY, InfantryKey, isInfantry } from './bunker';
 import { MAX_UNIT_LEVEL, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
 import { RunOptions } from './campaign';
+import { adoptTitles, bindTips, createTip, placeTip, textTip } from './gameTip';
 import './shop.css';
 
 const icon = (key: string): string => `<img class="shop-icon" src="${commandIconUrl(key)}" width="32" height="32" alt="" aria-hidden="true">`;
@@ -34,6 +35,7 @@ export class SupplyShop {
   private notice = '';
   private boarding: { bunkerId: string; slot: number } | null = null;
   private images = new Map(TOWER_KEYS.map(k => [k, unitImageUrl(k)]));
+  private tip = createTip();
 
   constructor(private actions: ShopActions) {
     this.dialog = document.createElement('dialog');
@@ -45,6 +47,12 @@ export class SupplyShop {
       this.dialog.addEventListener(type, e => e.stopPropagation(), { passive: true });
     }
     this.dialog.addEventListener('cancel', e => { e.preventDefault(); this.close(); });
+    // 상점의 설명도 브라우저 기본 툴팁 대신 작전실과 같은 장갑판 창으로 띄운다(모달 안이라 창 안에 붙인다).
+    bindTips(this.dialog, this.tip, el => {
+      this.tip.innerHTML = textTip(el);
+      if (this.tip.parentElement !== this.dialog) this.dialog.append(this.tip);
+      this.tip.hidden = false; placeTip(this.tip, el);
+    });
     this.dialog.addEventListener('keydown', e => {
       if (!this.dialog.open) return;
       e.stopPropagation();
@@ -131,6 +139,7 @@ export class SupplyShop {
       <footer class="shop-footer"><span class="shop-hint">${icon('help')}<span>${this.tab === 'garrison' ? '강화·스킬 아이콘을 누르면 즉시 적용 · 체크 표시는 장착 완료 · 스킬은 자동 사용' : '유닛당 스킬 2개 · 적을 만나면 자동 발동 · 병력 구매는 명령 카드 또는 1–9 키 · 회수 시 비용 70% 환급'}</span></span><kbd>ESC</kbd></footer>`;
     this.dialog.querySelector<HTMLElement>('.shop-content')!.scrollTop = scrollTop;
     for (const { selector, left } of strips) this.dialog.querySelector<HTMLElement>(selector)?.scrollTo({ left });
+    adoptTitles(this.dialog); this.tip.hidden = true;
   }
 
   private armyView(state: ShopState, selected?: ShopUnit): string {

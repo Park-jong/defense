@@ -3,6 +3,7 @@ import { SKILL_DEFS, SKILL_KEYS } from './catalog';
 import { unitImageUrl } from './unitArt';
 import { commandIconUrl } from './commandIcons';
 import { ACHIEVEMENTS, bossPattern, BRANCHES, COMMANDERS, CommanderKey, DIFFICULTIES, ENEMY_INFO, MODES, Profile, REWARDS, RewardKey, RunOptions, RunSave, RunStats, SavedUnit, TARGETS, TargetMode, wavePlan } from './campaign';
+import { adoptTitles, bindTips, createTip, placeTip, textTip } from './gameTip';
 import './operations.css';
 
 export interface OperationsView {
@@ -82,8 +83,8 @@ function mapPreview(key: RunOptions['map']): string {
 export class OperationsCenter {
   private ribbon = document.createElement('div');
   private dialog = document.createElement('dialog');
-  private tip = document.createElement('div');
-  private ribbonTip = document.createElement('div');
+  private tip = createTip();
+  private ribbonTip = createTip();
   private ribbonTipSpec = '';
   private section = 'setup';
   private draft?: RunOptions;
@@ -114,11 +115,10 @@ export class OperationsCenter {
       }
     });
     // 비교표와 상단 패널의 설명은 브라우저 기본 툴팁 대신 작전실 장갑판 모양의 창으로 띄운다.
-    for (const tip of [this.tip, this.ribbonTip]) { tip.className = 'ops-tip'; tip.setAttribute('role', 'tooltip'); tip.hidden = true; }
     document.body.append(this.ribbonTip);
-    this.bindTips(this.dialog, this.tip, false);
-    // 터치는 누르는 순간 명령이 실행되므로 상단 패널 설명은 마우스와 키보드 포커스에서만 띄운다.
-    this.bindTips(this.ribbon, this.ribbonTip, true);
+    // 비교표·도감처럼 명령이 없는 전용 설명은 터치로도 띄우고, 상단 패널은 누르는 순간 명령이 실행되므로 마우스와 키보드에서만 띄운다.
+    bindTips(this.dialog, this.tip, el => this.showTip(el), true);
+    bindTips(this.ribbon, this.ribbonTip, el => this.showTip(el, this.ribbonTip), false, () => { this.ribbonTipSpec = ''; });
     window.addEventListener('resize', this.onResize);
     this.update();
   }
@@ -160,7 +160,7 @@ export class OperationsCenter {
       const phase = -(performance.now() / 1000 % 2.6);
       this.ribbon.querySelectorAll<HTMLElement>('.is-auto').forEach(el => el.style.setProperty('--auto-delay', `${phase}s`));
       // 남은 title은 게임 스타일 설명 창으로 옮겨 브라우저 기본 툴팁이 겹치지 않게 한다.
-      this.ribbon.querySelectorAll<HTMLElement>('[title]').forEach(el => { if (!el.dataset.tip) { el.dataset.tip = 'text'; el.dataset.hint = el.title; } el.removeAttribute('title'); });
+      adoptTitles(this.ribbon);
       // 쿨타임 숫자처럼 보던 버튼이 다시 그려지면 설명 창도 새 버튼과 최신 값으로 다시 맞춘다.
       const hovered = this.ribbonTipSpec ? this.ribbon.querySelector<HTMLElement>(`[data-tip="${this.ribbonTipSpec}"]`) : null;
       if (hovered && !this.ribbonTip.hidden) this.showTip(hovered, this.ribbonTip); else { this.ribbonTip.hidden = true; this.ribbonTipSpec = ''; }
@@ -178,10 +178,7 @@ export class OperationsCenter {
   }
   private tipContent(spec: string, el?: HTMLElement): string {
     const [kind, key, extra] = spec.split(':');
-    if (kind === 'text') {
-      const [head, ...rest] = (el?.dataset.hint ?? '').split(' · '), src = el?.querySelector('img')?.getAttribute('src');
-      return `<header>${src ? `<img class="ops-icon" src="${src}" width="32" height="32" alt="">` : ''}<b>${head}</b></header>${rest.length ? `<p>${rest.join(' · ')}</p>` : ''}`;
-    }
+    if (kind === 'text') return el ? textTip(el) : '';
     if (kind === 'faction') {
       const f = key as Faction, v = this.actions.view(), locked = v.options.mode === 'bunker' && f === 'protoss';
       return `<header>${icon(f)}<b>${FACTIONS[f].name} 병력<small>${v.faction === f ? '현재 보급 중' : '명령 카드를 이 종족으로 전환'}</small></b><kbd>${f === 'terran' ? 'T' : 'R'}</kbd></header><div class="ops-tip-roster">${FACTION_TOWERS[f].map(k => this.art(k)).join('')}</div>${locked ? '<p class="ops-tip-note">벙커 작전에서는 테란만 보급합니다.</p>' : ''}`;
@@ -212,28 +209,12 @@ export class OperationsCenter {
       <p>${d.desc}</p>${traits.length ? `<ul class="ops-unit-traits">${traits.map(t => `<li>${t}</li>`).join('')}</ul>` : ''}
       ${skills.length ? `<ul class="ops-unit-skills">${skills.map(s => `<li><img src="${commandIconUrl(s)}" width="26" height="26" alt=""><div><b>${SKILL_DEFS[s].name}<small>${icon('clock')}${SKILL_DEFS[s].cooldown}초</small></b><span>${SKILL_DEFS[s].desc}</span></div></li>`).join('')}</ul>` : ''}</article>`;
   }
-  private bindTips(host: HTMLElement, tip: HTMLElement, mouseOnly: boolean): void {
-    const target = (e: Event) => (e.target as HTMLElement).closest?.<HTMLElement>('[data-tip]') ?? null;
-    const hide = () => { tip.hidden = true; if (tip === this.ribbonTip) this.ribbonTipSpec = ''; };
-    host.addEventListener('pointerover', e => { const el = target(e); if (el && (!mouseOnly || (e as PointerEvent).pointerType === 'mouse')) this.showTip(el, tip); });
-    host.addEventListener('focusin', e => { const el = target(e); if (el && (!mouseOnly || el.matches(':focus-visible'))) this.showTip(el, tip); });
-    for (const type of ['pointerout', 'focusout']) host.addEventListener(type, e => {
-      const el = target(e), next = (e as PointerEvent).relatedTarget as HTMLElement | null;
-      if (el && !(next && el.contains(next) && next.closest('[data-tip]') === el)) hide();
-    });
-    host.addEventListener('scroll', hide, true);
-  }
   private showTip(el: HTMLElement, tip: HTMLElement = this.tip): void {
     tip.innerHTML = this.tipContent(el.dataset.tip!, el);
     if (tip === this.tip && tip.parentElement !== this.dialog) this.dialog.append(tip);
     if (tip === this.ribbonTip) this.ribbonTipSpec = el.dataset.tip!;
     tip.hidden = false;
-    // 행 전체가 대상이면 병력 이름 칸에 붙여 표를 가리지 않게 아래(공간이 없으면 위)에 띄운다.
-    const anchor = (el.tagName === 'TR' ? el.querySelector('th') : el)!.getBoundingClientRect();
-    const w = tip.offsetWidth, h = tip.offsetHeight, gap = 6, margin = 8;
-    const below = anchor.bottom + gap + h <= innerHeight - margin;
-    tip.style.left = `${Math.max(margin, Math.min(anchor.left, innerWidth - w - margin))}px`;
-    tip.style.top = `${below ? anchor.bottom + gap : Math.max(margin, anchor.top - gap - h)}px`;
+    placeTip(tip, el);
   }
   private hideTip(): void { this.tip.hidden = true; }
   private art(key: TowerKey): string { return `<img class="ops-unit-art" src="${this.images.get(key)}" width="64" height="64" alt="" aria-hidden="true">`; }
@@ -285,6 +266,7 @@ export class OperationsCenter {
       const details = this.dialog.querySelector<HTMLDetailsElement>(`#${id}`); if (details) details.open = open;
     }
     for (const { selector, top, left } of scrolls) this.dialog.querySelector<HTMLElement>(selector)?.scrollTo({ top, left });
+    adoptTitles(this.dialog); this.hideTip();
   }
   private setup(v: OperationsView): string {
     const draft = this.draft ?? v.options;
