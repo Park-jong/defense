@@ -234,7 +234,8 @@ export class GameScene extends Phaser.Scene {
     this.setupOperations();
     if (data.resume) this.restoreCheckpoint(data.resume);
     this.applySkin();
-    if (!data.launched && !this.testMode) this.operations!.show('setup');
+    // 테스트 모드도 처음에는 출격 화면을 열어 보스를 시험할 전장·난이도를 고르게 한다.
+    if (!data.launched) this.operations!.show('setup');
     else if (this.pending.length) this.operations!.show('reward');
     else this.saveCheckpoint(false);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.operations?.destroy(); this.operations = undefined; this.audio.destroy(); });

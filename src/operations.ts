@@ -1,4 +1,4 @@
-import { attackCount, attackDamage, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, GAME_W, MAP_DEFS, MAX_WAVE, MOBILE_LAYOUT, SIDE_W, TOP_BAR_H, TOWER_DEFS, TowerKey, TOWER_KEYS, W } from './config';
+import { attackCount, attackDamage, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, GAME_W, MAP_DEFS, MAX_WAVE, MOBILE_LAYOUT, TEST_GOLD, SIDE_W, TOP_BAR_H, TOWER_DEFS, TowerKey, TOWER_KEYS, W } from './config';
 import { SKILL_DEFS, SKILL_KEYS } from './catalog';
 import { unitImageUrl } from './unitArt';
 import { commandIconUrl } from './commandIcons';
@@ -123,7 +123,7 @@ export class OperationsCenter {
     this.actions.pause(true); this.render();
     if (!this.dialog.open) {
       this.dialog.showModal();
-      if (this.section === 'setup') this.dialog.querySelector<HTMLButtonElement>(`[data-action="${v.checkpoint ? 'resume' : 'start'}"]`)?.focus({ preventScroll: true });
+      if (this.section === 'setup') this.dialog.querySelector<HTMLButtonElement>(`[data-action="${v.checkpoint && !v.test ? 'resume' : 'start'}"]`)?.focus({ preventScroll: true });
     }
   }
   close(): void {
@@ -234,9 +234,11 @@ export class OperationsCenter {
   }
   private setup(v: OperationsView): string {
     const draft = this.draft ?? v.options;
-    return `<section class="ops-setup"><div class="ops-section-heading"><h2>전장 선택</h2><span>${MAP_DEFS[draft.map].desc}</span></div><div class="ops-map-picker" role="group" aria-label="전장">${(Object.keys(MAP_DEFS) as RunOptions['map'][]).map(k => button('map', k, `${mapPreview(k)}<span>${MAP_DEFS[k].name}</span>`, MAP_DEFS[k].name, { selected: draft.map === k, hint: `${MAP_DEFS[k].name} · ${MAP_DEFS[k].desc}` })).join('')}</div>
+    return `<section class="ops-setup"><div class="ops-section-heading"><h2>${v.test ? '보스 테스트 전장' : '전장 선택'}</h2><span>${MAP_DEFS[draft.map].desc}</span></div><div class="ops-map-picker" role="group" aria-label="전장">${(Object.keys(MAP_DEFS) as RunOptions['map'][]).map(k => button('map', k, `${mapPreview(k)}<span>${MAP_DEFS[k].name}</span>`, MAP_DEFS[k].name, { selected: draft.map === k, hint: `${MAP_DEFS[k].name} · ${MAP_DEFS[k].desc}` })).join('')}</div>
       <div class="ops-rules"><div><h2>난이도</h2><div class="ops-difficulties" role="group" aria-label="난이도">${(Object.keys(DIFFICULTIES) as RunOptions['difficulty'][]).map((k, i) => button('difficulty', k, `${icon('shield')}<span>${DIFFICULTIES[k].name}</span><span class="ops-pips" aria-hidden="true">${'•'.repeat(i + 1)}</span>`, DIFFICULTIES[k].name, { selected: draft.difficulty === k })).join('')}</div></div><div><h2>모드</h2><div class="ops-modes" role="group" aria-label="작전 모드">${(Object.keys(MODES) as RunOptions['mode'][]).map(k => button('mode', k, k === 'bunker' ? this.art('bunker') : icon(modeIcons[k]), MODES[k].name, { selected: draft.mode === k, hint: `${MODES[k].name} · ${MODES[k].desc}` })).join('')}</div><p class="ops-mode-hint">${MODES[draft.mode].desc}</p></div></div>
-      <div class="ops-launch">${v.checkpoint ? `<div class="ops-checkpoint">${button('resume', '', `${icon('resume')}<span>이어하기</span><b>W ${String(v.checkpoint.wave).padStart(2, '0')}</b>`, '저장된 작전 이어하기', { className: 'ops-resume', hint: `${MAP_DEFS[v.checkpoint.options.map].name} · ${DIFFICULTIES[v.checkpoint.options.difficulty].name} · ${MODES[v.checkpoint.options.mode].name} · ${v.checkpoint.wave}웨이브 완료 · 기지 ${v.checkpoint.lives}/20 · 병력 ${v.checkpoint.units.length}기` })}<small>새 출격 시 기존 저장 교체</small></div>` : ''}${button('start', '', `${icon('deploy')}<span>출격</span>`, '새 작전 시작', { className: 'ops-deploy', hint: v.checkpoint ? '새 작전 시작 · 기존 체크포인트를 교체합니다' : '새 작전 시작' })}</div></section>`;
+      <div class="ops-launch">${v.checkpoint && !v.test ? `<div class="ops-checkpoint">${button('resume', '', `${icon('resume')}<span>이어하기</span><b>W ${String(v.checkpoint.wave).padStart(2, '0')}</b>`, '저장된 작전 이어하기', { className: 'ops-resume', hint: `${MAP_DEFS[v.checkpoint.options.map].name} · ${DIFFICULTIES[v.checkpoint.options.difficulty].name} · ${MODES[v.checkpoint.options.mode].name} · ${v.checkpoint.wave}웨이브 완료 · 기지 ${v.checkpoint.lives}/20 · 병력 ${v.checkpoint.units.length}기` })}<small>새 출격 시 기존 저장 교체</small></div>` : ''}${v.test
+        ? button('start', '', `${icon('boss')}<span>보스 테스트</span>`, '보스 테스트 시작', { className: 'ops-deploy', hint: `${MAP_DEFS[draft.map].name}에서 ${MAX_WAVE}웨이브 ${bossPattern(MAX_WAVE)} 반복 · ◆ ${TEST_GOLD.toLocaleString()} · 저장 및 업적 제외` })
+        : button('start', '', `${icon('deploy')}<span>출격</span>`, '새 작전 시작', { className: 'ops-deploy', hint: v.checkpoint ? '새 작전 시작 · 기존 체크포인트를 교체합니다' : '새 작전 시작' })}</div></section>`;
   }
   private tactics(v: OperationsView): string {
     const u = v.selected, next = v.test ? MAX_WAVE : v.wave + 1;
