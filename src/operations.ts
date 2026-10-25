@@ -62,7 +62,7 @@ function unitTraits(k: TowerKey): string[] {
 const OPS_SILENT = [
   '.ops-nav button', '.ops-volume', '.ops-save-status', '[data-action="map"]', '[data-action="difficulty"]', '[data-action="mode"]',
   '[data-action="start"]', '[data-action="resume"]', '[data-action="target"]', '.ops-empty [data-action="close"]', '.ops-metrics > div',
-  '[data-action="tutorial"]', '[data-action="skin"]',
+  '[data-action="tutorial"]', '[data-action="skin"]', '[data-action="reward"]',
 ].join(',');
 const tabs = {
   setup: { icon: 'flag', name: '출격', label: '작전 설정' },
