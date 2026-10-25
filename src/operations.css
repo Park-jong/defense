@@ -11,6 +11,15 @@
 .mission-ribbon button:disabled img { opacity:.35; }
 .mission-ribbon button:hover:enabled { background:#3b5340; }
 .mission-ribbon button:focus-visible,.operations-center :focus-visible { outline:2px solid #d0ee9b; outline-offset:3px; }
+/* 자동 사용: 희미한 빛이 버튼 가장자리를 따라 돈다. 쿨타임 오버레이보다 위에 그린다. */
+@property --auto-angle { syntax:'<angle>'; inherits:false; initial-value:0deg; }
+.mission-ribbon button.is-auto::before { content:''; position:absolute; inset:-1px; z-index:2; padding:2px; border-radius:7px; pointer-events:none;
+  background:conic-gradient(from var(--auto-angle),transparent 0 58%,#b8e07a66 76%,#f0ffd0e6 88%,transparent 97%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
+  animation:auto-orbit 2.6s linear var(--auto-delay,0s) infinite; }
+.mission-ribbon button.is-auto { box-shadow:0 0 6px #b8e07a33; }
+@keyframes auto-orbit { to { --auto-angle:360deg; } }
+@media(prefers-reduced-motion:reduce) { .mission-ribbon button.is-auto::before { animation:none; background:#b8e07a66; } }
 .mission-cooldown { position:absolute; inset:0; display:grid; place-items:center; border-radius:5px; background:#07100ed9; color:#e4edc7; font:bold 14px monospace; }
 .mission-forecast { display:flex; flex:none; justify-content:center; align-items:center; gap:5px; max-width:100%; color:#aec298; font:10px monospace; }
 .mission-forecast>b { margin:0 4px; color:#c9dbb2; }

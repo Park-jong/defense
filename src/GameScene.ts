@@ -86,6 +86,8 @@ export class GameScene extends Phaser.Scene {
   private bonuses: Bonuses = { power: 0, haste: 0, range: 0 };
   private runStats: RunStats = newStats();
   private commander: Record<CommanderKey, number> = { strike: 0, slow: 0, supply: 0 };
+  /** 쿨타임마다 자동으로 쓰는 사령관 스킬. 재시작해도 같은 페이지에서는 설정을 유지한다. */
+  private autoCommander = new Set<CommanderKey>();
   private pending: RewardKey[] = [];
   private rewarded = 0;
   private usedKinds: TowerKey[] = [];
@@ -251,7 +253,7 @@ export class GameScene extends Phaser.Scene {
     const units = this.savedUnits();
     return { options: this.options, wave: this.wave, gold: this.gold, lives: this.lives, active: this.waveActive, over: this.over,
       selected: units.find(u => u.id === this.selected?.id), units, stats: this.runStats, profile: this.profile,
-      commander: this.commander, pending: this.pending, checkpoint: this.checkpoint, tutorial: this.tutorial, notice: this.opsNotice, test: this.testMode, paused: this.paused, faction: this.faction };
+      commander: this.commander, autoCommander: [...this.autoCommander], pending: this.pending, checkpoint: this.checkpoint, tutorial: this.tutorial, notice: this.opsNotice, test: this.testMode, paused: this.paused, faction: this.faction };
   }
 
   private setupOperations(): void {
@@ -266,6 +268,7 @@ export class GameScene extends Phaser.Scene {
       select: id => this.selectUnit(id),
       faction: key => this.selectFaction(key),
       commander: key => this.useCommander(key),
+      autoCommander: key => this.toggleAutoCommander(key),
       reward: key => this.takeReward(key),
       skin: key => { this.profile.skin = key; this.applySkin(); this.persistProfile(); },
       volume: value => { this.profile.volume = value; this.audio.volume = value; this.audio.unlock(); this.audio.play('build'); this.persistProfile(); },
@@ -360,6 +363,11 @@ export class GameScene extends Phaser.Scene {
       else { e.slow = Math.min(e.slow, .35); e.slowT = Math.max(e.slowT, 5); }
     }
     this.audio.play('skill'); this.banner(COMMANDERS[key].name);
+  }
+
+  private toggleAutoCommander(key: CommanderKey): void {
+    if (this.autoCommander.delete(key)) { this.banner(COMMANDERS[key].name + ' 자동 사용 해제'); return; }
+    this.autoCommander.add(key); this.banner(COMMANDERS[key].name + ' 자동 사용');
   }
 
   private takeReward(key: RewardKey): void {
@@ -1112,6 +1120,8 @@ export class GameScene extends Phaser.Scene {
     if (this.waveActive) {
       this.runStats.seconds += dt;
       for (const key of Object.keys(COMMANDERS) as CommanderKey[]) this.commander[key] = Math.max(0, this.commander[key] - dt);
+      // 폭격·교란은 전장에 적이 있을 때만 자동 발동해 빈 화면에 낭비하지 않는다.
+      for (const key of this.autoCommander) if (this.commander[key] <= 0 && (key === 'supply' || this.enemies.some(e => !e.dead))) this.useCommander(key);
     }
     if (this.spawnQ.length) {
       this.spawnT -= dt;

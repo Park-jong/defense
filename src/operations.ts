@@ -8,7 +8,7 @@ import './operations.css';
 export interface OperationsView {
   options: RunOptions; wave: number; gold: number; lives: number; active: boolean; over: boolean; paused: boolean;
   selected?: SavedUnit; units: SavedUnit[]; stats: RunStats; profile: Profile;
-  commander: Record<CommanderKey, number>; pending: RewardKey[]; checkpoint: RunSave | null;
+  commander: Record<CommanderKey, number>; autoCommander: CommanderKey[]; pending: RewardKey[]; checkpoint: RunSave | null;
   tutorial: number; notice: string; test: boolean;
   faction: Faction;
 }
@@ -23,6 +23,7 @@ export interface OperationsActions {
   select(id: string): void;
   faction(key: Faction): void;
   commander(key: CommanderKey): void;
+  autoCommander(key: CommanderKey): void;
   reward(key: RewardKey): void;
   skin(key: Profile['skin']): void;
   volume(value: number): void;
@@ -94,6 +95,13 @@ export class OperationsCenter {
     for (const el of [this.ribbon, this.dialog]) {
       for (const type of ['pointerdown', 'pointerup', 'pointermove', 'pointercancel', 'mousedown', 'mouseup', 'mousemove', 'touchstart', 'touchmove', 'touchend', 'touchcancel', 'wheel']) el.addEventListener(type, e => e.stopPropagation(), { passive: true });
       el.addEventListener('click', e => { e.stopPropagation(); this.click(e); });
+      // 사령관 스킬 우클릭(터치는 길게 누르기)은 쿨타임마다 자동 사용을 켜고 끈다. 쿨타임 중이라 비활성인 버튼도 좌표로 찾아 받는다.
+      if (el === this.ribbon) el.addEventListener('contextmenu', e => {
+        const me = e as MouseEvent, selector = 'button[data-action="commander"]';
+        const btn = (me.target as HTMLElement).closest<HTMLButtonElement>(selector) ?? document.elementsFromPoint(me.clientX, me.clientY).find(node => node.matches(selector)) as HTMLButtonElement | undefined;
+        e.preventDefault(); e.stopPropagation();
+        if (btn) { this.actions.autoCommander(btn.dataset.key as CommanderKey); this.update(); }
+      });
       if (el === this.dialog) el.addEventListener('keydown', e => { if (!this.open) return; e.stopPropagation(); if ((e as KeyboardEvent).key.toLowerCase() === 'o') { e.preventDefault(); this.close(); } });
     }
     this.dialog.addEventListener('cancel', e => { e.preventDefault(); this.close(); });
@@ -144,9 +152,15 @@ export class OperationsCenter {
     const forecast = !v.active && !v.over && !(tutorial && MOBILE_LAYOUT) ? `<div class="mission-forecast" role="group" aria-label="다음 웨이브 ${next}"><b>W ${String(next).padStart(2, '0')}</b>${this.enemies(next)}</div>` : '';
     const html = `<div class="mission-strip"><div class="mission-toolbar">${factions}<div class="mission-actions" role="group" aria-label="사령관 패널">${button('open', 'tactics', icon('manage'), '작전실 [O]')}${(['strike', 'slow', 'supply'] as CommanderKey[]).map(k => {
       const cooldown = Math.ceil(v.commander[k]);
-      return button('commander', k, `${icon(k)}${cooldown > 0 ? `<span class="mission-cooldown" aria-hidden="true">${cooldown}</span>` : ''}`, COMMANDERS[k].name + (cooldown > 0 ? ` ${cooldown}초` : ''), { disabled: v.over || v.paused || !v.active || cooldown > 0 || v.options.mode === 'budget' && k === 'supply', hint: `${COMMANDERS[k].name} · ${COMMANDERS[k].desc} · 재사용 ${COMMANDERS[k].cooldown}초${cooldown > 0 ? ` · 남은 ${cooldown}초` : ''}` });
+      const auto = v.autoCommander.includes(k), autoText = auto ? ' · 자동 사용 중' : '';
+      return button('commander', k, `${icon(k)}${cooldown > 0 ? `<span class="mission-cooldown" aria-hidden="true">${cooldown}</span>` : ''}`, COMMANDERS[k].name + (cooldown > 0 ? ` ${cooldown}초` : '') + autoText, { disabled: v.over || v.paused || !v.active || cooldown > 0 || v.options.mode === 'budget' && k === 'supply', className: auto ? 'is-auto' : '', hint: `${COMMANDERS[k].name} · ${COMMANDERS[k].desc} · 재사용 ${COMMANDERS[k].cooldown}초${cooldown > 0 ? ` · 남은 ${cooldown}초` : ''}${autoText} · 우클릭(길게 누르기)으로 자동 사용 ${auto ? '끄기' : '켜기'}` });
     }).join('')}</div></div>${forecast}${tutorial}</div>`;
-    if (html !== this.cache) { this.ribbon.innerHTML = html; this.cache = html; }
+    if (html !== this.cache) {
+      this.ribbon.innerHTML = html; this.cache = html;
+      // 쿨타임 숫자가 바뀔 때마다 버튼을 새로 그리므로, 자동 사용 빛의 회전 위상을 시계에 맞춰 끊김 없이 잇는다.
+      const phase = -(performance.now() / 1000 % 2.6);
+      this.ribbon.querySelectorAll<HTMLElement>('.is-auto').forEach(el => el.style.setProperty('--auto-delay', `${phase}s`));
+    }
     this.position();
   }
   /** 게임 좌표 크기 그대로 배치하고 캔버스 배율만큼 줄인다: 데스크톱은 맵 위 전술 띠, 모바일은 사이드 패널 맨 위. */
