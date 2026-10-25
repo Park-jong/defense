@@ -15,17 +15,62 @@ export const classicUnitLayers = {
       <circle cx="43" cy="28" r="2" fill="#83efc9"/>`,
   },
   goliath: {
-    base: `<ellipse cx="31" cy="53" rx="25" ry="8" fill="#000" opacity=".4"/>
-      <path d="m17 29-5 17-6 8 13 6 9-9 3-19m6-3 1 19 8 11 13-7-8-9-3-17" fill="url(#steel)" stroke="#182d35" stroke-width="2"/>
-      <path d="m10 51 10 4m24-2 10-4M16 35l9 3m15-2 9-3" stroke="#c8d5bc" stroke-width="2"/>
-      <path d="m13 40 10 3-4 7-9-4m31-5 10-3 4 7-10 4" fill="#963b3e" stroke="#d8957b"/>`,
-    head: `<path d="M18 12h26l8 12-7 17H20L12 25Z" fill="url(#steel)" stroke="#162a32" stroke-width="2"/>
-      <path d="m24 14 13-2 7 8-5 8H25l-5-7Z" fill="#7c9295" stroke="#d3ded1"/>
-      <path d="m27 18 10-1 2 5-12 2Z" fill="#0d2534"/><path d="M29 20h7" stroke="#73e7e5" stroke-width="2"/>
-      <path d="M9 20h13v21H8Zm34 0h13v21H43Z" fill="#3f535a" stroke="#a9b9b0"/>
-      <path d="M15 26h43v5H15m0 6h43v5H15" fill="url(#gun)" stroke="#172b34"/>
-      <path d="M53 26h8v5h-8m0 6h8v5h-8" fill="#151f27" stroke="#c3caba"/>
-      <path d="m16 13-3-5h10v7m20-2 5-5h7v9" fill="#9d4c42" stroke="#e6c28a"/>`,
+    // Keep the walker together when aiming; a separately rotating torso tears away from its legs.
+    base: `<ellipse cx="30" cy="53" rx="24" ry="7" fill="#000" opacity=".32"/>
+      <ellipse cx="30" cy="53" rx="18" ry="4" fill="#000" opacity=".18"/>`,
+    head: `<defs>
+        <linearGradient id="goliathArmor" x1="0" y1="0" x2=".6" y2="1"><stop stop-color="#d4d5c5"/><stop offset=".3" stop-color="#929e99"/><stop offset=".65" stop-color="#58686b"/><stop offset="1" stop-color="#2a3943"/></linearGradient>
+        <linearGradient id="goliathTrim" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#e2e1cb"/><stop offset=".45" stop-color="#9aaba7"/><stop offset="1" stop-color="#40535a"/></linearGradient>
+        <linearGradient id="goliathRed" x1="0" y1="0" x2=".3" y2="1"><stop stop-color="#ce8172"/><stop offset=".4" stop-color="#9b4943"/><stop offset="1" stop-color="#4e2a30"/></linearGradient>
+      </defs>
+      <g stroke-linejoin="round">
+        <!-- Two articulated legs leave a clear gap beneath the narrow hip block. -->
+        <path d="m22 31 8 3-8 10-1 9-9-1 1-12Z" fill="#26343e" stroke="#111f29" stroke-width="1.3"/>
+        <path d="m23 32 5 3-8 9-4-3Z" fill="url(#goliathArmor)" stroke="#a6b2aa" stroke-width=".6"/>
+        <path d="m15 43 5 1-2 9-4-1Z" fill="url(#goliathTrim)"/>
+        <path d="m14 45 4 1m-5 3 4 1" stroke="#344a54" stroke-width="1.4"/>
+        <path d="m12 50 8 1 5 5-2 3H9L7 56Z" fill="url(#goliathArmor)" stroke="#162631" stroke-width="1.2"/>
+        <path d="m10 54 9 1 3 2H9m3-5 6 1" fill="none" stroke="#c9cebd" stroke-width=".8"/>
+        <path d="m29 32 9-1 6 12-4 12-8-2 2-11-8-5Z" fill="#26343e" stroke="#111f29" stroke-width="1.3"/>
+        <path d="m32 33 5-1 5 10-6 3-6-7Z" fill="url(#goliathArmor)" stroke="#bac2b6" stroke-width=".7"/>
+        <path d="m35 45 6-2-3 11-6-1Z" fill="url(#goliathTrim)" stroke="#152b36" stroke-width=".7"/>
+        <path d="m35 47 4-1m-5 4 4-1" stroke="#344a54" stroke-width="1.4"/>
+        <path d="m32 52 8 1 7 5-2 3H31l-3-4Z" fill="url(#goliathArmor)" stroke="#14242e" stroke-width="1.2"/>
+        <path d="m31 56 8 1 5 2H31m2-5 6 1" fill="none" stroke="#d1d3bf" stroke-width=".8"/>
+        <g fill="url(#goliathRed)" stroke="#24323b" stroke-width=".9"><path d="m13 39 6-2 3 4-4 4-6-2Z"/><path d="m35 39 6-2 4 5-5 5-6-3Z"/></g>
+        <path d="m21 29 12-3 7 7-6 5-12-3Z" fill="#283943" stroke="#13232e"/>
+        <path d="m23 30 9-1 5 4-5 2-8-2Z" fill="url(#goliathTrim)"/>
+        <!-- Far shoulder and its own short cannon sit behind the central cockpit. -->
+        <path d="m30 12 7-4 8 4-1 12-9 3-6-5Z" fill="url(#goliathArmor)" stroke="#172731" stroke-width="1.2"/>
+        <path d="m32 13 5-3 6 3-1 7-9 2Z" fill="url(#goliathRed)" stroke="#d2b6a0" stroke-width=".5"/>
+        <path d="m35 22 8-1 2 5-4 5-8-3Z" fill="url(#goliathArmor)" stroke="#182b36"/>
+        <path d="M40 25.5h8v4h-8Z" fill="url(#gun)" stroke="#182934" stroke-width=".8"/>
+        <path d="M46 25h4v5h-4Z" fill="#2e414a" stroke="#a1aaa3" stroke-width=".7"/>
+        <path d="M49 26v3" stroke="#0c1822" stroke-width="1.6"/>
+        <!-- Broad rear armour frames a compact, forward-facing blue cockpit. -->
+        <path d="m15 16 12-5 11 7 1 13-10 7-14-6-4-9Z" fill="url(#goliathArmor)" stroke="#12232e" stroke-width="1.4"/>
+        <path d="m17 17 10-4 7 5-8 4-12-1Z" fill="#bdc3b5" stroke="#e1deca" stroke-width=".6"/>
+        <path d="m14 23 10 1 5 11-12-5Z" fill="#566970" stroke="#8c9c98" stroke-width=".6"/>
+        <path d="m25 17 9-2 7 6-2 10-9 2-7-9Z" fill="url(#goliathTrim)" stroke="#20333e" stroke-width="1.1"/>
+        <path d="m28 19 6-1 5 4-2 6-7 1-4-6Z" fill="#0b2332" stroke="#506c77" stroke-width=".7"/>
+        <path d="m28 20 6-1 3 3-7 1Z" fill="#6bbac4"/><path d="m30 24 7-1-1 3-5 1Z" fill="#2b667b"/>
+        <path d="m28 29 3 2 6-1" fill="none" stroke="#d2d6c3" stroke-width=".7"/>
+        <path d="m17 25 5 2m-5 1 6 2m-5 1 5 2" stroke="#233945" stroke-width="1.2"/>
+        <!-- Near missile pod has recessed launch tubes, rather than decorative horns. -->
+        <path d="m8 14 8-5 9 4 1 12-9 5-9-5Z" fill="url(#goliathArmor)" stroke="#14252f" stroke-width="1.3"/>
+        <path d="m10 14 6-3 7 3-7 3Z" fill="#d0d1bd"/>
+        <path d="m10 17 7 2 6-3v8l-6 4-7-4Z" fill="url(#goliathRed)" stroke="#653d3b" stroke-width=".7"/>
+        <g fill="#182730" stroke="#b39981" stroke-width=".55"><ellipse cx="13" cy="20" rx="1.2" ry="1.5"/><ellipse cx="17" cy="21" rx="1.2" ry="1.5"/><ellipse cx="13" cy="24" rx="1.2" ry="1.5"/><ellipse cx="17" cy="25" rx="1.2" ry="1.5"/><ellipse cx="36" cy="14" rx="1" ry="1.2"/><ellipse cx="40" cy="14" rx="1" ry="1.2"/><ellipse cx="36" cy="18" rx="1" ry="1.2"/><ellipse cx="40" cy="18" rx="1" ry="1.2"/></g>
+        <circle cx="18" cy="31" r="4" fill="#253943" stroke="#acb6aa" stroke-width=".9"/><circle cx="18" cy="31" r="1.8" fill="#597078"/>
+        <path d="m20 29 9 3 8-1 5 5-4 6-12-1-7-5Z" fill="url(#goliathArmor)" stroke="#162b36" stroke-width="1.2"/>
+        <path d="m23 31 6 3 8-1 3 3-13 1-5-3Z" fill="#abb7af"/>
+        <path d="m26 38 10-1 2 3-11-1Z" fill="url(#goliathRed)"/>
+        <path d="M38 34.5h10v4H38Z" fill="url(#gun)" stroke="#192a35" stroke-width=".8"/>
+        <path d="M46 34h4v5h-4Z" fill="#31454e" stroke="#b7bcae" stroke-width=".7"/>
+        <path d="M49 35v3" stroke="#0b1821" stroke-width="1.6"/>
+        <path d="M40 35.5h5M40 26.5h5" stroke="#cbd1bf" stroke-width=".6"/>
+        <g fill="#d2d1b8"><circle cx="10" cy="15" r=".65"/><circle cx="23" cy="15" r=".65"/><circle cx="24" cy="33" r=".7"/><circle cx="36" cy="35" r=".7"/></g>
+      </g>`,
   },
   zealot: {
     base: `<ellipse cx="30" cy="54" rx="23" ry="7" fill="#000" opacity=".4"/>
