@@ -21,6 +21,7 @@ import { CombatEffects } from './combatEffects';
 import { hasWeaponEffects } from './data/weaponEffects';
 import { OperationsCenter, OperationsView } from './operations';
 import { COMMAND_ACTIVE_CURSOR, COMMAND_CURSOR } from './cursors';
+import { OBSERVATION_BONUSES, OBSERVATION_DURATION, Observation, observationCount, supportTraits, VESSEL_AURA, vesselAuraBonus, vesselAuraMultiplier, VESSEL_EMP, weaknessBonus } from './support';
 
 interface Tower {
   id: string;
@@ -39,6 +40,7 @@ interface Enemy {
   slow: number; slowT: number; reward: number; r: number; dead?: boolean;
   stunT: number; burnT: number; burnDps: number; vulnerableT: number;
   route?: readonly Point[]; shield?: number; pulse?: number; age?: number; hasteT?: number; spawned?: boolean; burnSource?: string;
+  observations?: Observation[];
 }
 
 interface TowerStats { dmg: number; range: number; rate: number; splash: number; slow: number }
@@ -51,6 +53,7 @@ interface Projectile {
 interface Cell { c: number; r: number }
 interface SkillField { x: number; y: number; radius: number; left: number; tick: number; dmg: number; color: number; source?: string }
 const DRAGOON_CHARGE_TIME = .18;
+const OBSERVER_INFO_BONUSES = OBSERVATION_BONUSES.map(bonus => Math.round(bonus * 100) + '%').join(' → +');
 /** 이 depth 이상은 UI로 보고 uiCam만, 미만은 맵으로 보고 mapCam만 그린다. */
 const UI_DEPTH = 25;
 const MAX_MAP_ZOOM = 2.5;
@@ -682,7 +685,9 @@ export class GameScene extends Phaser.Scene {
         title = `벙커  ${crew.length}/${BUNKER_CAPACITY} 주둔`;
         msg = `보병 최대 4기 · 사거리 +${BUNKER_RANGE_BONUS}${terrainHint}\n` + (crew.length ? crew.map(p => `${TOWER_DEFS[p.k].name} Lv.${p.lvl} · 스킬 ${p.skills.length}/2`).join('\n') : '현재 주둔 병력 없음\n빈 벙커는 공격하지 않습니다.\n명령 아이콘으로 탑승·구매');
       } else if (k === 'support' || k === 'observer') {
-        msg = `지원 사거리 ${st.range.toFixed(0)}${terrainHint}\n` + (k === 'support' ? `주변 공격 속도 +${20 + ((t?.lvl ?? 1) - 1) * 5}%\n같은 지원 효과는 중첩되지 않습니다.` : '적 하나의 약점을 3초 노출\n받는 피해 +35%') + '\n강화·특화로 지원 성능 개선';
+        msg = `지원 사거리 ${st.range.toFixed(0)}${terrainHint}\n` + (k === 'support'
+          ? `공속 +${Math.round(vesselAuraBonus(t?.lvl ?? 1) * 100)}% · 2대 중첩(추가 ${VESSEL_AURA.secondary * 100}%)\nEMP · ${VESSEL_EMP.cooldown}초마다 보호막 ${VESSEL_EMP.shieldFraction * 100}% 제거\n표적 주변 반경 ${VESSEL_EMP.radius} · 자동 사용`
+          : `미표식 우선 · 관측 ${OBSERVATION_DURATION}초\n받는 피해 +${OBSERVER_INFO_BONUSES}\n기체별 중첩 · 반복 관측은 갱신`);
       } else {
         msg = `공격 ${st.dmg.toFixed(0)}${attackCount(k) > 1 ? ` × ${attackCount(k)}` : ''} · 사거리 ${st.range.toFixed(0)}${terrainHint}\n공격 속도 ${(1 / st.rate).toFixed(1)}/초\n자동 스킬 ${t?.skills.length ?? 0}/${SKILL_SLOTS}`;
         msg += t?.skills.length ? '\n' + t.skills.map(s => `${SKILL_DEFS[s.key].name} ${s.cd > 0 ? Math.ceil(s.cd) + '초' : '준비'}`).join('\n') : '\n명령 아이콘으로 스킬 장착';
@@ -760,6 +765,12 @@ export class GameScene extends Phaser.Scene {
           () => this.equipSkill(key, t.id), !owned && t.skills.length < SKILL_SLOTS && this.gold >= def.cost, owned ? undefined : def.cost),
           hotkey: this.kb(i === 0 ? 'Z' : 'X'), active: !!owned, badge: owned ? owned.cd > 0 ? Math.ceil(owned.cd) + 's' : 'AUTO' : '',
           progress: owned ? 1 - owned.cd / def.cooldown : undefined };
+      });
+      supportTraits(t.k, t.lvl).forEach((trait, i) => {
+        const emp = trait.icon === 'emp', cooldown = emp ? t.cd : 0;
+        cells[1 + i] = { ...make('passive:' + trait.icon + ':' + t.id, trait.name, 'cmd_' + trait.icon,
+          '기본 능력 · 자동 적용\n' + trait.text, () => {}, false), active: true,
+          badge: cooldown > 0 ? Math.ceil(cooldown) + 's' : 'AUTO', progress: emp ? 1 - cooldown / VESSEL_EMP.cooldown : undefined };
       });
       cells[3] = make('sell:' + t.id, '유닛 회수', 'cmd_sell', `투자한 미네랄의 70%인 ${this.sellValue(t)}을 돌려받습니다.`,
         () => { if (this.selected?.id === t.id) this.sell(); });
@@ -906,7 +917,8 @@ export class GameScene extends Phaser.Scene {
     const l = t.lvl - 1, base = levelStats(t.k, t.lvl);
     let aura = 1;
     if (t.x !== undefined && t.y !== undefined) {
-      for (const ally of this.towers) if (ally.id !== t.id && ally.k === 'support' && Math.hypot(ally.x - t.x, ally.y - t.y) <= this.supportRange(ally)) aura = Math.max(aura, 1.2 + (ally.lvl - 1) * .05);
+      aura = vesselAuraMultiplier(this.towers.filter(ally => ally.id !== t.id && ally.k === 'support'
+        && Math.hypot(ally.x - t.x!, ally.y - t.y!) <= this.supportRange(ally)).map(ally => ally.lvl));
     }
     const haste = (t.buffs ?? []).reduce((v, b) => v * b.haste, 1) * aura * (1 + this.bonuses.haste) * (t.branch === 'rapid' ? 1.4 : 1);
     const power = (t.buffs ?? []).reduce((v, b) => v * b.power, 1);
@@ -1140,6 +1152,10 @@ export class GameScene extends Phaser.Scene {
       if (e.dead) continue;
       this.enemyAct(e, dt);
       e.vulnerableT = Math.max(0, e.vulnerableT - dt);
+      if (e.observations) {
+        for (const mark of e.observations) mark.left = Math.max(0, mark.left - dt);
+        e.observations = e.observations.filter(mark => mark.left > 0);
+      }
       if (e.burnT > 0) {
         this.damageEnemy(e, e.burnDps * Math.min(dt, e.burnT), 'burn', e.burnSource);
         e.burnT = Math.max(0, e.burnT - dt);
@@ -1161,7 +1177,7 @@ export class GameScene extends Phaser.Scene {
       if (e.seg < route.length) e.sprite.setRotation(Math.atan2(route[e.seg].y - e.y, route[e.seg].x - e.x));
       if (stunned) e.sprite.setTint(0xb7f5ff);
       else if (e.burnT > 0) e.sprite.setTint(0xffab69);
-      else if (e.vulnerableT > 0) e.sprite.setTint(0xb8a0ff);
+      else if (weaknessBonus(e) > 0) e.sprite.setTint(0xb8a0ff);
       else if (e.slow < 1) e.sprite.setTint(0x81d4fa); else if (accelerated) e.sprite.setTint(0xffb76f); else e.sprite.clearTint();
       if (e.seg >= route.length) {
         e.dead = true; e.sprite.destroy();
@@ -1247,11 +1263,25 @@ export class GameScene extends Phaser.Scene {
   }
 
   private towerAct(t: Tower, dt: number): void {
-    if (t.k === 'bunker' || t.k === 'support') return;
+    if (t.k === 'bunker') return;
     for (const buff of t.buffs) buff.left -= dt;
     t.buffs = t.buffs.filter(b => b.left > 0);
     for (const skill of t.skills) skill.cd = Math.max(0, skill.cd - dt);
     t.cd = Math.max(0, t.cd - dt);
+    if (t.k === 'support') {
+      if (t.cd > 0) return;
+      const target = this.findTarget(t, e => (e.shield ?? 0) > 0);
+      if (!target) return;
+      for (const e of this.enemies) {
+        if (e.dead || (e.shield ?? 0) <= 0 || Math.hypot(e.x - target.x, e.y - target.y) > VESSEL_EMP.radius) continue;
+        e.shield = (e.shield ?? 0) * (1 - VESSEL_EMP.shieldFraction);
+      }
+      t.cd = VESSEL_EMP.cooldown;
+      this.skillBeam(t, target, 0x81ceeb, 3);
+      this.skillRing(target.x, target.y, VESSEL_EMP.radius, 0x81ceeb);
+      this.audio.play('skill');
+      return;
+    }
     if (t.charge) {
       t.charge.left = Math.max(0, t.charge.left - dt);
       if (t.charge.left > 0) return;
@@ -1264,7 +1294,14 @@ export class GameScene extends Phaser.Scene {
     let best = this.findTarget(t);
     if (!best) return;
     if (t.k === 'observer') {
-      if (t.cd <= 0) { best.vulnerableT = Math.max(best.vulnerableT, 3); t.cd = this.stats(t).rate; this.skillBeam(t, best, 0xc4a1ff); }
+      if (t.cd <= 0) {
+        best.observations ??= [];
+        const own = best.observations.find(mark => mark.source === t.id);
+        if (own) own.left = OBSERVATION_DURATION;
+        else best.observations.push({ source: t.id, left: OBSERVATION_DURATION });
+        t.cd = this.stats(t).rate;
+        this.skillBeam(t, best, 0xc4a1ff);
+      }
       return;
     }
     for (const skill of t.skills) {
@@ -1352,23 +1389,29 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private findTarget(t: Tower): Enemy | null {
+  private findTarget(t: Tower, eligible: (enemy: Enemy) => boolean = () => true): Enemy | null {
     const range = this.stats(t).range;
-    let best: Enemy | null = null, bp = -Infinity;
+    let best: Enemy | null = null, bp = -Infinity, bestObservationRank = Infinity;
     for (const e of this.enemies) {
-      if (e.dead || Math.hypot(e.x - t.x, e.y - t.y) > range) continue;
+      if (e.dead || Math.hypot(e.x - t.x, e.y - t.y) > range || !eligible(e)) continue;
       const route = e.route ?? this.map.waypoints, nx = route[Math.min(e.seg, route.length - 1)];
       let remaining = Math.hypot(nx.x - e.x, nx.y - e.y);
       for (let i = e.seg; i < route.length - 1; i++) remaining += Math.hypot(route[i + 1].x - route[i].x, route[i + 1].y - route[i].y);
       const p = t.target === 'strong' ? e.hp : t.target === 'weak' ? -e.hp : t.target === 'boss' ? (e.type === 'boss' ? 1e9 : 0) - remaining : -remaining;
-      if (p > bp) { bp = p; best = e; }
+      // Spread first, then add a distinct observer's analysis before refreshing our own.
+      const rank = t.k !== 'observer' ? 0 : weaknessBonus(e) === 0 ? -1
+        : (e.observations?.some(mark => mark.source === t.id && mark.left > 0) ? OBSERVATION_BONUSES.length + 1 : 0)
+          + Math.min(observationCount(e), OBSERVATION_BONUSES.length);
+      if (rank < bestObservationRank || rank === bestObservationRank && p > bp) {
+        bestObservationRank = rank; bp = p; best = e;
+      }
     }
     return best;
   }
 
   private damageEnemy(e: Enemy, dmg: number, kind: DamageKind = 'normal', source?: string): void {
     if (e.dead || !Number.isFinite(dmg) || dmg <= 0) return;
-    const amount = dmg * (e.vulnerableT > 0 ? 1.35 : 1);
+    const amount = dmg * (1 + weaknessBonus(e));
     const absorbed = Math.min(e.shield ?? 0, amount);
     e.shield = Math.max(0, (e.shield ?? 0) - absorbed);
     const dealt = Math.min(e.hp, amount - absorbed);
@@ -1660,6 +1703,8 @@ export class GameScene extends Phaser.Scene {
         g.fillStyle(0x81b8ff).fillRect(x, y - 4, w * Math.min(1, (e.shield ?? 0) / (e.max * .18)), 2);
         g.lineStyle(1, 0x81b8ff, .65).strokeCircle(e.x, e.y, e.r + 3);
       }
+      const observations = Math.min(observationCount(e), OBSERVATION_BONUSES.length);
+      for (let i = 0; i < observations; i++) g.fillStyle(0xc4a1ff, .95).fillCircle(e.x + (i - (observations - 1) / 2) * 5, y - 8, 1.6);
       if (e.type === 'medic') { g.lineStyle(2, 0xc1ffe1).lineBetween(e.x - 4, e.y, e.x + 4, e.y).lineBetween(e.x, e.y - 4, e.x, e.y + 4); }
       if (e.type === 'splitter') g.lineStyle(1.5, 0xffe4a1).strokeTriangle(e.x - 6, e.y + 5, e.x, e.y - 6, e.x + 6, e.y + 5);
       if (e.stunT > 0) g.lineStyle(1, 0xb4f4ff, .8).strokeCircle(e.x, e.y, e.r + 4);

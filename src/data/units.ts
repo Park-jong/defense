@@ -1,3 +1,5 @@
+import { SUPPORT_DESCRIPTIONS } from '../support';
+
 export interface TowerDef {
   name: string; cost: number; range: number; dmg: number; rate: number;
   color: number; proj: number; barrel: number; desc: string;
@@ -20,8 +22,8 @@ export const TOWER_DEFS = {
   templar: { name: '아칸', faction: 'protoss', role: '에너지 / 범위 공격', cost: 190, range: 160, dmg: 22, rate: 1.2, color: 0x54bdff, proj: 0x9cefff, barrel: 12, splash: 48, desc: '푸른 에너지에 둘러싸인 사이오닉 전사. 플라즈마를 방출해 반경 48의 적을 함께 타격합니다.' },
   cruiser: { name: '배틀크루저', faction: 'terran', role: '중화력 / 범위', cost: 300, range: 230, dmg: 72, rate: .8, splash: 55, color: 0xa2b4c2, proj: 0xff8a76, barrel: 24, desc: '장거리 레이저 포격으로 밀집한 적을 제압하는 전투순양함. 야마토 포는 보스를 우선 공격하며, 융단 폭격으로 전선을 정리합니다.' },
   bunker: { name: '벙커', faction: 'terran', role: '주둔 / 보병 4기', cost: 40, range: 0, dmg: 0, rate: 1, color: 0x8f9d76, proj: 0xffe8a3, barrel: 0, desc: '빈 벙커는 공격하지 않습니다. 마린·파이어뱃 최대 4기 탑승, 각 병력의 사거리 +24. 스킬도 자동 사용합니다.' },
-  support: { name: '사이언스 베슬', faction: 'terran', role: '과학선 / 전술 지원', cost: 160, range: 145, dmg: 0, rate: 1, color: 0x81cead, proj: 0x81cead, barrel: 0, desc: '테란 과학선. 범위 내 다른 병력의 공격 속도를 20% 높입니다. 강화당 추가 5%. 같은 지원 효과는 중첩되지 않습니다.' },
-  observer: { name: '옵저버', faction: 'protoss', role: '정찰선 / 약점 노출', cost: 175, range: 170, dmg: 0, rate: 1.4, color: 0xc4a1ff, proj: 0xc4a1ff, barrel: 0, desc: '프로토스 정찰선. 사거리 내 적 하나의 약점을 3초간 노출해 받는 피해를 35% 높입니다. 직접 공격하지 않습니다.' },
+  support: { name: '사이언스 베슬', faction: 'terran', role: '과학선 / 전술 지원', cost: 160, range: 145, dmg: 0, rate: 1, color: 0x81cead, proj: 0x81cead, barrel: 0, desc: SUPPORT_DESCRIPTIONS.support },
+  observer: { name: '옵저버', faction: 'protoss', role: '정찰선 / 약점 노출', cost: 175, range: 170, dmg: 0, rate: 1.4, color: 0xc4a1ff, proj: 0xc4a1ff, barrel: 0, desc: SUPPORT_DESCRIPTIONS.observer },
   ghost: { name: '고스트', faction: 'terran', role: '저격 / 락다운', cost: 140, range: 240, dmg: 42, rate: 1.2, color: 0x91b4bd, proj: 0xd8f3e9, barrel: 28, desc: '장거리 C-10 저격 소총을 사용하는 특수 요원. 락다운으로 적의 진격을 저지합니다.' },
   goliath: { name: '골리앗', faction: 'terran', role: '보행 병기 / 쌍열 기관포', cost: 145, range: 170, dmg: 28, rate: .65, color: 0xa1b3a1, proj: 0xffd18b, barrel: 24, desc: '두 팔의 기관포를 동시에 발사하는 보행 병기. 헬파이어 미사일로 밀집한 적을 타격합니다.' },
   zealot: { name: '질럿', faction: 'protoss', role: '근접 / 사이오닉 검', cost: 80, range: 78, dmg: 26, rate: .6, color: 0xe4bc67, proj: 0x8deaff, barrel: 12, desc: '양팔의 사이오닉 검으로 가까운 적을 즉시 베는 전사. 짧은 사거리에서 빠르고 강하게 공격합니다.' },

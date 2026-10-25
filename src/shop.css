@@ -254,5 +254,6 @@
   .supply-shop .army-actions .garrison-action { min-height:62px; }
   .army-actions .garrison-action>span { font-size:9px; line-height:1.2; white-space:normal; }
   .army-skill-notes { display:none; }
+  .army-support-notes { display:grid; grid-column:1 / -1; }
   .army-empty,.army-pointer { padding:10px; gap:6px; }
 }

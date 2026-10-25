@@ -4,6 +4,7 @@ import { unitImageUrl } from './unitArt';
 import { commandIconUrl } from './commandIcons';
 import { ACHIEVEMENTS, bossPattern, BRANCHES, COMMANDERS, CommanderKey, DIFFICULTIES, ENEMY_INFO, MODES, Profile, REWARDS, RewardKey, RunOptions, RunSave, RunStats, SavedUnit, TARGETS, TargetMode, wavePlan } from './campaign';
 import { adoptTitles, bindTips, createTip, placeTip, textTip } from './gameTip';
+import { supportTraits } from './support';
 import './operations.css';
 
 export interface OperationsView {
@@ -54,7 +55,7 @@ const compareHead = [
 /** 비교표 설명 창과 도감 카드가 함께 쓰는 병력 특성 요약. */
 function unitTraits(k: TowerKey): string[] {
   const d = TOWER_DEFS[k] as (typeof TOWER_DEFS)[TowerKey] & { splash?: number; slow?: number };
-  return [k === 'support' ? '주변 공격 속도 +20% · 레벨당 +5%' : '', k === 'observer' ? '약점 노출 · 받는 피해 +35%' : '',
+  return [...supportTraits(k).map(trait => `${trait.name} · ${trait.text}`),
     attackCount(k) > 1 ? `인터셉터 ${attackCount(k)}기 × 공격력 ${d.dmg} · 처치 후 표적 재탐색` : '',
     d.splash ? `범위 피해 · 반경 ${d.splash}` : '', d.slow ? `둔화 ${Math.round(d.slow * 100)}%` : ''].filter(Boolean);
 }
@@ -311,7 +312,7 @@ export class OperationsCenter {
     const compare = (faction: Faction): string => {
       const rows = FACTION_TOWERS[faction].filter(k => k !== 'bunker').map(k => {
         const d = TOWER_DEFS[k], support = k === 'support' || k === 'observer', damage = attackDamage(k), dps = damage / d.rate;
-        const effect = k === 'support' ? '주변 공격 속도 +20% (레벨당 +5%)' : k === 'observer' ? '적 약점 노출 · 받는 피해 +35%' : '';
+        const effect = supportTraits(k).map(trait => `${trait.name} · ${trait.text}`).join(' · ');
         const cells = support ? ['—', d.range, '—', '—', '—'] : [damage, d.range, (1 / d.rate).toFixed(2), dps.toFixed(1), (dps / d.cost * 100).toFixed(1)];
         return `<tr data-tip="unit:${k}" tabindex="0" aria-label="${escape(`${d.name} · ${d.role}${effect ? ' · ' + effect : ''}`)}"><th scope="row"><span class="ops-compare-unit">${this.art(k)}<b>${d.name}</b></span></th><td>${d.cost}</td>${cells.map(c => `<td>${c}</td>`).join('')}<td class="ops-compare-skills">${SKILL_KEYS.filter(s => SKILL_DEFS[s].unit === k).map(s => `<img src="${commandIconUrl(s)}" width="24" height="24" alt="${escape(SKILL_DEFS[s].name)}" data-tip="skill:${s}">`).join('')}</td></tr>`;
       }).join('');

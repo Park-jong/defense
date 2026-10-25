@@ -6,6 +6,7 @@ import { BUNKER_CAPACITY, BUNKER_INFANTRY, InfantryKey, isInfantry } from './bun
 import { MAX_UNIT_LEVEL, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
 import { RunOptions } from './campaign';
 import { adoptTitles, bindTips, createTip, placeTip, textTip } from './gameTip';
+import { OBSERVATION_BONUSES, supportTraits, vesselAuraBonus } from './support';
 import './shop.css';
 
 /** 설명 창 없이 보이는 글자·아이콘만으로 충분한 상점 요소. */
@@ -169,7 +170,7 @@ export class SupplyShop {
       return `<div class="army-stat" title="${label}" aria-label="${label} ${text(now)}${changed ? ` → ${text(then)}` : ''}">${icon(art)}<b>${text(now)}</b>${changed ? `<i>→ ${text(then)}</i>` : ''}<small>${label}</small></div>`;
     };
     const stats = support
-      ? stat('range', '지원 반경', cur.range, next.range) + (u.k === 'support' ? stat('overdrive', '주변 공속 +%', 20 + (u.lvl - 1) * 5, 20 + u.lvl * 5) : stat('weak', '받는 피해 +%', 35, 35))
+      ? stat('range', '지원 반경', cur.range, next.range) + (u.k === 'support' ? stat('overdrive', '주변 공속 +%', vesselAuraBonus(u.lvl) * 100, vesselAuraBonus(u.lvl + 1) * 100) : stat('weak', '받는 피해 +%', OBSERVATION_BONUSES[0] * 100, OBSERVATION_BONUSES[0] * 100))
       : stat('siege', '공격력', attackDamage(u.k, cur.dmg), attackDamage(u.k, next.dmg)) + stat('range', '사거리', cur.range, next.range) + stat('overdrive', '초당 공격', 1 / cur.rate, 1 / next.rate, 2) + stat('barrage', 'DPS', attackDamage(u.k, cur.dmg) / cur.rate, attackDamage(u.k, next.dmg) / next.rate, 1);
     const skills = SKILL_KEYS.filter(key => SKILL_DEFS[key].unit === u.k);
     return `<section class="army-detail" aria-label="${d.name} 상세">
@@ -183,6 +184,7 @@ export class SupplyShop {
         return this.garrisonButton('equip-unit', key, sk.name, commandIconUrl(key), { unit: u.id, active: owned, disabled: owned || full || state.gold < sk.cost,
           meta: owned ? '자동 사용' : full ? '슬롯 가득' : `◆ ${sk.cost}`, detail: `${sk.desc} · 재사용 ${sk.cooldown}초${owned ? ' · 장착 완료' : full ? ' · 슬롯 가득 참' : state.gold < sk.cost ? ' · 미네랄 부족' : ''}` });
       }).join('')}</div>
+      ${support ? `<ul class="army-skill-notes army-support-notes">${supportTraits(u.k, u.lvl).map(trait => `<li><img src="${commandIconUrl(trait.icon)}" alt="" width="18" height="18"><span><b>${trait.name}</b> ${trait.text}</span></li>`).join('')}</ul>` : ''}
       ${skills.length ? `<ul class="army-skill-notes">${skills.map(key => `<li><img src="${commandIconUrl(key)}" alt="" width="18" height="18"><span><b>${SKILL_DEFS[key].name}</b> ${SKILL_DEFS[key].desc} · ↻ ${SKILL_DEFS[key].cooldown}초</span></li>`).join('')}</ul>` : ''}</section>`;
   }
 

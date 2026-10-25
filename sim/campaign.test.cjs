@@ -190,18 +190,141 @@ test('분열체는 처치된 위치와 진행 구간에서 보상 없는 질주�
   assert.equal(s.gold, gold + e.reward); assert.equal(s.runStats.kills, 3);
 });
 
-test('지원기 공속 오라는 같은 효과를 중첩하지 않고 강화한 지원기를 우선한다', () => {
+test('베슬 공속은 가장 강한 2대의 효과만 100%·40%로 더하고 배치 순서와 무관하다', () => {
   const s = setup(), m = place(s, 'marine'), base = s.stats(m).rate;
   place(s, 'support', 7); assert.ok(Math.abs(s.stats(m).rate - base / 1.2) < 1e-9);
-  const support = place(s, 'support', 8); assert.ok(Math.abs(s.stats(m).rate - base / 1.2) < 1e-9);
-  support.lvl = 3; assert.ok(Math.abs(s.stats(m).rate - base / 1.3) < 1e-9);
+  const support = place(s, 'support', 8); assert.ok(Math.abs(s.stats(m).rate - base / 1.28) < 1e-9);
+  support.lvl = 3; assert.ok(Math.abs(s.stats(m).rate - base / 1.38) < 1e-9);
+  const third = place(s, 'support', 5); third.lvl = 5;
+  assert.ok(Math.abs(s.stats(m).rate - base / 1.52) < 1e-9);
+  s.towers.reverse(); assert.ok(Math.abs(s.stats(m).rate - base / 1.52) < 1e-9);
+  third.x = m.x + s.supportRange(third) + 1;
+  assert.ok(Math.abs(s.stats(m).rate - base / 1.38) < 1e-9);
   assert.equal(s.runStats.damage, 0);
+});
+
+test('베슬 중첩은 사거리 경계·벙커 승객·회수에 즉시 반응하고 자기 자신을 세지 않는다', () => {
+  const s = setup(), bunker = place(s, 'bunker'), a = place(s, 'support', 7), b = place(s, 'support', 8);
+  s.recruit(bunker.id, 0, 'marine'); const marine = bunker.passengers[0], base = config.TOWER_DEFS.marine.rate;
+  assert.ok(Math.abs(s.stats(marine).rate - base / 1.28) < 1e-9);
+  assert.ok(Math.abs(s.stats(a).rate - config.TOWER_DEFS.support.rate / 1.2) < 1e-9);
+  b.x = marine.x + s.supportRange(b); b.y = marine.y;
+  assert.ok(Math.abs(s.stats(marine).rate - base / 1.28) < 1e-9);
+  b.x++;
+  assert.ok(Math.abs(s.stats(marine).rate - base / 1.2) < 1e-9);
+  s.selected = a; s.sell(); assert.equal(s.stats(marine).rate, base);
+});
+
+test('베슬 EMP는 표적 주변 반경 64의 보호막만 절반 제거하고 체력·전과·투사체를 만들지 않는다', () => {
+  const s = setup(), vessel = place(s, 'support'); vessel.target = 'strong';
+  const center = spawn(s, 'tank', vessel.x + 70, vessel.y), edge = spawn(s, 'tank', vessel.x + 134, vessel.y);
+  const outside = spawn(s, 'tank', vessel.x + 135, vessel.y), bare = spawn(s, 'grunt', center.x, center.y);
+  const dead = spawn(s, 'tank', center.x, center.y); dead.dead = true;
+  center.hp = center.max = 10000;
+  center.shield = 100; edge.shield = 60; outside.shield = 40; dead.shield = 80;
+  const hp = s.enemies.map(e => e.hp);
+  s.towerAct(vessel, .01);
+  assert.deepEqual(s.enemies.map(e => e.shield), [50, 30, 40, 0, 80]);
+  assert.deepEqual(s.enemies.map(e => e.hp), hp); assert.equal(bare.dead, undefined);
+  assert.equal(vessel.cd, 8); assert.equal(s.projs.length, 0);
+  assert.equal(s.runStats.damage, 0); assert.equal(s.runStats.kills, 0); assert.equal(s.runStats.units[0].damage, 0);
+  s.towerAct(vessel, 7.9); assert.equal(center.shield, 50);
+  s.towerAct(vessel, .11); assert.equal(center.shield, 25); assert.equal(vessel.cd, 8);
+});
+
+test('EMP는 사거리 밖·무보호막·죽은 표적에 낭비하지 않고 베슬별 재사용 시간을 따로 지킨다', () => {
+  const s = setup(), a = place(s, 'support'), b = place(s, 'support', 7);
+  const target = spawn(s, 'tank', a.x + s.supportRange(a) + 1, a.y); target.shield = 100;
+  s.towerAct(a, 1); assert.equal(a.cd, 0); assert.equal(target.shield, 100);
+  target.x = a.x + s.supportRange(a); target.shield = 0;
+  s.towerAct(a, 1); assert.equal(a.cd, 0);
+  target.shield = 100; target.dead = true;
+  s.towerAct(a, 1); assert.equal(a.cd, 0);
+  target.dead = false;
+  s.towerAct(a, .01); assert.equal(target.shield, 50);
+  s.towerAct(b, .01); assert.equal(target.shield, 25);
+  s.towerAct(a, .01); s.towerAct(b, .01); assert.equal(target.shield, 25);
 });
 
 test('옵저버는 직접 피해 없이 취약을 부여하며 재사용 대기시간을 지킨다', () => {
   const s = setup(), o = place(s, 'observer'), e = spawn(s, 'tank', o.x, o.y + 30);
-  s.towerAct(o, .01); assert.equal(e.vulnerableT, 3); assert.equal(s.projs.length, 0);
-  e.vulnerableT = 0; s.towerAct(o, .01); assert.equal(e.vulnerableT, 0);
+  const hp = e.hp;
+  s.towerAct(o, .01); assert.deepEqual(e.observations, [{ source: o.id, left: 3 }]); assert.equal(s.projs.length, 0);
+  e.observations = []; s.towerAct(o, .01); assert.deepEqual(e.observations, []);
+  assert.equal(e.hp, hp); assert.equal(s.runStats.damage, 0);
+});
+
+test('옵저버는 미표식 적을 먼저 나누어 관측하고 같은 조건에서는 지정한 표적 순서를 지킨다', () => {
+  const s = setup(), a = place(s, 'observer'), b = place(s, 'observer', 7), c = place(s, 'observer', 8);
+  for (const o of [a, b, c]) o.target = 'boss';
+  const boss = spawn(s, 'boss', a.x + 40, a.y), grunt = spawn(s, 'grunt', a.x + 50, a.y);
+  const outside = spawn(s, 'grunt', 2000, a.y), dead = spawn(s, 'grunt', a.x, a.y); dead.dead = true;
+  s.towerAct(a, .01); assert.equal(boss.observations[0].source, a.id);
+  assert.equal(s.findTarget(b), grunt); s.towerAct(b, .01);
+  assert.equal(grunt.observations[0].source, b.id);
+  assert.equal(s.findTarget(c), boss); s.towerAct(c, .01);
+  assert.equal(boss.observations.length, 2);
+  assert.equal(outside.observations, undefined); assert.equal(dead.observations, undefined);
+  assert.equal(s.findTarget(a), grunt, 'adds its own analysis before refreshing an existing mark');
+});
+
+test('같은 적의 관측은 서로 다른 옵저버로만 35%·45%·50%까지 쌓이고 반복 관측은 자기 시간만 갱신한다', () => {
+  const s = setup(), observers = [6, 7, 8, 9].map(c => place(s, 'observer', c));
+  const e = spawn(s, 'tank', observers[0].x + 40, observers[0].y); e.hp = e.max = 10000;
+  for (let i = 0; i < observers.length; i++) {
+    s.towerAct(observers[i], .01); const hp = e.hp; s.damageEnemy(e, 100);
+    assert.ok(Math.abs(hp - e.hp - [135, 145, 150, 150][i]) < 1e-9);
+  }
+  assert.equal(e.observations.length, 4);
+  for (const mark of e.observations) mark.left = 1;
+  observers[0].cd = 0; s.towerAct(observers[0], .01);
+  assert.deepEqual(e.observations.map(mark => mark.left), [3, 1, 1, 1]);
+  assert.equal(e.observations.length, 4);
+  const hp = e.hp; s.damageEnemy(e, 100); assert.equal(hp - e.hp, 150);
+});
+
+test('옵저버별 3초 관측은 따로 만료되어 피해 배율이 50%·45%·35%·0%로 내려간다', () => {
+  const s = setup(), observers = [6, 7, 8].map(c => place(s, 'observer', c));
+  const e = spawn(s, 'tank', observers[0].x + 40, observers[0].y); e.hp = e.max = 10000; e.speed = 0;
+  for (const o of observers) o.cd = 999;
+  for (const o of observers) {
+    o.cd = 0; s.towerAct(o, 0); o.cd = 999;
+    if (o !== observers.at(-1)) s.step(1);
+  }
+  for (const [index, damage] of [150, 145, 135, 100].entries()) {
+    if (index) s.step(index === 1 ? 1.01 : 1);
+    const hp = e.hp; s.damageEnemy(e, 100);
+    assert.ok(Math.abs(hp - e.hp - damage) < 1e-9);
+  }
+  assert.deepEqual(e.observations, []);
+});
+
+test('드라군의 5초 취약과 옵저버 관측은 배율을 곱하지 않고 각 지속 시간을 유지한다', () => {
+  const s = setup(), a = place(s, 'observer'), b = place(s, 'observer', 7);
+  const e = spawn(s, 'tank', a.x + 40, a.y); e.hp = e.max = 10000; e.speed = 0; e.vulnerableT = 5;
+  for (const o of [a, b]) { s.towerAct(o, 0); o.cd = 999; }
+  let hp = e.hp; s.damageEnemy(e, 100); assert.ok(Math.abs(hp - e.hp - 145) < 1e-9);
+  s.step(3.01); assert.ok(e.vulnerableT > 0); assert.deepEqual(e.observations, []);
+  hp = e.hp; s.damageEnemy(e, 100); assert.ok(Math.abs(hp - e.hp - 135) < 1e-9);
+  s.step(2); hp = e.hp; s.damageEnemy(e, 100); assert.equal(hp - e.hp, 100);
+});
+
+test('기본 지원 능력은 비용·스킬 슬롯 없이 자동 표시하고 EMP 재사용 시간은 저장·복원된다', () => {
+  const s = setup(), vessel = place(s, 'support'), observer = place(s, 'observer', 7);
+  const e = spawn(s, 'tank', vessel.x + 40, vessel.y); e.shield = 100;
+  s.towerAct(vessel, 0); s.selected = vessel;
+  const commands = s.commands(), gold = s.gold;
+  assert.equal(commands[1].title, '화력 지원'); assert.equal(commands[2].texture, 'cmd_emp');
+  assert.equal(commands[2].enabled, false); assert.equal(commands[2].active, true); assert.equal(commands[2].badge, '8s');
+  commands[2].run(); assert.equal(s.gold, gold); assert.equal(vessel.skills.length, 0);
+  s.selected = observer; assert.equal(s.commands()[1].title, '약점 분석'); assert.equal(s.commands()[2].title, '분산 관측');
+  const save = checkpoint(); save.units = s.savedUnits(); save.stats = s.runStats; save.usedKinds = s.usedKinds;
+  assert.equal(rules.validateSave(save), true);
+  const restored = setup(); restored.restoreCheckpoint(save);
+  const restoredVessel = restored.towers.find(t => t.k === 'support'); assert.equal(restoredVessel.cd, 8);
+  const target = spawn(restored, 'tank', restoredVessel.x + 40, restoredVessel.y); target.shield = 100;
+  restored.towerAct(restoredVessel, 7.9); assert.equal(target.shield, 100);
+  restored.towerAct(restoredVessel, .11); assert.equal(target.shield, 50);
 });
 
 test('Lv.3 특화는 한 번만 비용을 차감하고 화력·연사·지원 범위를 실제로 바꾼다', () => {
