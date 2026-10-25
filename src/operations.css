@@ -389,3 +389,13 @@
 .ops-unit-skills b small .ops-icon { width:12px; height:12px; }
 .ops-unit-skills span { display:block; font-size:10.5px; line-height:1.5; color:#a5b995; word-break:keep-all; }
 @media(max-width:480px) { .ops-unit-cards { grid-template-columns:1fr; } }
+/* 상단 패널 설명 창 보조 요소: 단축키, 자동 사용 표시, 종족 병력 줄. */
+.ops-tip kbd { flex:none; margin-left:auto; padding:1px 6px; font:10px monospace; color:#d2e4b3; border:1px solid #4a6338; border-radius:5px; background:#0f1b15; }
+.ops-tip .ops-tip-hint { display:flex; align-items:center; gap:6px; margin-top:7px; font-size:10px; color:#9aaf89; }
+.ops-tip .ops-tip-hint kbd { margin-left:0; }
+.ops-tip .ops-tip-note { margin-top:6px; font-size:10px; color:#e3a27a; }
+.ops-tip-auto { margin-left:auto; padding:1px 7px; font-size:9px; letter-spacing:1px; color:#16230f; border-radius:999px; background:#c6ea8c; box-shadow:0 0 8px #b8e07a88; }
+.ops-tip-wait { color:#f2c48a; }
+.ops-tip-roster { display:grid; grid-template-columns:repeat(9,24px); gap:3px; }
+.ops-tip-roster .ops-unit-art { width:24px; height:24px; }
+

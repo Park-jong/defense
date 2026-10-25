@@ -31,8 +31,8 @@ export interface OperationsActions {
 }
 const escape = (value: string): string => value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 const icon = (key: string): string => `<img class="ops-icon" src="${commandIconUrl(key)}" width="32" height="32" alt="" aria-hidden="true">`;
-const button = (action: string, key: string, content: string, label: string, options: { disabled?: boolean; selected?: boolean; className?: string; hint?: string } = {}): string =>
-  `<button type="button" data-action="${action}" data-key="${key}" class="${options.className ?? ''}" aria-label="${escape(label)}" title="${escape(options.hint ?? label)}" ${options.disabled ? 'disabled' : ''} ${options.selected === undefined ? '' : `aria-pressed="${options.selected}"`}>${content}</button>`;
+const button = (action: string, key: string, content: string, label: string, options: { disabled?: boolean; selected?: boolean; className?: string; hint?: string; tip?: string } = {}): string =>
+  `<button type="button" data-action="${action}" data-key="${key}" class="${options.className ?? ''}" aria-label="${escape(label)}" title="${escape(options.hint ?? label)}"${options.tip ? ` data-tip="${options.tip}"` : ''} ${options.disabled ? 'disabled' : ''} ${options.selected === undefined ? '' : `aria-pressed="${options.selected}"`}>${content}</button>`;
 const tutorialSteps = [
   '병력을 골라 길 옆 빈 칸에 배치하세요. 터치는 같은 칸을 두 번 탭합니다.',
   '배치한 병력을 선택하고 강화(U)를 누르세요.',
@@ -83,6 +83,8 @@ export class OperationsCenter {
   private ribbon = document.createElement('div');
   private dialog = document.createElement('dialog');
   private tip = document.createElement('div');
+  private ribbonTip = document.createElement('div');
+  private ribbonTipSpec = '';
   private section = 'setup';
   private draft?: RunOptions;
   private cache = '';
@@ -111,15 +113,12 @@ export class OperationsCenter {
         const output = this.dialog.querySelector('output'); if (output) output.textContent = (e.target as HTMLInputElement).value + '%';
       }
     });
-    // 비교표의 설명은 브라우저 기본 툴팁 대신 작전실 장갑판 모양의 창으로 띄운다.
-    this.tip.className = 'ops-tip'; this.tip.setAttribute('role', 'tooltip'); this.tip.hidden = true;
-    const tipTarget = (e: Event) => (e.target as HTMLElement).closest?.<HTMLElement>('[data-tip]') ?? null;
-    for (const type of ['pointerover', 'focusin']) this.dialog.addEventListener(type, e => { const el = tipTarget(e); if (el) this.showTip(el); });
-    for (const type of ['pointerout', 'focusout']) this.dialog.addEventListener(type, e => {
-      const el = tipTarget(e), next = (e as PointerEvent).relatedTarget as HTMLElement | null;
-      if (el && !(next && el.contains(next) && next.closest('[data-tip]') === el)) this.hideTip();
-    });
-    this.dialog.addEventListener('scroll', () => this.hideTip(), true);
+    // 비교표와 상단 패널의 설명은 브라우저 기본 툴팁 대신 작전실 장갑판 모양의 창으로 띄운다.
+    for (const tip of [this.tip, this.ribbonTip]) { tip.className = 'ops-tip'; tip.setAttribute('role', 'tooltip'); tip.hidden = true; }
+    document.body.append(this.ribbonTip);
+    this.bindTips(this.dialog, this.tip, false);
+    // 터치는 누르는 순간 명령이 실행되므로 상단 패널 설명은 마우스와 키보드 포커스에서만 띄운다.
+    this.bindTips(this.ribbon, this.ribbonTip, true);
     window.addEventListener('resize', this.onResize);
     this.update();
   }
@@ -142,24 +141,29 @@ export class OperationsCenter {
     this.dialog.close(); this.actions.pause(false);
     const canvas = document.querySelector('canvas'); canvas?.setAttribute('tabindex', '0'); canvas?.focus({ preventScroll: true });
   }
-  destroy(): void { window.removeEventListener('resize', this.onResize); this.ribbon.remove(); this.dialog.remove(); }
+  destroy(): void { window.removeEventListener('resize', this.onResize); this.ribbon.remove(); this.ribbonTip.remove(); this.dialog.remove(); }
   update(): void {
     const v = this.actions.view(), next = v.test ? MAX_WAVE : v.wave + 1;
     const tutorial = !v.profile.tutorialDone && v.tutorial < 4 && !v.test && !v.active && !v.over
       ? `<div class="field-tutorial">${icon(tutorialIcons[v.tutorial])}<span title="${escape(tutorialSteps[v.tutorial])}">${tutorialHints[v.tutorial]}</span><span class="training-progress" role="img" aria-label="훈련 ${v.tutorial + 1}/4">${tutorialSteps.map((_, i) => `<i class="${i <= v.tutorial ? 'done' : ''}"></i>`).join('')}</span>${button('open', 'codex', icon('help'), '도움말')}${button('skip', '', icon('skip'), '훈련 건너뛰기')}</div>` : '';
-    const factions = `<div class="mission-actions mission-factions" role="group" aria-label="종족 선택">${(Object.keys(FACTIONS) as Faction[]).map(k => button('faction', k, icon(k), `${FACTIONS[k].name} 병력 9종${k === 'terran' ? ' [T]' : ' [R]'}`, { disabled: v.over || v.options.mode === 'bunker' && k === 'protoss', selected: v.faction === k })).join('')}</div>`;
+    const factions = `<div class="mission-actions mission-factions" role="group" aria-label="종족 선택">${(Object.keys(FACTIONS) as Faction[]).map(k => button('faction', k, icon(k), `${FACTIONS[k].name} 병력 9종${k === 'terran' ? ' [T]' : ' [R]'}`, { disabled: v.over || v.options.mode === 'bunker' && k === 'protoss', selected: v.faction === k, tip: `faction:${k}` })).join('')}</div>`;
     // 모바일 사이드 패널은 한 줄(32px)뿐이라 훈련 안내가 있으면 예보 대신 보여준다.
     const forecast = !v.active && !v.over && !(tutorial && MOBILE_LAYOUT) ? `<div class="mission-forecast" role="group" aria-label="다음 웨이브 ${next}"><b>W ${String(next).padStart(2, '0')}</b>${this.enemies(next)}</div>` : '';
-    const html = `<div class="mission-strip"><div class="mission-toolbar">${factions}<div class="mission-actions" role="group" aria-label="사령관 패널">${button('open', 'tactics', icon('manage'), '작전실 [O]')}${(['strike', 'slow', 'supply'] as CommanderKey[]).map(k => {
+    const html = `<div class="mission-strip"><div class="mission-toolbar">${factions}<div class="mission-actions" role="group" aria-label="사령관 패널">${button('open', 'tactics', icon('manage'), '작전실 [O]', { tip: 'ops' })}${(['strike', 'slow', 'supply'] as CommanderKey[]).map(k => {
       const cooldown = Math.ceil(v.commander[k]);
       const auto = v.autoCommander.includes(k), autoText = auto ? ' · 자동 사용 중' : '';
-      return button('commander', k, `${icon(k)}${cooldown > 0 ? `<span class="mission-cooldown" aria-hidden="true">${cooldown}</span>` : ''}`, COMMANDERS[k].name + (cooldown > 0 ? ` ${cooldown}초` : '') + autoText, { disabled: v.over || v.paused || !v.active || cooldown > 0 || v.options.mode === 'budget' && k === 'supply', className: auto ? 'is-auto' : '', hint: `${COMMANDERS[k].name} · ${COMMANDERS[k].desc} · 재사용 ${COMMANDERS[k].cooldown}초${cooldown > 0 ? ` · 남은 ${cooldown}초` : ''}${autoText} · 우클릭(길게 누르기)으로 자동 사용 ${auto ? '끄기' : '켜기'}` });
+      return button('commander', k, `${icon(k)}${cooldown > 0 ? `<span class="mission-cooldown" aria-hidden="true">${cooldown}</span>` : ''}`, COMMANDERS[k].name + (cooldown > 0 ? ` ${cooldown}초` : '') + autoText, { disabled: v.over || v.paused || !v.active || cooldown > 0 || v.options.mode === 'budget' && k === 'supply', className: auto ? 'is-auto' : '', tip: `commander:${k}`, hint: `${COMMANDERS[k].name} · ${COMMANDERS[k].desc} · 재사용 ${COMMANDERS[k].cooldown}초${cooldown > 0 ? ` · 남은 ${cooldown}초` : ''}${autoText} · 우클릭(길게 누르기)으로 자동 사용 ${auto ? '끄기' : '켜기'}` });
     }).join('')}</div></div>${forecast}${tutorial}</div>`;
     if (html !== this.cache) {
       this.ribbon.innerHTML = html; this.cache = html;
       // 쿨타임 숫자가 바뀔 때마다 버튼을 새로 그리므로, 자동 사용 빛의 회전 위상을 시계에 맞춰 끊김 없이 잇는다.
       const phase = -(performance.now() / 1000 % 2.6);
       this.ribbon.querySelectorAll<HTMLElement>('.is-auto').forEach(el => el.style.setProperty('--auto-delay', `${phase}s`));
+      // 남은 title은 게임 스타일 설명 창으로 옮겨 브라우저 기본 툴팁이 겹치지 않게 한다.
+      this.ribbon.querySelectorAll<HTMLElement>('[title]').forEach(el => { if (!el.dataset.tip) { el.dataset.tip = 'text'; el.dataset.hint = el.title; } el.removeAttribute('title'); });
+      // 쿨타임 숫자처럼 보던 버튼이 다시 그려지면 설명 창도 새 버튼과 최신 값으로 다시 맞춘다.
+      const hovered = this.ribbonTipSpec ? this.ribbon.querySelector<HTMLElement>(`[data-tip="${this.ribbonTipSpec}"]`) : null;
+      if (hovered && !this.ribbonTip.hidden) this.showTip(hovered, this.ribbonTip); else { this.ribbonTip.hidden = true; this.ribbonTipSpec = ''; }
     }
     this.position();
   }
@@ -172,8 +176,26 @@ export class OperationsCenter {
       : { left: `${r.left + 8 * scale}px`, top: `${r.top + (TOP_BAR_H + 2) * scale}px`, width: `${W - 16}px`, transform: `scale(${scale})` });
     this.ribbon.classList.toggle('side', side);
   }
-  private tipContent(spec: string): string {
-    const [kind, key] = spec.split(':');
+  private tipContent(spec: string, el?: HTMLElement): string {
+    const [kind, key, extra] = spec.split(':');
+    if (kind === 'text') {
+      const [head, ...rest] = (el?.dataset.hint ?? '').split(' · '), src = el?.querySelector('img')?.getAttribute('src');
+      return `<header>${src ? `<img class="ops-icon" src="${src}" width="32" height="32" alt="">` : ''}<b>${head}</b></header>${rest.length ? `<p>${rest.join(' · ')}</p>` : ''}`;
+    }
+    if (kind === 'faction') {
+      const f = key as Faction, v = this.actions.view(), locked = v.options.mode === 'bunker' && f === 'protoss';
+      return `<header>${icon(f)}<b>${FACTIONS[f].name} 병력<small>${v.faction === f ? '현재 보급 중' : '명령 카드를 이 종족으로 전환'}</small></b><kbd>${f === 'terran' ? 'T' : 'R'}</kbd></header><div class="ops-tip-roster">${FACTION_TOWERS[f].map(k => this.art(k)).join('')}</div>${locked ? '<p class="ops-tip-note">벙커 작전에서는 테란만 보급합니다.</p>' : ''}`;
+    }
+    if (kind === 'ops') return `<header>${icon('manage')}<b>작전실<small>여는 동안 전투 일시정지</small></b><kbd>O</kbd></header><p>출격 설정 · 병력 전술 · 전적 · 도감 · 훈장</p>`;
+    if (kind === 'commander') {
+      const k = key as CommanderKey, v = this.actions.view(), cooldown = Math.ceil(v.commander[k]), auto = v.autoCommander.includes(k);
+      const blocked = v.options.mode === 'budget' && k === 'supply';
+      return `<header>${icon(k)}<b>${COMMANDERS[k].name}<small>사령관 지원</small></b>${auto ? '<span class="ops-tip-auto">AUTO</span>' : ''}</header><p>${COMMANDERS[k].desc}</p><footer><span>${icon('clock')}재사용 ${COMMANDERS[k].cooldown}초</span>${cooldown > 0 ? `<span class="ops-tip-wait">남은 ${cooldown}초</span>` : ''}</footer>${blocked ? '<p class="ops-tip-note">제한 예산 작전에서는 사용할 수 없습니다.</p>' : ''}<p class="ops-tip-hint"><kbd>우클릭</kbd>쿨타임마다 자동 사용 ${auto ? '끄기' : '켜기'}</p>`;
+    }
+    if (kind === 'enemy') {
+      const k = key as EnemyKey;
+      return `<header>${icon(enemyIcons[k])}<b>${ENEMY_INFO[k].name}<small>이번 웨이브 ${extra}기</small></b></header><p>${ENEMY_INFO[k].desc}</p><footer><span>기본 체력 ${ENEMY_DEFS[k].hp}</span><span>속도 ${ENEMY_DEFS[k].speed}</span></footer>`;
+    }
     if (kind === 'stat') { const [i, label, desc] = compareHead[Number(key)]; return `<header>${icon(i)}<b>${label}</b></header><p>${desc}</p>`; }
     if (kind === 'skill') {
       const s = SKILL_DEFS[key as keyof typeof SKILL_DEFS];
@@ -190,16 +212,28 @@ export class OperationsCenter {
       <p>${d.desc}</p>${traits.length ? `<ul class="ops-unit-traits">${traits.map(t => `<li>${t}</li>`).join('')}</ul>` : ''}
       ${skills.length ? `<ul class="ops-unit-skills">${skills.map(s => `<li><img src="${commandIconUrl(s)}" width="26" height="26" alt=""><div><b>${SKILL_DEFS[s].name}<small>${icon('clock')}${SKILL_DEFS[s].cooldown}초</small></b><span>${SKILL_DEFS[s].desc}</span></div></li>`).join('')}</ul>` : ''}</article>`;
   }
-  private showTip(el: HTMLElement): void {
-    this.tip.innerHTML = this.tipContent(el.dataset.tip!);
-    if (this.tip.parentElement !== this.dialog) this.dialog.append(this.tip);
-    this.tip.hidden = false;
+  private bindTips(host: HTMLElement, tip: HTMLElement, mouseOnly: boolean): void {
+    const target = (e: Event) => (e.target as HTMLElement).closest?.<HTMLElement>('[data-tip]') ?? null;
+    const hide = () => { tip.hidden = true; if (tip === this.ribbonTip) this.ribbonTipSpec = ''; };
+    host.addEventListener('pointerover', e => { const el = target(e); if (el && (!mouseOnly || (e as PointerEvent).pointerType === 'mouse')) this.showTip(el, tip); });
+    host.addEventListener('focusin', e => { const el = target(e); if (el && (!mouseOnly || el.matches(':focus-visible'))) this.showTip(el, tip); });
+    for (const type of ['pointerout', 'focusout']) host.addEventListener(type, e => {
+      const el = target(e), next = (e as PointerEvent).relatedTarget as HTMLElement | null;
+      if (el && !(next && el.contains(next) && next.closest('[data-tip]') === el)) hide();
+    });
+    host.addEventListener('scroll', hide, true);
+  }
+  private showTip(el: HTMLElement, tip: HTMLElement = this.tip): void {
+    tip.innerHTML = this.tipContent(el.dataset.tip!, el);
+    if (tip === this.tip && tip.parentElement !== this.dialog) this.dialog.append(tip);
+    if (tip === this.ribbonTip) this.ribbonTipSpec = el.dataset.tip!;
+    tip.hidden = false;
     // 행 전체가 대상이면 병력 이름 칸에 붙여 표를 가리지 않게 아래(공간이 없으면 위)에 띄운다.
     const anchor = (el.tagName === 'TR' ? el.querySelector('th') : el)!.getBoundingClientRect();
-    const w = this.tip.offsetWidth, h = this.tip.offsetHeight, gap = 6, margin = 8;
+    const w = tip.offsetWidth, h = tip.offsetHeight, gap = 6, margin = 8;
     const below = anchor.bottom + gap + h <= innerHeight - margin;
-    this.tip.style.left = `${Math.max(margin, Math.min(anchor.left, innerWidth - w - margin))}px`;
-    this.tip.style.top = `${below ? anchor.bottom + gap : Math.max(margin, anchor.top - gap - h)}px`;
+    tip.style.left = `${Math.max(margin, Math.min(anchor.left, innerWidth - w - margin))}px`;
+    tip.style.top = `${below ? anchor.bottom + gap : Math.max(margin, anchor.top - gap - h)}px`;
   }
   private hideTip(): void { this.tip.hidden = true; }
   private art(key: TowerKey): string { return `<img class="ops-unit-art" src="${this.images.get(key)}" width="64" height="64" alt="" aria-hidden="true">`; }
@@ -207,7 +241,7 @@ export class OperationsCenter {
     const plan = wavePlan(wave);
     return (Object.keys(ENEMY_DEFS) as EnemyKey[]).filter(k => plan.includes(k)).map(k => {
       const count = plan.filter(x => x === k).length, label = `${ENEMY_INFO[k].name} ${count}기`;
-      return `<span class="ops-enemy ${k === 'boss' ? 'is-boss' : ''}" role="img" title="${label}" aria-label="${label}">${icon(enemyIcons[k])}<b aria-hidden="true">${count}</b></span>`;
+      return `<span class="ops-enemy ${k === 'boss' ? 'is-boss' : ''}" role="img" data-tip="enemy:${k}:${count}" aria-label="${label}">${icon(enemyIcons[k])}<b aria-hidden="true">${count}</b></span>`;
     }).join('');
   }
   private click(e: Event): void {
