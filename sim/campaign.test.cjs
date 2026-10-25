@@ -447,15 +447,89 @@ test('하이 템플러는 무기 대신 지속 폭풍을 시전하고 범위 안
   assert.equal(s.runStats.units.find(u => u.id === unit.id).damage, s.stats(unit).dmg * 2);
 });
 
-test('골리앗·스카우트의 쌍열 사격은 피해를 분배하고 캐리어는 독립된 인터셉터 4기를 발사한다', () => {
-  for (const [key, count, multiplier] of [['goliath', 2, 1], ['scout', 2, 1], ['carrier', 4, 4]]) {
+test('골리앗·스카우트의 쌍열 사격은 피해를 분배하고 캐리어는 독립된 인터셉터 8기를 발사한다', () => {
+  for (const [key, count, multiplier] of [['goliath', 2, 1], ['scout', 2, 1], ['carrier', 8, 8]]) {
     const s = setup(), unit = place(s, key), enemy = spawn(s, 'tank', unit.x + 60, unit.y);
     enemy.hp = enemy.max = 10000;
     s.towerAct(unit, .01); assert.equal(s.projs.length, count);
     assert.equal(new Set(s.projs.map(p => p.y)).size, count);
     for (const p of s.projs) { assert.equal(p.source, unit.id); s.hit(p); }
     assert.ok(Math.abs(enemy.hp - (10000 - s.stats(unit).dmg * multiplier)) < 1e-8);
+    assert.ok(Math.abs(s.runStats.units[0].damage - config.attackDamage(key, s.stats(unit).dmg)) < 1e-8);
   }
+});
+
+test('표적을 처치한 뒤 남은 인터셉터는 다음 적에게 명중하고 일반 탄환은 소멸한다', () => {
+  for (const key of ['carrier', 'scout']) {
+    const s = setup(), unit = place(s, key), first = spawn(s, 'tank', unit.x + 60, unit.y);
+    const second = spawn(s, 'tank', unit.x + 85, unit.y);
+    first.hp = 1; second.hp = second.max = 10000;
+    first.speed = second.speed = 0; unit.target = 'weak';
+    s.towerAct(unit, .01); unit.cd = 100;
+    for (let i = 0; i < 60; i++) s.step(1 / 60);
+    const remaining = key === 'carrier' ? s.stats(unit).dmg * 7 : 0;
+    assert.equal(first.dead, true); assert.equal(second.hp, 10000 - remaining);
+    assert.equal(s.projs.length, 0);
+    assert.equal(s.runStats.units[0].damage, 1 + remaining);
+    assert.equal(s.runStats.units[0].kills, 1);
+  }
+});
+
+test('인터셉터 재탐색은 캐리어의 보스 우선 명령과 사거리 제한을 따른다', () => {
+  const s = setup(), unit = place(s, 'carrier'), first = spawn(s, 'tank', unit.x + 60, unit.y);
+  s.fire(unit, first, s.stats(unit)); unit.cd = 100;
+  const weak = spawn(s, 'tank', unit.x + 40, unit.y), boss = spawn(s, 'boss', unit.x + 150, unit.y);
+  const outside = spawn(s, 'boss', unit.x + s.stats(unit).range + 1, unit.y);
+  for (const e of [first, weak, boss, outside]) e.speed = 0;
+  s.damageEnemy(first, first.hp); unit.target = 'boss'; s.step(1 / 60);
+  assert.equal(s.projs.length, 8);
+  assert.ok(s.projs.every(p => p.tgt === boss && p.source === unit.id));
+  assert.equal(weak.hp, weak.max); assert.equal(outside.hp, outside.max);
+});
+
+test('재탐색할 적이 없거나 캐리어가 회수되면 남은 인터셉터를 정리한다', () => {
+  for (const removed of [false, true]) {
+    const s = setup(), unit = place(s, 'carrier'), first = spawn(s, 'tank', unit.x + 60, unit.y);
+    const other = spawn(s, 'tank', unit.x + (removed ? 100 : s.stats(unit).range + 1), unit.y);
+    first.speed = other.speed = 0;
+    s.fire(unit, first, s.stats(unit)); unit.cd = 100;
+    s.damageEnemy(first, first.hp);
+    if (removed) s.towers = [];
+    s.step(1 / 60);
+    assert.equal(s.projs.length, 0); assert.equal(other.hp, other.max);
+  }
+});
+
+test('인터셉터 집중 공격은 처치 후 다음 적으로 이어지고 단일 표적 피해를 중복 배율 없이 계산한다', () => {
+  for (const lvl of [1, 3, 5]) {
+    const s = setup(), unit = place(s, 'carrier'); unit.lvl = lvl; unit.branch = 'power';
+    unit.buffs = [{ left: 6, haste: 2, power: 1.3 }]; s.bonuses.power = .12;
+    const first = spawn(s, 'tank', unit.x + 60, unit.y), second = spawn(s, 'tank', unit.x + 80, unit.y);
+    first.hp = 1; second.hp = second.max = 100000;
+    const damage = s.stats(unit).dmg * 2;
+    s.autoSkill(unit, 'interceptors', first);
+    assert.equal(first.dead, true);
+    assert.ok(Math.abs(second.hp - (100000 - damage * 7)) < 1e-8);
+    assert.ok(Math.abs(s.runStats.units[0].damage - (1 + damage * 7)) < 1e-8);
+    second.hp = second.max; const before = s.runStats.units[0].damage;
+    s.autoSkill(unit, 'interceptors', second);
+    assert.ok(Math.abs(s.runStats.units[0].damage - before - damage * 8) < 1e-8);
+  }
+});
+
+test('캐리어 강화·연사 특화·재출격이 실제 출격 주기를 줄이고 8기 합산 화력을 유지한다', () => {
+  const s = setup(), unit = place(s, 'carrier'), enemy = spawn(s, 'tank', unit.x + 60, unit.y);
+  enemy.hp = enemy.max = 1000000; enemy.speed = 0;
+  unit.lvl = 3; unit.branch = 'rapid'; s.autoSkill(unit, 'carrierCapacity', enemy);
+  let launches = 0;
+  const fire = s.fire.bind(s); s.fire = (...args) => { launches++; fire(...args); };
+  for (let i = 0; i < 120; i++) s.step(1 / 60);
+  assert.ok(launches >= 9, '강화·연사·재출격으로 2초 안에 최소 9회 출격');
+  unit.cd = 100;
+  for (let i = 0; i < 60; i++) s.step(1 / 60);
+  const { levelStats } = load('./management');
+  assert.ok(Math.abs(s.runStats.units[0].damage - launches * config.attackDamage('carrier', levelStats('carrier', 3).dmg)) < 1e-7);
+  assert.equal(s.projs.length, 0);
 });
 
 test('고스트의 락다운은 일반 적과 보스 정지 시간을 구분하고 리버의 스캐럽은 폭발 반경을 지킨다', () => {

@@ -1,4 +1,4 @@
-import { TOWER_DEFS, TOWER_KEYS, TowerKey } from './config';
+import { attackDamage, TOWER_DEFS, TOWER_KEYS, TowerKey } from './config';
 import { EquippedSkill, SKILL_DEFS, SKILL_KEYS, SKILL_SLOTS, SkillKey } from './catalog';
 import { unitImageUrl } from './unitArt';
 import { commandIconUrl } from './commandIcons';
@@ -157,7 +157,7 @@ export class SupplyShop {
     };
     const stats = support
       ? stat('range', '지원 반경', cur.range + bonus, next.range + bonus) + (u.k === 'support' ? stat('overdrive', '주변 공속 +%', 20 + (u.lvl - 1) * 5, 20 + u.lvl * 5) : stat('weak', '받는 피해 +%', 35, 35))
-      : stat('siege', '공격력', cur.dmg, next.dmg) + stat('range', '사거리', cur.range + bonus, next.range + bonus) + stat('overdrive', '초당 공격', 1 / cur.rate, 1 / next.rate, 2) + stat('barrage', 'DPS', cur.dmg / cur.rate, next.dmg / next.rate, 1);
+      : stat('siege', '공격력', attackDamage(u.k, cur.dmg), attackDamage(u.k, next.dmg)) + stat('range', '사거리', cur.range + bonus, next.range + bonus) + stat('overdrive', '초당 공격', 1 / cur.rate, 1 / next.rate, 2) + stat('barrage', 'DPS', attackDamage(u.k, cur.dmg) / cur.rate, attackDamage(u.k, next.dmg) / next.rate, 1);
     const skills = SKILL_KEYS.filter(key => SKILL_DEFS[key].unit === u.k);
     return `<section class="army-detail" aria-label="${d.name} 상세">
       <header class="army-head"><img src="${this.images.get(u.k)}" alt="" width="72" height="72"><div><h3>${d.name} <small>${max ? 'MAX' : `Lv.${u.lvl}`}</small></h3>

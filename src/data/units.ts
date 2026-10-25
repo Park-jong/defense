@@ -3,6 +3,8 @@ export interface TowerDef {
   color: number; proj: number; barrel: number; desc: string;
   faction: Faction; role: string;
   splash?: number; slow?: number;
+  /** Independent hits per basic attack; dmg is the damage of each hit. */
+  attackCount?: number;
 }
 
 export const FACTIONS = { terran: { name: '테란', color: '#9bc4b5' }, protoss: { name: '프로토스', color: '#e4c777' } };
@@ -26,11 +28,14 @@ export const TOWER_DEFS = {
   highTemplar: { name: '하이 템플러', faction: 'protoss', role: '마법 / 사이오닉 스톰', cost: 170, range: 195, dmg: 22, rate: 2.8, splash: 75, color: 0xc3a0ee, proj: 0xa6c7ff, barrel: 0, desc: '일반 무기 대신 사이오닉 스톰을 자동 시전합니다. 표적 위치에 2초간 남는 폭풍으로 0.5초마다 피해를 줍니다.' },
   reaver: { name: '리버', faction: 'protoss', role: '공성 / 스캐럽', cost: 250, range: 225, dmg: 85, rate: 2.2, splash: 72, color: 0xd5b768, proj: 0xffe3a2, barrel: 20, desc: '스캐럽을 발사하는 중장갑 로봇. 느리지만 넓은 폭발 범위와 강한 한 발로 밀집한 적을 분쇄합니다.' },
   scout: { name: '스카우트', faction: 'protoss', role: '전투기 / 쌍열 광자포', cost: 200, range: 195, dmg: 32, rate: .8, color: 0x7fa8e3, proj: 0x9bdcff, barrel: 25, desc: '황금 날개를 펼친 프로토스 전투기. 쌍열 광자포와 미사일 일제 사격으로 전선을 지원합니다.' },
-  carrier: { name: '캐리어', faction: 'protoss', role: '주력함 / 인터셉터', cost: 350, range: 245, dmg: 10, rate: .8, color: 0xe7c77d, proj: 0x9deaff, barrel: 25, desc: '4기의 인터셉터를 동시에 출격시키는 프로토스 주력함. 각 요격기가 독립적으로 표적을 추적합니다.' },
+  carrier: { name: '캐리어', faction: 'protoss', role: '주력함 / 인터셉터', cost: 350, range: 270, dmg: 12, rate: .7, attackCount: 8, color: 0xe7c77d, proj: 0x9deaff, barrel: 25, desc: '8기의 인터셉터를 동시에 출격시키는 프로토스 주력함. 표적이 쓰러지면 사거리 안의 다음 적을 추적해 남은 화력을 이어갑니다.' },
 } satisfies Record<string, TowerDef>;
 
 export type TowerKey = keyof typeof TOWER_DEFS;
 export const TOWER_KEYS = Object.keys(TOWER_DEFS) as TowerKey[];
+export const attackCount = (k: TowerKey): number => (TOWER_DEFS[k] as TowerDef).attackCount ?? 1;
+/** Total basic-attack damage for displays; skills still use each interceptor's damage. */
+export const attackDamage = (k: TowerKey, dmg = TOWER_DEFS[k].dmg): number => dmg * attackCount(k);
 /** The command card and shop share the same nine slots and keyboard order. Legacy unit keys stay stable for saves. */
 export const FACTION_TOWERS: Record<Faction, TowerKey[]> = {
   terran: ['arrow', 'cannon', 'marine', 'firebat', 'ghost', 'goliath', 'cruiser', 'bunker', 'support'],

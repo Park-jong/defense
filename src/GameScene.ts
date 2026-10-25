@@ -3,6 +3,7 @@ import {
   CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE, COLS, CONSOLE_Y, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, FINAL_BOSS_HP_MULT, FONT, GAME_W, H, MAP_H, MAP_Y, MAX_CATCHUP_SEC, MAX_WAVE, MOBILE_LAYOUT, RENDER_SCALE, RIBBON_BAND, ROWS, SIDE_RIBBON_H, SIDE_W, STEP_SEC, T, TEST_GOLD, TOP_BAR_H, TOWER_DEFS, TowerKey, VIEW_H, W,
 } from './config';
 import { drawMap, makeTextures } from './textures';
+import { attackCount } from './data/units';
 import { Btn, mkBtn } from './ui';
 import { DRAGOON_EMITTER, FIREBAT_MUZZLES, loadUnitArt, SIEGE_MUZZLE, TURRET_LAUNCH_PORTS, UNIT_WORLD_SCALE } from './unitArt';
 import { EquippedSkill, SKILL_DEFS, SKILL_KEYS, SKILL_SLOTS, SkillKey, UnitBuff } from './catalog';
@@ -668,7 +669,7 @@ export class GameScene extends Phaser.Scene {
       } else if (k === 'support' || k === 'observer') {
         msg = `지원 사거리 ${(st.range + (t ? 0 : this.bonuses.range + highGround)).toFixed(0)}${terrainHint}\n` + (k === 'support' ? `주변 공격 속도 +${20 + ((t?.lvl ?? 1) - 1) * 5}%\n같은 지원 효과는 중첩되지 않습니다.` : '적 하나의 약점을 3초 노출\n받는 피해 +35%') + '\n강화·특화로 지원 성능 개선';
       } else {
-        msg = `공격 ${st.dmg.toFixed(0)} · 사거리 ${(st.range + (t ? 0 : this.bonuses.range + highGround)).toFixed(0)}${terrainHint}\n공격 속도 ${(1 / st.rate).toFixed(1)}/초\n자동 스킬 ${t?.skills.length ?? 0}/${SKILL_SLOTS}`;
+        msg = `공격 ${st.dmg.toFixed(0)}${attackCount(k) > 1 ? ` × ${attackCount(k)}` : ''} · 사거리 ${(st.range + (t ? 0 : this.bonuses.range + highGround)).toFixed(0)}${terrainHint}\n공격 속도 ${(1 / st.rate).toFixed(1)}/초\n자동 스킬 ${t?.skills.length ?? 0}/${SKILL_SLOTS}`;
         msg += t?.skills.length ? '\n' + t.skills.map(s => `${SKILL_DEFS[s.key].name} ${s.cd > 0 ? Math.ceil(s.cd) + '초' : '준비'}`).join('\n') : '\n명령 아이콘으로 스킬 장착';
         if (t?.host) title += ' / 탑승';
       }
@@ -1160,6 +1161,12 @@ export class GameScene extends Phaser.Scene {
     this.fields = this.fields.filter(f => f.left > 0);
 
     for (const p of this.projs) {
+      // Launched interceptors keep fighting after a kill, following their carrier's orders.
+      if (p.k === 'carrier' && p.tgt.dead) {
+        const carrier = this.towers.find(t => t.id === p.source);
+        const next = carrier ? this.findTarget(carrier) : null;
+        if (next) p.tgt = next;
+      }
       const e = p.tgt;
       if (e.dead) { p.dead = true; p.s.destroy(); continue; }
       const dx = e.x - p.x, dy = e.y - p.y, dist = Math.hypot(dx, dy), mv = 420 * dt;
@@ -1262,9 +1269,9 @@ export class GameScene extends Phaser.Scene {
       this.skillRing(best.x, best.y, st.splash, d.proj); return;
     }
     if (t.k === 'carrier' || t.k === 'goliath' || t.k === 'scout') {
-      const count = t.k === 'carrier' ? 4 : 2;
+      const count = t.k === 'carrier' ? attackCount(t.k) : 2;
       for (let i = 0; i < count; i++) {
-        const offset = (i - (count - 1) / 2) * 9;
+        const offset = (i - (count - 1) / 2) * (t.k === 'carrier' ? 6 : 9);
         const x = t.x + Math.cos(angle) * 18 - Math.sin(angle) * offset;
         const y = t.y + Math.sin(angle) * 18 + Math.cos(angle) * offset;
         const s = this.add.image(x, y, 'shot_' + t.k).setDepth(9).setRotation(angle);
@@ -1478,12 +1485,16 @@ export class GameScene extends Phaser.Scene {
       case 'scoutVolley':
         for (const e of nearby.slice(0, 3)) { this.skillBeam(t, e, d.color); this.damageEnemy(e, st.dmg * 2.5, 'skill', t.id); }
         break;
-      case 'interceptors':
+      case 'interceptors': {
+        let next: Enemy | null = target;
         for (let i = 0; i < 8; i++) {
-          this.skillBeam({ x: t.x, y: t.y + (i - 3.5) * 4 }, target, d.color);
-          this.damageEnemy(target, st.dmg * 2, 'skill', t.id);
+          if (next.dead) next = this.findTarget(t);
+          if (!next) break;
+          this.skillBeam({ x: t.x, y: t.y + (i - 3.5) * 4 }, next, d.color);
+          this.damageEnemy(next, st.dmg * 2, 'skill', t.id);
         }
         break;
+      }
       case 'carrierCapacity':
         t.buffs.push({ left: 6, haste: 2, power: 1 }); this.skillRing(t.x, t.y, 45, d.color); break;
     }

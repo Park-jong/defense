@@ -34,7 +34,7 @@ export const SKILL_DEFS = {
   scarabUpgrade: { name: '스캐럽 강화', unit: 'reaver', cost: 150, cooldown: 14, color: 0xe8bd67, icon: '▲', desc: '6초 동안 자신의 공격력 60% 증가.' },
   scoutVolley: { name: '반물질 미사일', unit: 'scout', cost: 145, cooldown: 9, color: 0x9ed9ff, icon: '↗', desc: '사거리 안의 적 최대 3기에게 각각 공격력 250% 피해.' },
   photonDrive: { name: '광자포 과충전', unit: 'scout', cost: 125, cooldown: 12, color: 0x7dcaff, icon: '»', desc: '5초 동안 자신의 공격 속도 80% 증가.' },
-  interceptors: { name: '인터셉터 집중 공격', unit: 'carrier', cost: 220, cooldown: 10, color: 0xb5ecff, icon: '✦', desc: '표적에 8기의 인터셉터가 각각 공격력 200%의 집중 공격.' },
+  interceptors: { name: '인터셉터 집중 공격', unit: 'carrier', cost: 220, cooldown: 10, color: 0xb5ecff, icon: '✦', desc: '인터셉터 8기가 각각 요격기 공격력 200%로 집중 공격. 표적 처치 시 다음 적을 공격합니다.' },
   carrierCapacity: { name: '인터셉터 재출격', unit: 'carrier', cost: 200, cooldown: 14, color: 0xffdf9f, icon: '»', desc: '6초 동안 인터셉터 출격 속도 100% 증가.' },
 } satisfies Record<string, SkillDef>;
 

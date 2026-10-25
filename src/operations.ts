@@ -1,4 +1,4 @@
-import { ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, GAME_W, MAP_DEFS, MAX_WAVE, MOBILE_LAYOUT, SIDE_W, TOP_BAR_H, TOWER_DEFS, TowerKey, TOWER_KEYS, W } from './config';
+import { attackCount, attackDamage, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, GAME_W, MAP_DEFS, MAX_WAVE, MOBILE_LAYOUT, SIDE_W, TOP_BAR_H, TOWER_DEFS, TowerKey, TOWER_KEYS, W } from './config';
 import { SKILL_DEFS, SKILL_KEYS } from './catalog';
 import { unitImageUrl } from './unitArt';
 import { commandIconUrl } from './commandIcons';
@@ -45,7 +45,7 @@ const rewardIcons: Record<RewardKey, string> = { power: 'siege', haste: 'overdri
 const rewardValues: Record<RewardKey, string> = { power: '+12%', haste: '+10%', range: '+12', repair: '+4', supply: '+150' };
 const modeIcons: Record<RunOptions['mode'], string> = { standard: 'shield', endless: 'endless', bunker: 'empty', budget: 'mineral' };
 const compareHead = [
-  ['mineral', '비용', '배치 비용 · 미네랄'], ['siege', '공격력', 'Lv.1 한 번 공격의 피해'], ['range', '사거리', '공격 · 지원이 닿는 반경'],
+  ['mineral', '비용', '배치 비용 · 미네랄'], ['siege', '공격력', 'Lv.1 한 번 공격의 총 피해 · 캐리어는 인터셉터 전체 합산'], ['range', '사거리', '공격 · 지원이 닿는 반경'],
   ['overdrive', '초당 공격', '1초에 공격하는 횟수'], ['barrage', 'DPS', '초당 피해 · 공격력 × 초당 공격'],
   ['mineral', '미네랄 100당 DPS', '비용 대비 화력 · 높을수록 경제적'], ['storm', '전용 스킬', '보급 상점 부대 탭에서 장착 · 전투 중 자동 발동'],
 ];
@@ -53,6 +53,7 @@ const compareHead = [
 function unitTraits(k: TowerKey): string[] {
   const d = TOWER_DEFS[k] as (typeof TOWER_DEFS)[TowerKey] & { splash?: number; slow?: number };
   return [k === 'support' ? '주변 공격 속도 +20% · 레벨당 +5%' : '', k === 'observer' ? '약점 노출 · 받는 피해 +35%' : '',
+    attackCount(k) > 1 ? `인터셉터 ${attackCount(k)}기 × 공격력 ${d.dmg} · 처치 후 표적 재탐색` : '',
     d.splash ? `범위 피해 · 반경 ${d.splash}` : '', d.slow ? `둔화 ${Math.round(d.slow * 100)}%` : ''].filter(Boolean);
 }
 const tabs = {
@@ -171,7 +172,7 @@ export class OperationsCenter {
   /** 도감 병력 카드: 펼치지 않아도 역할·비용·특성·전용 스킬을 한눈에 읽는다. */
   private unitCard(k: TowerKey): string {
     const d = TOWER_DEFS[k], traits = unitTraits(k), skills = SKILL_KEYS.filter(s => SKILL_DEFS[s].unit === k);
-    return `<article class="ops-unit-card" aria-label="${escape(`${d.name} · ${d.role}`)}"><header>${this.art(k)}<div><h3>${d.name}</h3><small>${d.role}</small></div>${d.dmg ? `<span class="ops-unit-cost ops-unit-dmg" title="공격력 · Lv.1 한 번 공격의 피해" aria-label="공격력 ${d.dmg}">${icon('siege')}${d.dmg}</span>` : ''}<span class="ops-unit-cost" title="배치 비용" aria-label="비용 ${d.cost}">${icon('mineral')}${d.cost}</span></header>
+    return `<article class="ops-unit-card" aria-label="${escape(`${d.name} · ${d.role}`)}"><header>${this.art(k)}<div><h3>${d.name}</h3><small>${d.role}</small></div>${d.dmg ? `<span class="ops-unit-cost ops-unit-dmg" title="공격력 · Lv.1 한 번 공격의 총 피해" aria-label="공격력 ${attackDamage(k)}">${icon('siege')}${attackDamage(k)}</span>` : ''}<span class="ops-unit-cost" title="배치 비용" aria-label="비용 ${d.cost}">${icon('mineral')}${d.cost}</span></header>
       <p>${d.desc}</p>${traits.length ? `<ul class="ops-unit-traits">${traits.map(t => `<li>${t}</li>`).join('')}</ul>` : ''}
       ${skills.length ? `<ul class="ops-unit-skills">${skills.map(s => `<li><img src="${commandIconUrl(s)}" width="26" height="26" alt=""><div><b>${SKILL_DEFS[s].name}<small>${icon('clock')}${SKILL_DEFS[s].cooldown}초</small></b><span>${SKILL_DEFS[s].desc}</span></div></li>`).join('')}</ul>` : ''}</article>`;
   }
@@ -265,9 +266,9 @@ export class OperationsCenter {
     const enemies = (Object.keys(ENEMY_INFO) as EnemyKey[]).map(k => `<details class="ops-codex-entry"><summary>${icon(enemyIcons[k])}<b>${ENEMY_INFO[k].name}</b></summary><p>${ENEMY_INFO[k].desc}</p><small>체력 ${ENEMY_DEFS[k].hp} · 속도 ${ENEMY_DEFS[k].speed}</small></details>`).join('');
     const compare = (faction: Faction): string => {
       const rows = FACTION_TOWERS[faction].filter(k => k !== 'bunker').map(k => {
-        const d = TOWER_DEFS[k], support = k === 'support' || k === 'observer', dps = d.dmg / d.rate;
+        const d = TOWER_DEFS[k], support = k === 'support' || k === 'observer', damage = attackDamage(k), dps = damage / d.rate;
         const effect = k === 'support' ? '주변 공격 속도 +20% (레벨당 +5%)' : k === 'observer' ? '적 약점 노출 · 받는 피해 +35%' : '';
-        const cells = support ? ['—', d.range, '—', '—', '—'] : [d.dmg, d.range, (1 / d.rate).toFixed(2), dps.toFixed(1), (dps / d.cost * 100).toFixed(1)];
+        const cells = support ? ['—', d.range, '—', '—', '—'] : [damage, d.range, (1 / d.rate).toFixed(2), dps.toFixed(1), (dps / d.cost * 100).toFixed(1)];
         return `<tr data-tip="unit:${k}" tabindex="0" aria-label="${escape(`${d.name} · ${d.role}${effect ? ' · ' + effect : ''}`)}"><th scope="row"><span class="ops-compare-unit">${this.art(k)}<b>${d.name}</b></span></th><td>${d.cost}</td>${cells.map(c => `<td>${c}</td>`).join('')}<td class="ops-compare-skills">${SKILL_KEYS.filter(s => SKILL_DEFS[s].unit === k).map(s => `<img src="${commandIconUrl(s)}" width="24" height="24" alt="${escape(SKILL_DEFS[s].name)}" data-tip="skill:${s}">`).join('')}</td></tr>`;
       }).join('');
       return `<details id="ops-${faction}-compare" class="ops-disclosure"><summary>${icon(faction)}<b>${FACTIONS[faction].name} 병력 비교</b><small>Lv.1</small></summary><div class="ops-compare"><table><thead><tr><th scope="col"><span class="ops-sr">병력</span></th>${compareHead.map(([i, l], n) => `<th scope="col" class="${n === compareHead.length - 1 ? 'ops-compare-skills' : ''}" data-tip="stat:${n}" aria-label="${l}">${icon(i)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div></details>`;
