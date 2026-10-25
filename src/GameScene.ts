@@ -577,12 +577,31 @@ export class GameScene extends Phaser.Scene {
       text(901, 33, '● LIVE', 8, '#8eb967');
     }
     text(24, y + 181, '전술 지도', 11, '#b7c2a2');
-    text(140, y + 183, this.map.key === 'canyon' ? 'C-03' : 'F-07', 9, '#72866a').setFontFamily('monospace');
-    this.add.rectangle(24, y + 50, 162, 108, 0x0a1711).setOrigin(0).setStrokeStyle(1, 0x556447).setDepth(27);
+    const junction = this.map.key === 'junction';
+    text(140, y + 183, this.map.key === 'canyon' ? 'C-03' : junction ? 'J-02' : 'F-07', 9, junction ? '#82a9b6' : '#72866a').setFontFamily('monospace');
+    this.add.rectangle(24, y + 50, 162, 108, junction ? 0x101f2a : 0x0a1711).setOrigin(0).setStrokeStyle(1, junction ? 0x527480 : 0x556447).setDepth(27);
     const mini = this.add.graphics().setDepth(28);
     for (const cell of this.map.pathCells) {
       const [c, r] = cell.split(',').map(Number);
-      if (c >= 0 && c < COLS) mini.fillStyle(this.map.key === 'canyon' ? 0xae8255 : 0x3f5941).fillRect(25 + c * 8, y + 53 + r * 8, 8, 8);
+      if (c >= 0 && c < COLS) mini.fillStyle(this.map.key === 'canyon' ? 0xae8255 : junction ? 0x415866 : 0x3f5941).fillRect(25 + c * 8, y + 53 + r * 8, 8, 8);
+    }
+    if (junction) {
+      const [north, south] = this.map.routes;
+      const start = north.findIndex(p => south.some(q => p.x === q.x && p.y === q.y));
+      const merge = north[start];
+      const lanes = this.map.routes.map((route, i) => ({ route: route.slice(0, route.findIndex(p => p.x === merge.x && p.y === merge.y) + 1), color: i === 0 ? 0x71d0dc : 0xe5b96c }));
+      lanes.push({ route: north.slice(start), color: 0xb7d6bd });
+      // Match the battlefield's two approaches and common exit using actual route coordinates.
+      for (const { route, color } of lanes) {
+        mini.lineStyle(2, color, .85).beginPath();
+        route.forEach((p, i) => {
+          const x = Math.max(25, Math.min(25 + COLS * 8, 25 + p.x / T * 8)), yy = y + 53 + (p.y - this.map.mapY) / T * 8;
+          if (i === 0) mini.moveTo(x, yy); else mini.lineTo(x, yy);
+        });
+        mini.strokePath();
+      }
+      mini.fillStyle(0x172d39).fillCircle(25 + merge.x / T * 8, y + 53 + (merge.y - this.map.mapY) / T * 8, 4);
+      mini.lineStyle(1, 0xb7d6bd).strokeCircle(25 + merge.x / T * 8, y + 53 + (merge.y - this.map.mapY) / T * 8, 4);
     }
     for (const cell of this.map.highGroundCells) {
       const [c, r] = cell.split(',').map(Number);

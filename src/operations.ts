@@ -67,7 +67,14 @@ const tabs = {
 function mapPreview(key: RunOptions['map']): string {
   const routes = MAP_DEFS[key].routes.map(route => `<polyline points="${route.map(([c, r]) => `${(c + 1) * 8},${(r + 1) * 8}`).join(' ')}"/>`).join('');
   const highlands = key === 'canyon' ? MAP_DEFS.canyon.highGround.areas.map(([c, r, w, h]) => `<rect class="ops-map-highland" x="${(c + .5) * 8}" y="${(r + .5) * 8}" width="${w * 8}" height="${h * 8}" rx="3"/><path class="ops-map-elevation" d="M${(c + w / 2 + 1) * 8 - 4} ${(r + h / 2 + 1) * 8 + 1}l4-4 4 4m-8 4 4-4 4 4"/>`).join('') : '';
-  return `<svg class="ops-map${key === 'canyon' ? ' ops-map-canyon' : ''}" viewBox="0 0 168 104" fill="none" aria-hidden="true"><path class="ops-map-grid" d="M0 24h168M0 48h168M0 72h168M0 96h168M24 0v104M48 0v104M72 0v104M96 0v104M120 0v104M144 0v104"/><g class="ops-map-road">${routes}</g><g class="ops-map-route">${routes}</g>${highlands}${MAP_DEFS[key].routes.map(route => `<circle class="ops-map-entry" cx="${(route[0][0] + 1) * 8 + 3}" cy="${(route[0][1] + 1) * 8}" r="3"/>`).join('')}</svg>`;
+  let junction = '';
+  if (key === 'junction') {
+    const [north, south] = MAP_DEFS[key].routes;
+    const start = north.findIndex(([c, r]) => south.some(([sc, sr]) => c === sc && r === sr));
+    const [c, r] = north[start], x = (c + 1) * 8, y = (r + 1) * 8;
+    junction = `<polyline class="ops-map-shared" points="${north.slice(start).map(([c, r]) => `${(c + 1) * 8},${(r + 1) * 8}`).join(' ')}"/><circle class="ops-map-hub" cx="${x}" cy="${y}" r="5"/><path class="ops-map-merge" d="M${x - 3} ${y - 1}h2l1 2 1-2h2m-3 2v2"/>`;
+  }
+  return `<svg class="ops-map ops-map-${key}" viewBox="0 0 168 104" fill="none" aria-hidden="true"><path class="ops-map-grid" d="M0 24h168M0 48h168M0 72h168M0 96h168M24 0v104M48 0v104M72 0v104M96 0v104M120 0v104M144 0v104"/><g class="ops-map-road">${routes}</g><g class="ops-map-route">${routes}</g>${highlands}${junction}${MAP_DEFS[key].routes.map(route => `<circle class="ops-map-entry" cx="${(route[0][0] + 1) * 8 + 3}" cy="${(route[0][1] + 1) * 8}" r="3"/>`).join('')}</svg>`;
 }
 
 export class OperationsCenter {

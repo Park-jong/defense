@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { MapRuntime } from './game/map';
 import { drawCanyon } from './canyonArt';
+import { drawJunction } from './junctionArt';
 import { ENEMY_DEFS, FONT, MAP_H, RENDER_SCALE, T, TOWER_DEFS, VIEW_H, W } from './config';
 
 /** All art is generated locally: no image downloads or external assets. */
@@ -203,6 +204,7 @@ export function drawMap(scene: Phaser.Scene, cols: number, rows: number, map: Ma
     const ctx = texture.context;
     ctx.setTransform(RENDER_SCALE, 0, 0, RENDER_SCALE, 0, 0);
     if (mapKey === 'canyon') drawCanyon(ctx, map);
+    else if (mapKey === 'junction') drawJunction(ctx, map);
     else {
       let seed = 842;
       const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
@@ -266,13 +268,13 @@ export function drawMap(scene: Phaser.Scene, cols: number, rows: number, map: Ma
   }
   const g = scene.add.graphics();
   // Landing-zone markings and a powered exit gate.
-  if (mapKey !== 'canyon') {
+  if (mapKey === 'frontier') {
     g.lineStyle(1, 0x859274, .2).strokeCircle(480, mapY + 357, 59).strokeCircle(480, mapY + 357, 66);
     g.lineBetween(410, mapY + 357, 550, mapY + 357).lineBetween(480, mapY + 287, 480, mapY + 427);
     scene.add.text(480, mapY + 347, 'F-07', { fontFamily: 'monospace', fontSize: '24px', color: '#6b7560' }).setOrigin(.5).setAlpha(.35);
   }
   const label = (x: number, y: number, text: string, color: string) => scene.add.text(x, y, text, {fontFamily: FONT, fontSize: '10px', color}).setDepth(2);
-  routes.forEach(route => label(16, route[0].y - 37, '▶  적 진입', '#c1a271'));
+  routes.forEach((route, i) => label(16, route[0].y - 37, mapKey === 'junction' ? `▶  ${i === 0 ? '북측' : '남측'} 진입` : '▶  적 진입', mapKey === 'junction' ? i === 0 ? '#71d0dc' : '#e5b96c' : '#c1a271'));
   label(W - 103, waypoints[waypoints.length - 1].y + 30, '방어선  ▶', '#a7cd8d');
   for (const x of [W - 40, W - 12]) {
     g.fillStyle(0x141d1b).fillRect(x, waypoints[waypoints.length - 1].y - 33, 10, 66);

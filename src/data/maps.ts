@@ -15,6 +15,6 @@ export const MAP_DEFS = {
     routes: [[[-1, 1], [17, 1], [17, 4], [2, 4], [2, 7], [17, 7], [17, 10], [20, 10]]],
     highGround: { rangeBonus: 24, areas: [[5, 2, 8, 2], [6, 5, 7, 2], [5, 8, 8, 2]] },
   },
-  junction: { name: '합류 지대', desc: '두 진입로가 중앙에서 합류', routes: [[[-1, 1], [10, 1], [10, 5], [4, 5], [4, 9], [20, 9]], [[-1, 9], [1, 9], [1, 5], [4, 5], [4, 9], [20, 9]]] },
+  junction: { name: '합류 지대', desc: '산업 중계기지 · 두 보급로가 중앙 관제 허브에서 합류', routes: [[[-1, 1], [10, 1], [10, 5], [4, 5], [4, 9], [20, 9]], [[-1, 9], [1, 9], [1, 5], [4, 5], [4, 9], [20, 9]]] },
 } as const satisfies Record<string, MapDef>;
 export type MapKey = keyof typeof MAP_DEFS;
