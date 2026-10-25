@@ -11,8 +11,9 @@
     "test:bunker": "node --test sim/bunker.test.cjs",
     "test:campaign": "node --test sim/campaign.test.cjs",
     "test": "node --test sim/*.test.cjs",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "predeploy": "node .claude/hooks/git-workflow.cjs deploy-check && npm run build",
+    "deploy": "gh-pages -d dist",
+    "postdeploy": "node .claude/hooks/git-workflow.cjs deployed"
   },
   "dependencies": {
     "phaser": "3.80.1"

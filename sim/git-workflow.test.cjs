@@ -35,6 +35,11 @@ function invoke(cwd, mode, extra) {
 }
 function before(cwd) { const r = invoke(cwd, 'before'); assert.equal(r.status, 0, r.stderr); }
 function finish(cwd, extra) { const r = invoke(cwd, 'finish', extra); assert.equal(r.status, 0, r.stderr); return JSON.parse(r.stdout); }
+function deployed(cwd) {
+  for (const mode of ['deploy-check', 'deployed']) {
+    const r = invoke(cwd, mode); assert.equal(r.status, 0, r.stderr);
+  }
+}
 function advance(cwd, file = 'remote.txt') {
   fs.writeFileSync(path.join(cwd, file), 'remote contribution\n');
   git(cwd, 'add', file); git(cwd, 'commit', '-m', 'remote work'); git(cwd, 'push');
@@ -61,11 +66,13 @@ test('Stop continues the agent when its new changes are uncommitted', () => {
   assert.equal(git(local, 'diff', '--cached'), '');
 });
 
-test('a commit still requires push; a completed push permits Stop', () => {
+test('a commit requires push and successful deployment before Stop', () => {
   const { local } = fixture(); before(local);
   fs.writeFileSync(path.join(local, 'game.txt'), 'agent change\n');
   git(local, 'add', 'game.txt'); git(local, 'commit', '-m', 'agent change');
   assert.equal(finish(local).decision, 'block'); git(local, 'push');
+  const pending = finish(local); assert.equal(pending.decision, 'block'); assert.match(pending.reason, /npm run deploy/);
+  deployed(local);
   assert.deepEqual(finish(local), {});
   assert.equal(git(local, 'rev-list', '--left-right', '--count', 'HEAD...origin/main'), '0\t0');
 });
@@ -85,7 +92,8 @@ test('new branches pull the default base and publish their own name', () => {
   fs.writeFileSync(path.join(local, 'feature.txt'), 'feature\n');
   git(local, 'add', 'feature.txt'); git(local, 'commit', '-m', 'feature');
   const r = finish(local); assert.equal(r.decision, 'block'); assert.match(r.reason, /--set-upstream origin feature/);
-  git(local, 'push', '--set-upstream', 'origin', 'feature'); assert.deepEqual(finish(local), {});
+  git(local, 'push', '--set-upstream', 'origin', 'feature');
+  assert.equal(finish(local).decision, 'block'); deployed(local); assert.deepEqual(finish(local), {});
 });
 
 test('an unavailable remote blocks editing and preserves existing files', () => {
@@ -115,4 +123,69 @@ test('a persistent Stop failure is reported without an infinite continuation loo
   const { local } = fixture(); before(local); fs.writeFileSync(path.join(local, 'game.txt'), 'unfinished\n');
   const r = finish(local, { stop_hook_active: true });
   assert.equal(r.decision, undefined); assert.match(r.systemMessage, /미커밋 변경/);
+});
+
+test('deployment rejects uncommitted files and commits that have not been pushed', () => {
+  const { local } = fixture(); before(local);
+  fs.writeFileSync(path.join(local, 'game.txt'), 'new source\n');
+  assert.equal(invoke(local, 'deploy-check').status, 2);
+  git(local, 'add', 'game.txt'); git(local, 'commit', '-m', 'new source');
+  assert.equal(invoke(local, 'deploy-check').status, 2);
+  git(local, 'push'); deployed(local); assert.deepEqual(finish(local), {});
+});
+
+test('a newer source commit requires a new deployment and cannot reuse an old success record', () => {
+  const { local } = fixture(); before(local); advance(local); deployed(local);
+  assert.deepEqual(finish(local), {});
+  before(local); advance(local, 'next.txt');
+  assert.equal(finish(local).decision, 'block');
+  assert.equal(invoke(local, 'deployed').status, 2);
+  deployed(local); assert.deepEqual(finish(local), {});
+});
+
+test('a failed npm deployment remains pending until the deployment lifecycle succeeds', () => {
+  const { local } = fixture(); before(local);
+  const packagePath = path.join(local, 'package.json');
+  const pkg = { scripts: {
+    predeploy: `"${process.execPath}" "${hook}" deploy-check`,
+    deploy: 'node -e "process.exit(1)"',
+    postdeploy: `"${process.execPath}" "${hook}" deployed`,
+  } };
+  fs.writeFileSync(packagePath, JSON.stringify(pkg));
+  git(local, 'add', 'package.json'); git(local, 'commit', '-m', 'deployment fixture'); git(local, 'push');
+  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  const deploy = () => spawnSync(npm, ['run', 'deploy'], { cwd: local, encoding: 'utf8', windowsHide: true });
+  assert.notEqual(deploy().status, 0);
+  assert.equal(finish(local).decision, 'block');
+  const continued = finish(local, { stop_hook_active: true });
+  assert.equal(continued.decision, undefined); assert.match(continued.systemMessage, /npm run deploy/);
+  pkg.scripts.deploy = 'node -e "process.exit(0)"'; fs.writeFileSync(packagePath, JSON.stringify(pkg));
+  git(local, 'add', 'package.json'); git(local, 'commit', '-m', 'repair deployment'); git(local, 'push');
+  const r = deploy(); assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(finish(local), {});
+});
+
+test('deployment from a detached worktree is shared while pre-existing user edits stay untouched', () => {
+  const { local, folder } = fixture();
+  fs.writeFileSync(path.join(local, 'game.txt'), 'user edit\n'); before(local);
+  advance(local);
+  assert.equal(finish(local).decision, 'block');
+  const isolated = path.join(folder, 'deployment');
+  git(local, 'worktree', 'add', '--detach', isolated, 'HEAD');
+  deployed(isolated); assert.deepEqual(finish(local), {});
+  assert.equal(fs.readFileSync(path.join(local, 'game.txt'), 'utf8'), 'user edit\n');
+});
+
+test('read-only sessions do not deploy changes pulled from another contributor', () => {
+  const { local, other } = fixture(); before(local); advance(other); before(local);
+  assert.deepEqual(finish(local), {});
+});
+
+test('an unpublished commit present at session start still requires deployment after push', () => {
+  const { local } = fixture();
+  fs.writeFileSync(path.join(local, 'game.txt'), 'unpublished source\n');
+  git(local, 'add', 'game.txt'); git(local, 'commit', '-m', 'unpublished source'); before(local);
+  assert.equal(finish(local).decision, 'block'); git(local, 'push');
+  assert.equal(finish(local).decision, 'block');
+  deployed(local); assert.deepEqual(finish(local), {});
 });
