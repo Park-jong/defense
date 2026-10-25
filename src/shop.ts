@@ -8,6 +8,9 @@ import { RunOptions } from './campaign';
 import { adoptTitles, bindTips, createTip, placeTip, textTip } from './gameTip';
 import './shop.css';
 
+/** 설명 창 없이 보이는 글자·아이콘만으로 충분한 상점 요소. */
+const SHOP_SILENT = '.shop-tabs button, .army-unit, .army-stat, .garrison-unload[data-action="tab"]';
+
 const icon = (key: string): string => `<img class="shop-icon" src="${commandIconUrl(key)}" width="32" height="32" alt="" aria-hidden="true">`;
 
 export interface ShopUnit {
@@ -139,7 +142,7 @@ export class SupplyShop {
       <footer class="shop-footer"><span class="shop-hint">${icon('help')}<span>${this.tab === 'garrison' ? '강화·스킬 아이콘을 누르면 즉시 적용 · 체크 표시는 장착 완료 · 스킬은 자동 사용' : '유닛당 스킬 2개 · 적을 만나면 자동 발동 · 병력 구매는 명령 카드 또는 1–9 키 · 회수 시 비용 70% 환급'}</span></span><kbd>ESC</kbd></footer>`;
     this.dialog.querySelector<HTMLElement>('.shop-content')!.scrollTop = scrollTop;
     for (const { selector, left } of strips) this.dialog.querySelector<HTMLElement>(selector)?.scrollTo({ left });
-    adoptTitles(this.dialog); this.tip.hidden = true;
+    adoptTitles(this.dialog, SHOP_SILENT); this.tip.hidden = true;
   }
 
   private armyView(state: ShopState, selected?: ShopUnit): string {

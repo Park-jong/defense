@@ -2,10 +2,13 @@
 
 const escapeHtml = (value: string): string => value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 
-/** 남은 title을 data-tip="text"로 옮겨 기본 툴팁이 겹치지 않게 한다. 이미 전용 설명이 있는 요소는 title만 지운다. */
-export function adoptTitles(root: ParentNode): void {
+/**
+ * 남은 title을 data-tip="text"로 옮겨 기본 툴팁이 겹치지 않게 한다. 이미 전용 설명이 있는 요소는 title만 지운다.
+ * silent에 맞는 요소는 보이는 글자와 아이콘으로 충분해 설명 창 없이 title만 지운다(aria-label은 그대로 둔다).
+ */
+export function adoptTitles(root: ParentNode, silent = ''): void {
   root.querySelectorAll<HTMLElement>('[title]').forEach(el => {
-    if (!el.dataset.tip) { el.dataset.tip = 'text'; el.dataset.hint = el.title; }
+    if (!el.dataset.tip && !(silent && el.matches(silent))) { el.dataset.tip = 'text'; el.dataset.hint = el.title; }
     el.removeAttribute('title');
   });
 }

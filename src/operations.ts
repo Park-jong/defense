@@ -58,6 +58,12 @@ function unitTraits(k: TowerKey): string[] {
     attackCount(k) > 1 ? `인터셉터 ${attackCount(k)}기 × 공격력 ${d.dmg} · 처치 후 표적 재탐색` : '',
     d.splash ? `범위 피해 · 반경 ${d.splash}` : '', d.slow ? `둔화 ${Math.round(d.slow * 100)}%` : ''].filter(Boolean);
 }
+/** 설명 창 없이 보이는 글자·아이콘만으로 충분한 작전실 요소. */
+const OPS_SILENT = [
+  '.ops-nav button', '.ops-volume', '.ops-save-status', '[data-action="map"]', '[data-action="difficulty"]', '[data-action="mode"]',
+  '[data-action="start"]', '[data-action="resume"]', '[data-action="target"]', '.ops-empty [data-action="close"]', '.ops-metrics > div',
+  '[data-action="tutorial"]', '[data-action="skin"]',
+].join(',');
 const tabs = {
   setup: { icon: 'flag', name: '출격', label: '작전 설정' },
   tactics: { icon: 'tactics', name: '병력', label: '전술 / 병력' },
@@ -266,7 +272,7 @@ export class OperationsCenter {
       const details = this.dialog.querySelector<HTMLDetailsElement>(`#${id}`); if (details) details.open = open;
     }
     for (const { selector, top, left } of scrolls) this.dialog.querySelector<HTMLElement>(selector)?.scrollTo({ top, left });
-    adoptTitles(this.dialog); this.hideTip();
+    adoptTitles(this.dialog, OPS_SILENT); this.hideTip();
   }
   private setup(v: OperationsView): string {
     const draft = this.draft ?? v.options;
