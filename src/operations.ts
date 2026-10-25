@@ -223,6 +223,11 @@ export class OperationsCenter {
   private render(): void {
     const v = this.actions.view();
     const disclosures = Array.from(this.dialog.querySelectorAll<HTMLDetailsElement>('details[id]')).map(el => ({ id: el.id, open: el.open }));
+    // 병력 명부·탭 사이드바처럼 자체 스크롤하는 영역은 다시 그려도 보던 위치를 유지해 연속 조정이 끊기지 않게 한다.
+    const scrolls = ['.ops-roster', '.ops-nav'].map(selector => {
+      const el = this.dialog.querySelector<HTMLElement>(selector);
+      return { selector, top: el?.scrollTop ?? 0, left: el?.scrollLeft ?? 0 };
+    });
     this.dialog.classList.toggle('is-reward', this.section === 'reward');
     this.dialog.innerHTML = `<header class="ops-header"><div class="ops-heading">${icon(this.section === 'reward' ? 'supply' : 'manage')}<div><h1>${this.section === 'reward' ? '전장 보상 선택' : '작전실'}</h1><p>${this.section === 'reward' ? `WAVE ${v.wave} CLEAR` : MAP_DEFS[v.options.map].name}</p></div></div><span class="ops-wallet" aria-label="미네랄 ${v.gold}">${icon('mineral')}${v.gold.toLocaleString()}</span>${v.pending.length ? '' : button('close', '', icon('close'), '전장 복귀', { className: 'ops-close', hint: '전장 복귀 [Esc / O]' })}</header>
       ${v.pending.length ? '' : `<nav class="ops-nav" aria-label="작전실 메뉴">${Object.entries(tabs).map(([key, tab]) => button('tab', key, `${icon(tab.icon)}<span>${tab.name}</span>`, tab.label, { selected: this.section === key })).join('')}</nav>`}
@@ -231,6 +236,7 @@ export class OperationsCenter {
     for (const { id, open } of disclosures) {
       const details = this.dialog.querySelector<HTMLDetailsElement>(`#${id}`); if (details) details.open = open;
     }
+    for (const { selector, top, left } of scrolls) this.dialog.querySelector<HTMLElement>(selector)?.scrollTo({ top, left });
   }
   private setup(v: OperationsView): string {
     const draft = this.draft ?? v.options;
