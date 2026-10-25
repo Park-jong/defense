@@ -103,92 +103,73 @@ export const TURRET_LAUNCH_PORTS = [{ x: 5, y: -4 }, { x: 21, y: -13 }];
 
 const tankBase = `
   <defs>
-    <linearGradient id="siegeHull" x1="0" y1="0" x2=".5" y2="1"><stop stop-color="#c6c8bd"/><stop offset=".22" stop-color="#8c9390"/><stop offset=".6" stop-color="#505a60"/><stop offset="1" stop-color="#222c35"/></linearGradient>
-    <linearGradient id="siegeEdge" x1="0" y1="0" x2=".3" y2="1"><stop stop-color="#f1efda"/><stop offset=".4" stop-color="#b6c0b8"/><stop offset="1" stop-color="#5a686a"/></linearGradient>
-    <linearGradient id="siegeRed" x1="0" y1="0" x2=".4" y2="1"><stop stop-color="#f19b8a"/><stop offset=".2" stop-color="#d55452"/><stop offset=".65" stop-color="#a02e3b"/><stop offset="1" stop-color="#512331"/></linearGradient>
+    <linearGradient id="siegeHull" x1="0" y1="0" x2=".2" y2="1"><stop stop-color="#aab0a5"/><stop offset=".35" stop-color="#747e7b"/><stop offset="1" stop-color="#35434a"/></linearGradient>
+    <linearGradient id="siegeRed" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c96c61"/><stop offset=".4" stop-color="#99443f"/><stop offset="1" stop-color="#522d32"/></linearGradient>
+    <linearGradient id="siegeTrack" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#424b4c"/><stop offset=".4" stop-color="#202c32"/><stop offset="1" stop-color="#111c23"/></linearGradient>
   </defs>
-  <ellipse cx="31" cy="39" rx="31" ry="23" fill="#000" opacity=".38"/>
+  <ellipse cx="31" cy="38" rx="30" ry="22" fill="#000" opacity=".35"/>
   <g stroke-linejoin="round">
-    <!-- Splayed suspension arms expose their black joints and silver hydraulic rods. -->
-    <path d="M25 27 13 16m17 23L15 50m22-13 13 13m-13-23 14-13" stroke="#0e1820" stroke-width="10" fill="none"/>
-    <path d="M25 26 13 15m17 23L15 49m22-13 13 13m-13-23 14-13" stroke="url(#siegeHull)" stroke-width="6" fill="none"/>
-    <path d="m22 25-8-9m11 24-9 8m23-7 9 8m-6-22 7-9" stroke="#d8dfd0" stroke-width="1.7"/>
-    <path d="m22 27-8-9m13 23-9 8m23-9 9 8m-7-22 7-9" stroke="#7a8584" stroke-width="1.1"/>
-    <!-- Three broad tread shoes carry red plates inside thick bevelled armour. -->
-    <path d="M2 10 10 5 22 10 23 21 15 29 3 24 0 18Z" fill="#101b23" stroke="#08121a" stroke-width="1.2"/>
-    <path d="M2 10 10 6 20 10 20 18 13 23 3 20Z" fill="url(#siegeHull)" stroke="#bfc5b7" stroke-width=".9"/>
-    <path d="m6 11 5-3 7 3-1 7-5 3-7-3Z" fill="url(#siegeRed)" stroke="#662e38" stroke-width=".6"/>
-    <path d="m9 11 2 7m-4-2 7-2m-4-3 3 7m-5-6 6 5" stroke="#f3ead4" stroke-width=".6"/>
-    <path d="m3 22 10 4 7-5m-16 4 9 3 6-5m-11-1-1 3m5-2-1 3m5-5-1 3" fill="none" stroke="#627277" stroke-width=".9"/>
-    <path d="M4 45 13 40 24 46 24 56 16 63 4 58 1 52Z" fill="#111c24" stroke="#09131a" stroke-width="1.2"/>
-    <path d="M4 45 13 41 22 46 21 54 15 59 5 55Z" fill="url(#siegeHull)" stroke="#bdc6b9" stroke-width=".8"/>
-    <path d="m7 46 6-3 6 4-1 7-4 3-7-3Z" fill="url(#siegeRed)" stroke="#672a36" stroke-width=".6"/>
-    <path d="m8 47 8 3m-8 1 8 3" stroke="#e7927e" stroke-width=".5"/>
-    <path d="m4 57 11 4 7-5m-16 1 1 3m4-2 1 3m5-3 1 2" fill="none" stroke="#73817d" stroke-width=".9"/>
-    <path d="M43 43 52 39 61 45 63 56 57 63 45 61 40 53Z" fill="#111c24" stroke="#09131a" stroke-width="1.2"/>
-    <path d="M44 43 52 40 59 45 60 54 54 59 45 56 42 51Z" fill="url(#siegeHull)" stroke="#cbd0bf" stroke-width=".8"/>
-    <path d="m47 45 5-2 5 4 1 7-5 3-6-3Z" fill="url(#siegeRed)" stroke="#672a36" stroke-width=".6"/>
-    <path d="m48 46 7 3m-7 0 8 3" stroke="#e7927e" stroke-width=".55"/>
-    <path d="m45 58 10 3 6-5m-13 2v3m4-2v3m5-3 2 1" fill="none" stroke="#73817d" stroke-width=".9"/>
-    <!-- The forward stabilizer ends in two long, separate ground claws. -->
-    <path d="M40 20 45 11 52 10 57 15 52 24 45 27Z" fill="url(#siegeHull)" stroke="#15242c"/>
-    <path d="m45 18 4-5 4 2-4 7-4 1Z" fill="#18252c" stroke="#a0aca6" stroke-width=".6"/>
-    <path d="m47 18 4-4m-5 6 4-4" stroke="#d4d9ca" stroke-width="1"/>
-    <path d="M48 11 49 5 54 1 57 4 54 11 51 15Zm7 5 3-6 5-2 1 4-4 7-5 2Z" fill="url(#siegeEdge)" stroke="#23343b" stroke-width="1"/>
-    <path d="m50 8 4-4 1 1-3 6Zm8 6 3-3 1 1-3 5Z" fill="#4a5557"/>
-    <!-- Low open chassis, black cooling bays and red corner guards. -->
-    <path d="M17 22 29 15 43 20 49 31 43 43 29 49 16 41 11 31Z" fill="#18232c" stroke="#0c1720" stroke-width="1.3"/>
-    <path d="M17 22 29 16 42 21 46 31 39 39 26 43 15 36 13 30Z" fill="url(#siegeHull)" stroke="#cbd0be" stroke-width=".8"/>
-    <path d="m17 26 8-5 5 2-6 7-8 1Zm18-5 7 3 2 7-7-1Zm-19 13 8 2 1 7-9-5Zm19 5 7-4 3 3-5 6-6 1Z" fill="#0d1c24" stroke="#71837f" stroke-width=".6"/>
-    <path d="m19 26 5-3m-4 5 5-3m12 0 5 2m-4 0 5 2m-24 7 4 2m-4 0 4 2m13 0 4-2" stroke="#45d84b" stroke-width=".8"/>
-    <path d="M17 22 22 19 27 21 23 27 17 28Zm18-5 7 2 4 5-5 2-5-3Zm-19 17 7 3 3 6-5 1-6-5Zm18 7 6-5 5 2-4 7-6 1Z" fill="url(#siegeRed)" stroke="#c4c9b9" stroke-width=".8"/>
-    <path d="m19 23 4-2m15-1 4 2m-24 14 4 2m14 6 4-4" stroke="#ffe0a5" stroke-width=".7"/>
-    <ellipse cx="30" cy="31" rx="12" ry="10" fill="#102029" stroke="#879a91" stroke-width="1.5"/>
-    <ellipse cx="30" cy="30" rx="9" ry="7" fill="url(#siegeHull)" stroke="#c9d3c1" stroke-width=".6"/>
-    <g fill="#22333c" stroke="#afbcad" stroke-width=".8"><circle cx="20" cy="30" r="2.2"/><circle cx="30" cy="40" r="2.2"/><circle cx="42" cy="31" r="2.2"/></g>
+    <!-- Short, broad outriggers sit close to the hull instead of separate legs. -->
+    <path d="M17 18 9 6 4 8 3 15 12 28Zm26 0L50 6l6 2 2 7-10 13ZM16 42 5 48 3 55l7 5 14-14Zm28 0 13 6 3 7-7 5-15-14Z" fill="#27343a" stroke="#101c23" stroke-width="1.4"/>
+    <path d="m14 19-6-8m37 8 8-8M15 45l-7 8m36-8 10 8" stroke="#9aa69d" stroke-width="3"/>
+    <path d="M3 7 10 5 14 10 11 16 3 16 1 12Zm47-2 8 2 3 5-3 4h-9l-3-6ZM3 50l8-2 5 6-5 6-9-2-1-5Zm47-2 8 2 4 4-3 5-9 1-5-6Z" fill="url(#siegeHull)" stroke="#15232b" stroke-width="1.2"/>
+    <path d="m4 9 5-1m42 0 5 1M4 54l6 2m41 0 6-2" stroke="#c5c9b7" stroke-width="1.4"/>
+    <!-- Two continuous tread housings establish a wide, low tank silhouette. -->
+    <path d="M10 12h35l8 6v8l-6 5H10l-5-6v-7Zm0 27h37l6 6v8l-8 5H10l-5-6v-7Z" fill="url(#siegeTrack)" stroke="#0d1921" stroke-width="1.6"/>
+    <path d="M10 14h33l7 5v5H9l-2-5Zm0 27h35l5 5v6H9l-2-6Z" fill="url(#siegeHull)" stroke="#89958d" stroke-width=".7"/>
+    <path d="M13 15h27l5 4v3H12Zm-1 27h28l6 5v3H12Z" fill="url(#siegeRed)" stroke="#4c3034" stroke-width=".7"/>
+    <path d="M10 26h36M10 54h35" stroke="#82908b" stroke-width="1"/>
+    <path d="M13 26v3m6-3v3m6-3v3m6-3v3m6-3v3m6-3v3M13 54v2m6-2v2m6-2v2m6-2v2m6-2v2m6-2v2" stroke="#101c22" stroke-width="2"/>
+    <!-- One connected armoured deck covers the suspension and anchors the turret. -->
+    <path d="M14 20h24l11 9v13l-11 8H14l-7-9V28Z" fill="#26363e" stroke="#101e27" stroke-width="1.4"/>
+    <path d="M14 20h24l10 9-9 14H15L8 31Z" fill="url(#siegeHull)" stroke="#a4aea1" stroke-width=".8"/>
+    <path d="m8 32 7 11h24l9-13v11l-10 8H15l-7-8Z" fill="#3c4c51"/>
+    <path d="m12 24 5-2h9l-4 7H12Zm1 11 9 2 4 6h-9Z" fill="url(#siegeRed)" stroke="#482e33" stroke-width=".7"/>
+    <path d="M12 29h8m-8 3h8m-7 3h6" stroke="#1b2a30" stroke-width="1.4"/>
+    <path d="m39 25 6 5-3 5-6-5Z" fill="#26383f" stroke="#88968c" stroke-width=".7"/>
+    <ellipse cx="32" cy="34" rx="13" ry="10" fill="#14252d" stroke="#929e92" stroke-width="1.2"/>
+    <ellipse cx="32" cy="31" rx="11" ry="8" fill="#626f6e" stroke="#b5bcac" stroke-width=".7"/>
+    <path d="m17 46h18" stroke="#7c8981" stroke-width=".8"/>
   </g>
 `;
 const tankHead = `
   <defs>
-    <linearGradient id="siegeTurret" x1="0" y1="0" x2=".25" y2="1"><stop stop-color="#e0e2cf"/><stop offset=".25" stop-color="#a3ada6"/><stop offset=".6" stop-color="#657277"/><stop offset="1" stop-color="#2d414b"/></linearGradient>
-    <linearGradient id="siegeBarrel" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#80948f"/><stop offset=".4" stop-color="#354851"/><stop offset="1" stop-color="#10252f"/></linearGradient>
-    <linearGradient id="siegePlate" x1="0" y1="0" x2=".3" y2="1"><stop stop-color="#f3a28b"/><stop offset=".25" stop-color="#d64c4d"/><stop offset=".7" stop-color="#982938"/><stop offset="1" stop-color="#4c2631"/></linearGradient>
+    <linearGradient id="siegeTurret" x1="0" y1="0" x2=".15" y2="1"><stop stop-color="#c4c9b7"/><stop offset=".35" stop-color="#8b9690"/><stop offset="1" stop-color="#455960"/></linearGradient>
+    <linearGradient id="siegeBarrel" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#d4d8c3"/><stop offset=".28" stop-color="#9aa79d"/><stop offset=".65" stop-color="#5d7072"/><stop offset="1" stop-color="#2d444e"/></linearGradient>
+    <linearGradient id="siegePlate" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#d07869"/><stop offset=".45" stop-color="#a24c46"/><stop offset="1" stop-color="#64353a"/></linearGradient>
   </defs>
   <g stroke-linejoin="round">
-    <path d="M12 28 24 20 37 25 43 35 33 45 20 45 11 36Z" fill="#07131c" opacity=".6"/>
-    <!-- Compact armoured breech leaves most of the forward silhouette to the long rails. -->
-    <path d="M12 25 23 18 35 22 42 31 36 41 24 46 13 39 9 31Z" fill="url(#siegeTurret)" stroke="#10232d" stroke-width="1.2"/>
-    <path d="m14 25 8-5 9 3-4 7-10 2Zm1 9 11-1 7 6-9 5-9-6Z" fill="url(#siegePlate)" stroke="#f1b39d" stroke-width=".7"/>
-    <path d="m16 25 6-3 5 1-4 3-5 1Z" fill="#f07b6c"/><path d="m17 37 5 3 6-2" fill="none" stroke="#ed9e86" stroke-width=".6"/>
-    <path d="M11 28 18 27 23 31 18 35 11 33Z" fill="#1c2b33" stroke="#abb8ac" stroke-width=".8"/>
-    <path d="M13 29h4m-4 2h5m-4 2h3" stroke="#4be548" stroke-width=".8"/>
-    <path d="M22 26 29 21 36 24 39 30 33 37 25 35Z" fill="url(#siegeTurret)" stroke="#243b43" stroke-width=".8"/>
-    <path d="m25 26 5-3 4 2-1 5-5 3-4-3Z" fill="url(#siegePlate)" stroke="#eac8ab" stroke-width=".65"/>
-    <path d="m27 26 4-1m-4 3 4-1" stroke="#f6c5a6" stroke-width=".6"/>
-    <!-- Deep black central channel, neon-green recoil coils and a silver sliding piston. -->
-    <path d="M31 23 47 25 55 29 55 35 47 39 31 41 26 35 26 29Z" fill="url(#siegeBarrel)" stroke="#8caaa0" stroke-width=".7"/>
-    <path d="M33 27h15l5 3v4l-5 3H33Z" fill="#07171e"/>
-    <path d="M34 29h12m-12 6h12" stroke="#16492d" stroke-width="3"/>
-    <path d="M34 29h12m-12 6h12" stroke="#4af343" stroke-width="1.5" stroke-dasharray="1.4 1.1"/>
-    <path d="M29 30h13v4H29Z" fill="url(#siegeTurret)" stroke="#1b3138" stroke-width=".7"/>
-    <path d="M32 30v4m2-4v4m2-4v4" stroke="#d2dccc" stroke-width=".6"/>
-    <!-- Two separated, pale-edged prongs form the distinctive open siege cannon. -->
-    <path d="M29 24 34 18 44 19 49 22 61 22 63 25v3H48l-6-3-11 3Z" fill="url(#siegeTurret)" stroke="#172d37" stroke-width="1"/>
-    <path d="m34 19 9 1 6 3h12l1 2H48l-6-3-10 4Z" fill="#d5ddcd"/>
-    <path d="M45 24h17v3H48Z" fill="#1b3138"/><path d="M49 25h11" stroke="#38c94a" stroke-width=".65"/>
-    <path d="m31 24 4-4 6 1 3 2-4 1-6-1-2 3Z" fill="url(#siegePlate)"/>
-    <path d="M29 40 34 46 44 45 49 42 61 42 63 39v-3H48l-6 3-11-3Z" fill="url(#siegeTurret)" stroke="#172d37" stroke-width="1"/>
-    <path d="m34 45 9-1 6-3h12l1-2H48l-6 3-10-4Z" fill="#d5ddcd"/>
-    <path d="M45 40h17v-3H48Z" fill="#1b3138"/><path d="M49 39h11" stroke="#38c94a" stroke-width=".65"/>
-    <path d="m31 40 4 4 6-1 3-2-4-1-6 1-2-3Z" fill="url(#siegePlate)"/>
-    <path d="m49 22 12 1m-12 19 12-1" stroke="#d7bd7b" stroke-width=".7"/>
-    <path d="M48 28v8l4-1v-6Z" fill="#273f45" stroke="#899f91" stroke-width=".5"/><path d="M51 30v4" stroke="#060f15" stroke-width="1.6"/>
-    <path d="m17 24 3-1m-5 13 4 2m15-15 4 1m-3 17 3-1" stroke="#f3d9ba" stroke-width=".6"/>
-    <g fill="#e5ddbf" stroke="#334a50" stroke-width=".3"><circle cx="14" cy="27" r=".65"/><circle cx="24" cy="21" r=".65"/><circle cx="24" cy="42" r=".65"/><circle cx="35" cy="26" r=".6"/></g>
+    <path d="M14 27 24 22h12l8 9v9l-11 7H21l-9-9Z" fill="#081820" opacity=".55"/>
+    <!-- A broad, single breech keeps the rotating turret visually planted. -->
+    <path d="M14 25 23 20h12l8 8v12l-10 6H22l-10-9Z" fill="#344951" stroke="#142832" stroke-width="1.3"/>
+    <path d="M14 25 23 20h12l8 8-7 10H22l-10-7Z" fill="url(#siegeTurret)" stroke="#bac3b0" stroke-width=".8"/>
+    <path d="m14 26 9-4h7l-4 8-10 3Z" fill="url(#siegePlate)" stroke="#673b3b" stroke-width=".7"/>
+    <path d="m16 35 9-2 9 6-3 4h-9Z" fill="url(#siegePlate)" stroke="#673b3b" stroke-width=".7"/>
+    <path d="m17 26 6-2h4" fill="none" stroke="#e5a084" stroke-width=".8"/>
+    <path d="m14 29 5-2v6l-5 1Z" fill="#23363d"/>
+    <path d="m15 29 3-1m-3 3 3-1" stroke="#84968b" stroke-width=".8"/>
+    <ellipse cx="29" cy="25" rx="4" ry="2.8" fill="#667b7b" stroke="#c0c8b3" stroke-width=".7"/>
+    <path d="M28 23h3" stroke="#344950" stroke-width=".8"/>
+    <!-- A closed barrel with a single dark muzzle replaces the open fork. -->
+    <path d="M33 27h13l5 3h8v7H47l-6 3h-8Z" fill="#0c1d27" opacity=".5" transform="translate(0 2)"/>
+    <path d="M34 28h23v8H34Z" fill="url(#siegeBarrel)" stroke="#203943" stroke-width="1"/>
+    <path d="M35 29h21" stroke="#d8deca" stroke-width="1.1"/>
+    <path d="M40 35h16" stroke="#304b55" stroke-width="1.2"/>
+    <path d="M28 27 32 25h5l4 4v7l-4 3h-5l-4-3Z" fill="url(#siegeTurret)" stroke="#263d45" stroke-width="1"/>
+    <path d="m30 28 3-1h4l2 2H31Z" fill="#d0d6c1"/>
+    <path d="M32 30h6v5h-6Z" fill="#53696e" stroke="#2d454d" stroke-width=".6"/>
+    <path d="M34 30v5m3-5v5" stroke="#a3b1a5" stroke-width="1"/>
+    <path d="M54 28 57 26h4l1 3v6l-1 3h-4l-3-2Z" fill="url(#siegeBarrel)" stroke="#203640" stroke-width="1"/>
+    <path d="m55 28 3-1h3" fill="none" stroke="#e0e2c9" stroke-width="1"/>
+    <path d="M59 29h2v6h-2Z" fill="#091923" stroke="#6e8888" stroke-width=".6"/>
+    <path d="M55 30v4" stroke="#314b55" stroke-width="1.1"/>
+    <path d="M35 22h3l2 3h-5Z" fill="#1a343d" stroke="#8c9f93" stroke-width=".6"/>
+    <path d="M36 23h2" stroke="#a1d7c4" stroke-width="1"/>
+    <g fill="#c9cbb5" stroke="#445a5b" stroke-width=".4"><circle cx="22" cy="23" r=".8"/><circle cx="22" cy="40" r=".8"/><circle cx="33" cy="41" r=".8"/></g>
   </g>
 `;
-// The recessed muzzle is at (52, 32), between the two forward recoil rails.
-export const SIEGE_MUZZLE = { x: 20, y: 0 };
+// Local offset from the turret's (32, 32) pivot to the muzzle at (60, 32).
+export const SIEGE_MUZZLE = { x: 28, y: 0 };
 
 const cannonBase = `
   <defs>
