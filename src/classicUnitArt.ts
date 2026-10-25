@@ -88,24 +88,4 @@ export const classicUnitLayers = {
       <path d="m53 29 9 3-9 6m-34-9-8 3 8 5" fill="none" stroke="#fff0c4" stroke-width="2"/>
       <path d="M26 24h9m-8 17h9" stroke="#f9e5a6" stroke-width="2"/>`,
   },
-  support: {
-    base: `<ellipse cx="31" cy="49" rx="28" ry="10" fill="#000" opacity=".35"/>
-      <path d="m9 26-7 10 9 11 19 6 24-9 8-11-12-12Z" fill="url(#steel)" stroke="#263f48" stroke-width="2"/>
-      <ellipse cx="32" cy="31" rx="25" ry="17" fill="#748e8b" stroke="#cfdbce" stroke-width="1.5"/>
-      <ellipse cx="32" cy="31" rx="18" ry="11" fill="#253e49" stroke="#9ebeb0"/>
-      <path d="m8 33 7 3m35-2 8-4M23 46l-2 6m20-8 3 6" stroke="#a4f1c9" stroke-width="3"/>`,
-    head: `<path d="M22 19 27 9h12l7 10-3 17-19 1Z" fill="url(#steel)" stroke="#1c3540" stroke-width="1.5"/>
-      <ellipse cx="33" cy="18" rx="13" ry="8" fill="#b6c8b6" stroke="#e1e7cc"/>
-      <ellipse cx="33" cy="18" rx="8" ry="4" fill="#1d3745"/><circle cx="33" cy="18" r="3" fill="#86eddb"/>
-      <path d="M32 11V3m-5 3h10m-9 23h12" stroke="#d8ddca" stroke-width="2"/>`,
-  },
-  observer: {
-    base: `<ellipse cx="32" cy="47" rx="21" ry="7" fill="#000" opacity=".3"/>
-      <path d="M22 23 7 12 3 18l10 18 10 6m18-19 16-11 4 7-9 18-12 5" fill="url(#gold)" stroke="#8e713d" stroke-width="1.5"/>
-      <path d="m23 34-9 16 6 5 12-12 12 12 6-5-9-16Z" fill="url(#goldDark)" stroke="#e1c580"/>`,
-    head: `<ellipse cx="32" cy="29" rx="16" ry="18" fill="url(#gold)" stroke="#644e2f" stroke-width="1.5"/>
-      <ellipse cx="32" cy="29" rx="10" ry="12" fill="#2d4c77" stroke="#ddd698"/>
-      <ellipse cx="32" cy="29" rx="6" ry="7" fill="#a3e5ff"/><circle cx="34" cy="27" r="3" fill="#efffff"/>
-      <path d="m24 14 8-8 8 8M21 39l-4 4m26-4 4 4" fill="none" stroke="#ffdc8c" stroke-width="2"/>`,
-  },
 } satisfies Partial<Record<TowerKey, { base: string; head: string }>>;

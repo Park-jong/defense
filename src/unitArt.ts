@@ -1,6 +1,7 @@
 import type { TowerKey } from './config';
 import type Phaser from 'phaser';
 import { classicUnitLayers } from './classicUnitArt';
+import { supportUnitLayers } from './supportUnitArt';
 
 // Layered, hand-drawn unit art. Each unit has a fixed chassis and a rotating weapon.
 const defs = `<defs>
@@ -589,6 +590,7 @@ const layers: Record<TowerKey, { base: string; head: string }> = {
   cruiser: { base: cruiserBase, head: cruiserHead },
   bunker: { base: bunkerBase, head: '' },
   ...classicUnitLayers,
+  ...supportUnitLayers,
 };
 
 export const UNIT_WORLD_SCALE: Partial<Record<TowerKey, number>> = { cannon: 1.15, cruiser: 1.3, carrier: 1.2 };
