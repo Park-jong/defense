@@ -42,6 +42,7 @@ interface Enemy {
 }
 
 interface TowerStats { dmg: number; range: number; rate: number; splash: number; slow: number }
+type StatsUnit = Pick<Tower, 'k' | 'lvl'> & Partial<Pick<Tower, 'id' | 'c' | 'r' | 'x' | 'y' | 'buffs' | 'host' | 'branch'>>;
 
 interface Projectile {
   s: Phaser.GameObjects.Image; x: number; y: number; tgt: Enemy; k: TowerKey; st: TowerStats; dead?: boolean; source?: string;
@@ -670,9 +671,10 @@ export class GameScene extends Phaser.Scene {
     const t = this.selected, k = t?.k ?? this.building;
     let title: string, msg: string;
     if (k) {
-      const d = TOWER_DEFS[k], st = t ? this.stats(t) : d;
+      const d = TOWER_DEFS[k];
       title = `${d.name}  ${t ? 'Lv.' + t.lvl : '/ 건설 대기'}`;
       const cell = t ?? this.hover;
+      const st = this.stats(t ?? { k, lvl: 1, ...(cell ? { ...cell, x: (cell.c + .5) * T, y: MAP_Y + (cell.r + .5) * T } : {}) });
       const highGround = cell ? highGroundRangeBonus(this.map, cell.c, cell.r) : 0;
       const terrainHint = highGround ? ` · 고지 +${highGround}` : '';
       if (k === 'bunker') {
@@ -680,9 +682,9 @@ export class GameScene extends Phaser.Scene {
         title = `벙커  ${crew.length}/${BUNKER_CAPACITY} 주둔`;
         msg = `보병 최대 4기 · 사거리 +${BUNKER_RANGE_BONUS}${terrainHint}\n` + (crew.length ? crew.map(p => `${TOWER_DEFS[p.k].name} Lv.${p.lvl} · 스킬 ${p.skills.length}/2`).join('\n') : '현재 주둔 병력 없음\n빈 벙커는 공격하지 않습니다.\n명령 아이콘으로 탑승·구매');
       } else if (k === 'support' || k === 'observer') {
-        msg = `지원 사거리 ${(st.range + (t ? 0 : this.bonuses.range + highGround)).toFixed(0)}${terrainHint}\n` + (k === 'support' ? `주변 공격 속도 +${20 + ((t?.lvl ?? 1) - 1) * 5}%\n같은 지원 효과는 중첩되지 않습니다.` : '적 하나의 약점을 3초 노출\n받는 피해 +35%') + '\n강화·특화로 지원 성능 개선';
+        msg = `지원 사거리 ${st.range.toFixed(0)}${terrainHint}\n` + (k === 'support' ? `주변 공격 속도 +${20 + ((t?.lvl ?? 1) - 1) * 5}%\n같은 지원 효과는 중첩되지 않습니다.` : '적 하나의 약점을 3초 노출\n받는 피해 +35%') + '\n강화·특화로 지원 성능 개선';
       } else {
-        msg = `공격 ${st.dmg.toFixed(0)}${attackCount(k) > 1 ? ` × ${attackCount(k)}` : ''} · 사거리 ${(st.range + (t ? 0 : this.bonuses.range + highGround)).toFixed(0)}${terrainHint}\n공격 속도 ${(1 / st.rate).toFixed(1)}/초\n자동 스킬 ${t?.skills.length ?? 0}/${SKILL_SLOTS}`;
+        msg = `공격 ${st.dmg.toFixed(0)}${attackCount(k) > 1 ? ` × ${attackCount(k)}` : ''} · 사거리 ${st.range.toFixed(0)}${terrainHint}\n공격 속도 ${(1 / st.rate).toFixed(1)}/초\n자동 스킬 ${t?.skills.length ?? 0}/${SKILL_SLOTS}`;
         msg += t?.skills.length ? '\n' + t.skills.map(s => `${SKILL_DEFS[s.key].name} ${s.cd > 0 ? Math.ceil(s.cd) + '초' : '준비'}`).join('\n') : '\n명령 아이콘으로 스킬 장착';
         if (t?.host) title += ' / 탑승';
       }
@@ -867,6 +869,7 @@ export class GameScene extends Phaser.Scene {
   private shopState(): ShopState {
     return { gold: this.gold, selectedId: this.selected?.id ?? null, mode: this.options.mode,
       units: this.towers.map(t => ({ id: t.id, k: t.k, lvl: t.lvl, skills: t.skills, c: t.c, r: t.r,
+        stats: this.stats(t), nextStats: this.stats({ ...t, lvl: Math.min(MAX_UNIT_LEVEL, t.lvl + 1) }),
         hostId: t.host?.id, passengers: t.passengers.map(p => p?.id ?? null) })) };
   }
 
@@ -898,13 +901,15 @@ export class GameScene extends Phaser.Scene {
     return { count: plan.ids.length, cost: plan.cost };
   }
 
-  private stats(t: Tower): TowerStats {
+  private stats(t: StatsUnit): TowerStats {
     const d: { dmg: number; range: number; rate: number; splash?: number; slow?: number } = TOWER_DEFS[t.k];
     const l = t.lvl - 1, base = levelStats(t.k, t.lvl);
     let aura = 1;
-    for (const ally of this.towers) if (ally !== t && ally.k === 'support' && Math.hypot(ally.x - t.x, ally.y - t.y) <= this.supportRange(ally)) aura = Math.max(aura, 1.2 + (ally.lvl - 1) * .05);
-    const haste = t.buffs.reduce((v, b) => v * b.haste, 1) * aura * (1 + this.bonuses.haste) * (t.branch === 'rapid' ? 1.4 : 1);
-    const power = t.buffs.reduce((v, b) => v * b.power, 1);
+    if (t.x !== undefined && t.y !== undefined) {
+      for (const ally of this.towers) if (ally.id !== t.id && ally.k === 'support' && Math.hypot(ally.x - t.x, ally.y - t.y) <= this.supportRange(ally)) aura = Math.max(aura, 1.2 + (ally.lvl - 1) * .05);
+    }
+    const haste = (t.buffs ?? []).reduce((v, b) => v * b.haste, 1) * aura * (1 + this.bonuses.haste) * (t.branch === 'rapid' ? 1.4 : 1);
+    const power = (t.buffs ?? []).reduce((v, b) => v * b.power, 1);
     return {
       dmg: base.dmg * power * (1 + this.bonuses.power) * (t.branch === 'power' ? 1.7 : 1),
       range: this.supportRange(t) + (t.host ? BUNKER_RANGE_BONUS : 0),
@@ -913,8 +918,8 @@ export class GameScene extends Phaser.Scene {
       slow: d.slow ? Math.max(.2, d.slow - .08 * l) : 0,
     };
   }
-  private supportRange(t: Tower): number {
-    return levelStats(t.k, t.lvl).range + this.bonuses.range + highGroundRangeBonus(this.map, t.c, t.r) + (['support', 'observer'].includes(t.k) && t.branch ? t.branch === 'power' ? 45 : 25 : 0);
+  private supportRange(t: StatsUnit): number {
+    return levelStats(t.k, t.lvl).range + this.bonuses.range + highGroundRangeBonus(this.map, t.c ?? -1, t.r ?? -1) + (['support', 'observer'].includes(t.k) && t.branch ? t.branch === 'power' ? 45 : 25 : 0);
   }
   private upgradeCost(t: Tower): number { return unitUpgradeCost(t); }
   private sellValue(t: Tower): number { return Math.round(t.spent * .7); }

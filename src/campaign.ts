@@ -26,9 +26,9 @@ export const BRANCHES = {
 };
 export type Branch = keyof typeof BRANCHES;
 export const REWARDS = {
-  power: { name: '고출력 탄두', desc: '모든 병력 공격력 +12%' },
-  haste: { name: '가속 장전', desc: '모든 병력 공격 속도 +10%' },
-  range: { name: '장거리 센서', desc: '모든 병력 사거리 +12' },
+  power: { name: '고출력 탄두', desc: '모든 병력 공격력 +12% (이후 배치 포함)' },
+  haste: { name: '가속 장전', desc: '모든 병력 공격 속도 +10% (이후 배치 포함)' },
+  range: { name: '장거리 센서', desc: '모든 병력 사거리 +12 (이후 배치 포함)' },
   repair: { name: '기지 수리', desc: '기지 내구도 4 회복 (최대 20)' },
   supply: { name: '긴급 보급', desc: '미네랄 150 획득 (제한 예산에서는 등장하지 않음)' },
 };

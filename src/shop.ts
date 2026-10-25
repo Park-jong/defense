@@ -2,8 +2,8 @@ import { attackDamage, TOWER_DEFS, TOWER_KEYS, TowerKey } from './config';
 import { EquippedSkill, SKILL_DEFS, SKILL_KEYS, SKILL_SLOTS, SkillKey } from './catalog';
 import { unitImageUrl } from './unitArt';
 import { commandIconUrl } from './commandIcons';
-import { BUNKER_CAPACITY, BUNKER_INFANTRY, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
-import { levelStats, MAX_UNIT_LEVEL, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
+import { BUNKER_CAPACITY, BUNKER_INFANTRY, InfantryKey, isInfantry } from './bunker';
+import { MAX_UNIT_LEVEL, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
 import { RunOptions } from './campaign';
 import './shop.css';
 
@@ -11,6 +11,7 @@ const icon = (key: string): string => `<img class="shop-icon" src="${commandIcon
 
 export interface ShopUnit {
   id: string; k: TowerKey; lvl: number; skills: EquippedSkill[]; c: number; r: number;
+  stats: { dmg: number; range: number; rate: number }; nextStats: { dmg: number; range: number; rate: number };
   hostId?: string; passengers: (string | null)[];
 }
 export interface ShopState { gold: number; units: ShopUnit[]; selectedId: string | null; mode?: RunOptions['mode'] }
@@ -149,15 +150,15 @@ export class SupplyShop {
     const d = TOWER_DEFS[u.k];
     const toGarrison = `<button type="button" class="garrison-unload" data-action="tab" data-key="garrison" aria-label="벙커 탭으로 이동" title="벙커 탭으로 이동"><img src="${this.images.get('bunker')}" alt="" width="22" height="22"></button>`;
     if (u.k === 'bunker') return `<section class="army-detail army-pointer"><img src="${this.images.get('bunker')}" alt="" width="64" height="64"><p>벙커는 벙커 탭에서 주둔 병력을 관리합니다</p>${toGarrison}</section>`;
-    const max = u.lvl >= MAX_UNIT_LEVEL, cost = unitUpgradeCost(u), cur = levelStats(u.k, u.lvl), next = levelStats(u.k, Math.min(MAX_UNIT_LEVEL, u.lvl + 1));
-    const bonus = u.hostId ? BUNKER_RANGE_BONUS : 0, support = u.k === 'support' || u.k === 'observer';
+    const max = u.lvl >= MAX_UNIT_LEVEL, cost = unitUpgradeCost(u), cur = u.stats, next = u.nextStats;
+    const support = u.k === 'support' || u.k === 'observer';
     const stat = (art: string, label: string, now: number, then: number, digits = 0): string => {
       const text = (v: number) => String(+v.toFixed(digits)), changed = !max && text(now) !== text(then);
       return `<div class="army-stat" title="${label}" aria-label="${label} ${text(now)}${changed ? ` → ${text(then)}` : ''}">${icon(art)}<b>${text(now)}</b>${changed ? `<i>→ ${text(then)}</i>` : ''}<small>${label}</small></div>`;
     };
     const stats = support
-      ? stat('range', '지원 반경', cur.range + bonus, next.range + bonus) + (u.k === 'support' ? stat('overdrive', '주변 공속 +%', 20 + (u.lvl - 1) * 5, 20 + u.lvl * 5) : stat('weak', '받는 피해 +%', 35, 35))
-      : stat('siege', '공격력', attackDamage(u.k, cur.dmg), attackDamage(u.k, next.dmg)) + stat('range', '사거리', cur.range + bonus, next.range + bonus) + stat('overdrive', '초당 공격', 1 / cur.rate, 1 / next.rate, 2) + stat('barrage', 'DPS', attackDamage(u.k, cur.dmg) / cur.rate, attackDamage(u.k, next.dmg) / next.rate, 1);
+      ? stat('range', '지원 반경', cur.range, next.range) + (u.k === 'support' ? stat('overdrive', '주변 공속 +%', 20 + (u.lvl - 1) * 5, 20 + u.lvl * 5) : stat('weak', '받는 피해 +%', 35, 35))
+      : stat('siege', '공격력', attackDamage(u.k, cur.dmg), attackDamage(u.k, next.dmg)) + stat('range', '사거리', cur.range, next.range) + stat('overdrive', '초당 공격', 1 / cur.rate, 1 / next.rate, 2) + stat('barrage', 'DPS', attackDamage(u.k, cur.dmg) / cur.rate, attackDamage(u.k, next.dmg) / next.rate, 1);
     const skills = SKILL_KEYS.filter(key => SKILL_DEFS[key].unit === u.k);
     return `<section class="army-detail" aria-label="${d.name} 상세">
       <header class="army-head"><img src="${this.images.get(u.k)}" alt="" width="72" height="72"><div><h3>${d.name} <small>${max ? 'MAX' : `Lv.${u.lvl}`}</small></h3>

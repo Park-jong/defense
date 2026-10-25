@@ -268,6 +268,86 @@ test('5웨이브 보상은 세 개의 서로 다른 선택지를 제공하고 �
   for (let i = 0; i < 20; i++) { const choices = rules.rewardChoices('budget'); assert.equal(new Set(choices).size, 3); assert.ok(!choices.includes('supply')); }
 });
 
+test('누적 전장 보상은 모든 종류의 기존 병력과 이후 건설한 병력에 똑같이 적용된다', () => {
+  for (const k of config.TOWER_KEYS) {
+    const s = setup(), existing = place(s, k);
+    for (const [i, key] of ['power', 'haste', 'range', 'power'].entries()) {
+      s.wave = (i + 1) * 5; s.pending = ['power', 'haste', 'range']; s.takeReward(key);
+    }
+    const added = place(s, k, 7), d = config.TOWER_DEFS[k];
+    assert.deepEqual(s.stats(added), s.stats(existing), k);
+    assert.equal(s.stats(added).dmg, d.dmg * 1.24, k);
+    assert.equal(s.stats(added).range, d.range + 12, k);
+    assert.equal(s.stats(added).rate, d.rate / ((k === 'support' ? 1.2 : 1) * 1.1), k);
+  }
+});
+
+test('보상 후 벙커 충원과 저장 복원 뒤 새 병력도 전장 보상을 한 번씩 받는다', () => {
+  const s = setup(), bunker = place(s, 'bunker');
+  for (const [i, key] of ['power', 'haste', 'range'].entries()) {
+    s.wave = (i + 1) * 5; s.pending = ['power', 'haste', 'range']; s.takeReward(key);
+  }
+  s.recruit(bunker.id, 0, 'marine');
+  const expected = s.stats(bunker.passengers[0]);
+  assert.equal(expected.dmg, config.TOWER_DEFS.marine.dmg * 1.12);
+  assert.equal(expected.range, config.TOWER_DEFS.marine.range + 12 + 24);
+  assert.equal(expected.rate, config.TOWER_DEFS.marine.rate / 1.1);
+  const store = memory(), save = { ...checkpoint(), wave: s.wave, units: s.savedUnits(), bonuses: { ...s.bonuses },
+    stats: s.runStats, pending: [], rewarded: s.rewarded, usedKinds: s.usedKinds };
+  rules.writeStored(rules.SAVE_KEY, save, store);
+  const restored = setup(); restored.restoreCheckpoint(rules.readSave(store));
+  const restoredBunker = restored.towers[0]; restored.recruit(restoredBunker.id, 1, 'marine');
+  assert.deepEqual(restored.stats(restoredBunker.passengers[0]), expected);
+  assert.deepEqual(restored.stats(restoredBunker.passengers[1]), expected);
+  const added = place(restored, 'marine', 7);
+  assert.equal(restored.stats(added).dmg, expected.dmg);
+  assert.equal(restored.stats(added).range, expected.range - 24);
+  assert.equal(restored.stats(added).rate, expected.rate);
+});
+
+test('건설 대기 정보는 전장 보상·고지·지원 오라를 반영해 배치 직후 정보와 일치한다', () => {
+  const s = setup('standard', 'canyon');
+  s.bonuses = { power: .24, haste: .2, range: 24 };
+  place(s, 'support', 7, 2);
+  const label = () => ({ text: '', setText(value) { this.text = value; return this; }, setColor() {}, setTexture() {}, setDisplaySize() {} });
+  for (const key of ['hud', 'mineralTxt', 'lifeTxt', 'unitTitle', 'info', 'unitImage']) s[key] = label();
+  s.goBtn = s.shopBtn = { set() {}, en() {} }; s.commandCard = { update() {} }; s.commands = () => [];
+  for (const k of ['marine', 'carrier', 'support', 'observer']) {
+    s.selected = null; s.building = k; s.hover = { c: 6, r: 2 }; s.refreshUI();
+    const preview = s.info.text, tower = place(s, k, 6, 2);
+    s.selected = tower; s.building = null; s.refreshUI();
+    assert.equal(s.info.text, preview, k);
+    s.towers = s.towers.filter(t => t !== tower);
+  }
+});
+
+test('보급 상점의 현재·강화 예상 수치는 보상·특화·주둔·고지·버프·오라를 포함한 전투 계산과 같다', () => {
+  const { SupplyShop } = createSourceLoader({ './unitArt': { unitImageUrl: () => '' }, './commandIcons': { commandIconUrl: () => '' }, './shop.css': {} })('./shop');
+  const shop = Object.create(SupplyShop.prototype); shop.images = new Map();
+  const s = setup('standard', 'canyon'), bunker = place(s, 'bunker', 6, 2), support = place(s, 'support', 7, 2);
+  s.recruit(bunker.id, 0, 'marine'); const marine = bunker.passengers[0];
+  s.bonuses = { power: .24, haste: .2, range: 24 };
+  marine.lvl = support.lvl = 3; marine.branch = 'power'; support.branch = 'rapid';
+  marine.buffs = [{ left: 4, haste: 1.8, power: 1.3 }];
+  for (const tower of [marine, support]) {
+    const state = s.shopState(), unit = state.units.find(u => u.id === tower.id), current = s.stats(tower);
+    assert.deepEqual(unit.stats, current);
+    tower.lvl++; const next = s.stats(tower); tower.lvl--;
+    assert.deepEqual(unit.nextStats, next);
+    const html = shop.armyDetail(state, unit);
+    const stat = (label, now, then, digits = 0) => {
+      const format = v => String(+v.toFixed(digits));
+      assert.ok(html.includes(`aria-label="${label} ${format(now)}${format(now) !== format(then) ? ` → ${format(then)}` : ''}"`), label);
+    };
+    stat(tower === support ? '지원 반경' : '사거리', current.range, next.range);
+    if (tower === marine) {
+      stat('공격력', current.dmg, next.dmg);
+      stat('초당 공격', 1 / current.rate, 1 / next.rate, 2);
+      stat('DPS', current.dmg / current.rate, next.dmg / next.rate, 1);
+    }
+  }
+});
+
 test('지휘관 능력은 교전 중에만 작동하고 보스 피해·감속·재사용 제한을 지킨다', () => {
   const s = setup(), e = spawn(s, 'grunt'), boss = spawn(s, 'boss'); boss.shield = 0;
   s.useCommander('strike'); assert.equal(e.hp, e.max);
