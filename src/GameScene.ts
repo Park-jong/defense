@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import {
-  CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE, COLS, CONSOLE_Y, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, FINAL_BOSS_HP_MULT, FONT, GAME_W, H, MAP_H, MAP_Y, MAX_CATCHUP_SEC, MAX_WAVE, MOBILE_LAYOUT, RENDER_SCALE, RIBBON_BAND, ROWS, SIDE_RIBBON_H, SIDE_W, STEP_SEC, T, TEST_GOLD, TOP_BAR_H, TOWER_DEFS, TowerKey, VIEW_H, W,
+  CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE, COLS, SUPPORT_BRANCH_RANGE, CONSOLE_Y, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, FINAL_BOSS_HP_MULT, FONT, GAME_W, H, MAP_H, MAP_Y, MAX_CATCHUP_SEC, MAX_WAVE, MOBILE_LAYOUT, RENDER_SCALE, RIBBON_BAND, ROWS, SIDE_RIBBON_H, SIDE_W, STEP_SEC, T, TEST_GOLD, TOP_BAR_H, TOWER_DEFS, TowerKey, VIEW_H, W,
 } from './config';
 import { drawMap, makeTextures } from './textures';
 import { attackCount } from './data/units';
@@ -919,7 +919,7 @@ export class GameScene extends Phaser.Scene {
     };
   }
   private supportRange(t: StatsUnit): number {
-    return levelStats(t.k, t.lvl).range + this.bonuses.range + highGroundRangeBonus(this.map, t.c ?? -1, t.r ?? -1) + (['support', 'observer'].includes(t.k) && t.branch ? t.branch === 'power' ? 45 : 25 : 0);
+    return levelStats(t.k, t.lvl).range + this.bonuses.range + highGroundRangeBonus(this.map, t.c ?? -1, t.r ?? -1) + (['support', 'observer'].includes(t.k) && t.branch ? SUPPORT_BRANCH_RANGE : 0);
   }
   private upgradeCost(t: Tower): number { return unitUpgradeCost(t); }
   private sellValue(t: Tower): number { return Math.round(t.spent * .7); }

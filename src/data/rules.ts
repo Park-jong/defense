@@ -17,3 +17,5 @@ export const CLEAR_BONUS_PER_WAVE = 4;
 export const FINAL_BOSS_HP_MULT = 1;
 /** 테스트 모드(`?test`): MAX_WAVE 스테이지를 반복하며, 아래의 고정 미네랄을 지급한다. */
 export const TEST_GOLD = 100000;
+/** 지원 유닛(사이언스 베슬·옵저버)은 어느 특화를 골라도 지원 사거리가 같은 만큼 늘어난다. */
+export const SUPPORT_BRANCH_RANGE = 45;

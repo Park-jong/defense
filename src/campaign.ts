@@ -22,7 +22,7 @@ export const TARGETS = { first: '선두', strong: '체력 높은 적', weak: '�
 export type TargetMode = keyof typeof TARGETS;
 export const BRANCHES = {
   power: { name: '집중 화력', desc: '공격력 +70% · 공격 간격 +15% · 지원 유닛은 지원 사거리 +45' },
-  rapid: { name: '전술 확장', desc: '공격 속도 +40% · 범위 공격 반경 +35% · 지원 유닛은 지원 사거리 +25' },
+  rapid: { name: '전술 확장', desc: '공격 속도 +40% · 범위 공격 반경 +35% · 지원 유닛은 지원 사거리 +45' },
 };
 export type Branch = keyof typeof BRANCHES;
 export const REWARDS = {

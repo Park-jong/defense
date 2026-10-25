@@ -1,4 +1,4 @@
-import { attackCount, attackDamage, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, GAME_W, MAP_DEFS, MAX_WAVE, MOBILE_LAYOUT, TEST_GOLD, SIDE_W, TOP_BAR_H, TOWER_DEFS, TowerKey, TOWER_KEYS, W } from './config';
+import { attackCount, attackDamage, SUPPORT_BRANCH_RANGE, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, GAME_W, MAP_DEFS, MAX_WAVE, MOBILE_LAYOUT, TEST_GOLD, SIDE_W, TOP_BAR_H, TOWER_DEFS, TowerKey, TOWER_KEYS, W } from './config';
 import { SKILL_DEFS, SKILL_KEYS } from './catalog';
 import { unitImageUrl } from './unitArt';
 import { commandIconUrl } from './commandIcons';
@@ -291,7 +291,7 @@ export class OperationsCenter {
     return `${forecast}<div class="ops-section-heading"><h2>내 병력 <small>${v.units.length}</small></h2></div><div class="ops-roster" role="group" aria-label="배치된 병력">${v.units.map(t => button('select', t.id, `${this.art(t.k)}<span class="ops-level" aria-hidden="true">${t.hostId ? '↳ ' : ''}${'•'.repeat(t.lvl)}</span>`, `${TOWER_DEFS[t.k].name} #${t.id} · Lv.${t.lvl}${t.hostId ? ' · 주둔' : ''}`, { selected: t.id === u?.id })).join('')}</div>
       ${u ? `<section class="ops-unit"><div class="ops-unit-heading">${this.art(u.k)}<div><h2>${TOWER_DEFS[u.k].name}<small>Lv.${u.lvl}</small></h2><p>${TOWER_DEFS[u.k].role}</p></div>${button('move', '', `${icon('move')}<small>◆ 20</small>`, '선택 병력 재배치 · ◆ 20', { disabled: v.over || v.active || !!u.hostId || v.gold < 20, className: 'ops-move', hint: '준비 시간에 빈 칸으로 재배치 · ◆ 20 · 빈 칸 선택 시 비용 차감' })}</div>${u.k !== 'bunker' ? `<div class="ops-targets" role="group" aria-label="공격 대상 우선순위">${(Object.keys(TARGETS) as TargetMode[]).map(k => button('target', k, `${icon(targetIcons[k])}<span>${targetNames[k]}</span>`, TARGETS[k] + ' 우선', { disabled: v.over, selected: u.target === k })).join('')}</div><div class="ops-section-heading ops-branch-heading"><h3>특화</h3><span>${u.branch ? '선택 완료' : `Lv.3 · ◆ ${TOWER_DEFS[u.k].cost} · 선택 후 변경 불가`}</span></div><div class="ops-branches">${(Object.keys(BRANCHES) as (keyof typeof BRANCHES)[]).map(k => {
         const support = u.k === 'support' || u.k === 'observer';
-        const value = support ? `+${k === 'power' ? 45 : 25}` : k === 'power' ? '+70%' : '+40%';
+        const value = support ? `+${SUPPORT_BRANCH_RANGE}` : k === 'power' ? '+70%' : '+40%';
         const detail = support ? '지원 사거리' : k === 'power' ? '공격력 · 간격 +15%' : '공속 · 범위 +35%';
         return button('branch', k, `${icon(k === 'power' ? 'siege' : 'overdrive')}<span><b>${BRANCHES[k].name}</b><small>${detail}</small></span><strong>${value}</strong>`, u.branch === k ? '선택 완료' : BRANCHES[k].name + ' 선택', { disabled: v.over || u.lvl < 3 || !!u.branch || v.gold < TOWER_DEFS[u.k].cost, selected: u.branch === k, hint: `${BRANCHES[k].name} · ${BRANCHES[k].desc} · ◆ ${TOWER_DEFS[u.k].cost} · 선택 후 변경 불가` });
       }).join('')}</div>` : `<p class="ops-muted">보병 보급과 강화는 벙커 명령 아이콘에서.</p>`}</section>` : '<p class="ops-muted">병력을 선택해 전술을 바꾸세요.</p>'}`;
