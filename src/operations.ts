@@ -66,7 +66,8 @@ const tabs = {
 /** Preview the actual routes so the map can be chosen without a settings form. */
 function mapPreview(key: RunOptions['map']): string {
   const routes = MAP_DEFS[key].routes.map(route => `<polyline points="${route.map(([c, r]) => `${(c + 1) * 8},${(r + 1) * 8}`).join(' ')}"/>`).join('');
-  return `<svg class="ops-map" viewBox="0 0 168 104" fill="none" aria-hidden="true"><path class="ops-map-grid" d="M0 24h168M0 48h168M0 72h168M0 96h168M24 0v104M48 0v104M72 0v104M96 0v104M120 0v104M144 0v104"/><g class="ops-map-road">${routes}</g><g class="ops-map-route">${routes}</g>${MAP_DEFS[key].routes.map(route => `<circle class="ops-map-entry" cx="${(route[0][0] + 1) * 8 + 3}" cy="${(route[0][1] + 1) * 8}" r="3"/>`).join('')}</svg>`;
+  const highlands = key === 'canyon' ? MAP_DEFS.canyon.highGround.areas.map(([c, r, w, h]) => `<rect class="ops-map-highland" x="${(c + .5) * 8}" y="${(r + .5) * 8}" width="${w * 8}" height="${h * 8}" rx="3"/><path class="ops-map-elevation" d="M${(c + w / 2 + 1) * 8 - 4} ${(r + h / 2 + 1) * 8 + 1}l4-4 4 4m-8 4 4-4 4 4"/>`).join('') : '';
+  return `<svg class="ops-map${key === 'canyon' ? ' ops-map-canyon' : ''}" viewBox="0 0 168 104" fill="none" aria-hidden="true"><path class="ops-map-grid" d="M0 24h168M0 48h168M0 72h168M0 96h168M24 0v104M48 0v104M72 0v104M96 0v104M120 0v104M144 0v104"/><g class="ops-map-road">${routes}</g><g class="ops-map-route">${routes}</g>${highlands}${MAP_DEFS[key].routes.map(route => `<circle class="ops-map-entry" cx="${(route[0][0] + 1) * 8 + 3}" cy="${(route[0][1] + 1) * 8}" r="3"/>`).join('')}</svg>`;
 }
 
 export class OperationsCenter {

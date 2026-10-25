@@ -97,6 +97,55 @@ test('합류 지대의 적은 두 입구를 번갈아 사용하고 자신의 경
   const bx = b.x; s.step(.1); assert.ok(b.x > bx); assert.equal(b.y, s.map.routes[1][0].y);
 });
 
+test('협곡 고지의 사거리 보너스는 실제 표적 선택·강화·지원 오라에 적용된다', () => {
+  const s = setup('standard', 'canyon');
+  const tower = place(s, 'arrow', 6, 2), base = config.TOWER_DEFS.arrow.range;
+  const enemy = spawn(s, 'grunt', tower.x + base + 12, tower.y);
+  assert.equal(s.stats(tower).range, base + 24);
+  assert.equal(s.findTarget(tower), enemy);
+  s.selected = tower; assert.equal(s.beginRelocate(), true); s.finishRelocate(3, 2);
+  assert.equal(s.stats(tower).range, base);
+  enemy.x = tower.x + base + 12; enemy.y = tower.y;
+  assert.equal(s.findTarget(tower), null);
+  s.selected = tower; s.beginRelocate(); s.finishRelocate(6, 2);
+  s.upgradeUnit(tower.id); s.bonuses.range = 12;
+  assert.equal(s.stats(tower).range, config.TOWER_DEFS.arrow.range * 1.08 + 12 + 24);
+  const support = place(s, 'support', 8, 2), ally = place(s, 'marine', 15, 2);
+  // Keep coordinates 12 beyond the normal aura edge, inside the high-ground extension.
+  ally.x = support.x + config.TOWER_DEFS.support.range + s.bonuses.range + 12; ally.y = support.y;
+  assert.ok(s.stats(ally).rate < config.TOWER_DEFS.marine.rate);
+  s.selected = support; s.beginRelocate(); s.finishRelocate(14, 2);
+  ally.x = support.x + config.TOWER_DEFS.support.range + s.bonuses.range + 12;
+  assert.equal(s.stats(ally).rate, config.TOWER_DEFS.marine.rate);
+});
+
+test('협곡 고지의 벙커 병력은 보너스를 한 번만 받고 재배치·하차 시 새 지형을 따른다', () => {
+  const s = setup('standard', 'canyon'), bunker = place(s, 'bunker', 6, 2);
+  assert.equal(s.recruit(bunker.id, 0, 'marine'), true);
+  const marine = bunker.passengers[0], base = config.TOWER_DEFS.marine.range;
+  const { BUNKER_RANGE_BONUS } = load('./bunker');
+  assert.equal(s.stats(marine).range, base + BUNKER_RANGE_BONUS + 24);
+  s.selected = bunker; s.beginRelocate(); s.finishRelocate(3, 2);
+  assert.equal(s.stats(marine).range, base + BUNKER_RANGE_BONUS);
+  s.beginUnload(marine.id); s.finishUnload(7, 2);
+  assert.equal(s.stats(marine).range, base + 24);
+  assert.equal(marine.host, undefined);
+  s.selected = marine; s.beginRelocate(); s.finishRelocate(4, 2);
+  assert.equal(s.stats(marine).range, base);
+});
+
+test('기존 협곡 체크포인트는 고지·일반 칸을 모두 복원하고 지형 보너스를 다시 계산한다', () => {
+  for (const r of [2, 11]) {
+    const save = checkpoint(); save.options.map = 'canyon';
+    for (const unit of save.units) unit.r = r;
+    assert.equal(rules.validateSave(save), true);
+    const s = setup('standard', 'canyon'); s.restoreCheckpoint(save);
+    const marine = s.towers[1];
+    const low = setup('standard', 'junction'); low.restoreCheckpoint({...save, options: {...save.options, map: 'junction'}});
+    assert.equal(s.stats(marine).range - low.stats(low.towers[1]).range, r === 2 ? 24 : 0);
+  }
+});
+
 test('타겟 우선순위는 체력·보스·도착까지 남은 거리로 적을 고르고 범위 밖은 제외한다', () => {
   const s = setup(), t = place(s, 'sniper');
   const a = spawn(s, 'grunt', t.x, t.y + 30), b = spawn(s, 'boss', t.x + 20, t.y + 30);

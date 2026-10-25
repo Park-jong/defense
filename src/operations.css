@@ -79,6 +79,12 @@
 .ops-map-entry { fill:#dba16c; }
 .ops-map-picker button[aria-pressed="true"] .ops-map-road { stroke:#647e44; }
 .ops-map-picker button[aria-pressed="true"] .ops-map-route { stroke:#d4eda9; }
+.ops-map-canyon { background:radial-gradient(ellipse at 45% 35%,#81503980,#36282b); border-radius:5px; }
+.ops-map-canyon .ops-map-grid { stroke:#e5b37c; }
+.ops-map-picker button .ops-map-canyon .ops-map-road { stroke:#b68a59; }
+.ops-map-picker button .ops-map-canyon .ops-map-route { stroke:#f6d39b; }
+.ops-map-highland { fill:#aa704e; stroke:#e3b67b; stroke-width:.7; }
+.ops-map-elevation { stroke:#f5d79d; stroke-width:1.1; stroke-linejoin:round; }
 .ops-rules { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:22px; }
 .ops-rules h2 { margin-bottom:10px; }
 .ops-difficulties,.ops-modes { display:flex; gap:6px; }

@@ -13,7 +13,7 @@ import { DamageKind, DamageNumbers } from './damageNumbers';
 import { ShopState, SupplyShop } from './shop';
 import { levelStats, MAX_UNIT_LEVEL, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
 import { BUNKER_BARREL_LENGTH, BUNKER_CAPACITY, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
-import { createMapRuntime, type MapRuntime, type Point } from './game/map';
+import { createMapRuntime, highGroundRangeBonus, type MapRuntime, type Point } from './game/map';
 import { ACHIEVEMENTS, allowedUnit, awardAchievements, Bonuses, bossPattern, Branch, COMMANDERS, CommanderKey, DEFAULT_OPTIONS, DIFFICULTIES, newStats, Profile, PROFILE_KEY, readProfile, readSave, REWARDS, RewardKey, rewardChoices, RunOptions, RunSave, RunStats, SavedUnit, SAVE_KEY, clearSave, TargetMode, validateSave, wavePlan, writeStored } from './campaign';
 import { BattleAudio } from './audio';
 import { OperationsCenter, OperationsView } from './operations';
@@ -577,12 +577,16 @@ export class GameScene extends Phaser.Scene {
       text(901, 33, '● LIVE', 8, '#8eb967');
     }
     text(24, y + 181, '전술 지도', 11, '#b7c2a2');
-    text(140, y + 183, 'F-07', 9, '#72866a').setFontFamily('monospace');
+    text(140, y + 183, this.map.key === 'canyon' ? 'C-03' : 'F-07', 9, '#72866a').setFontFamily('monospace');
     this.add.rectangle(24, y + 50, 162, 108, 0x0a1711).setOrigin(0).setStrokeStyle(1, 0x556447).setDepth(27);
     const mini = this.add.graphics().setDepth(28);
     for (const cell of this.map.pathCells) {
       const [c, r] = cell.split(',').map(Number);
-      if (c >= 0 && c < COLS) mini.fillStyle(0x3f5941).fillRect(25 + c * 8, y + 53 + r * 8, 8, 8);
+      if (c >= 0 && c < COLS) mini.fillStyle(this.map.key === 'canyon' ? 0xae8255 : 0x3f5941).fillRect(25 + c * 8, y + 53 + r * 8, 8, 8);
+    }
+    for (const cell of this.map.highGroundCells) {
+      const [c, r] = cell.split(',').map(Number);
+      mini.fillStyle(0xc18b58, .7).fillRect(25 + c * 8 + 1, y + 53 + r * 8 + 1, 6, 6);
     }
     mini.lineStyle(1, 0x7a9663, .5).strokeRect(27, y + 51, 156, 102);
     for (let yy = y + 51; yy < y + 156; yy += 3) mini.fillStyle(0x000000, .15).fillRect(25, yy, 160, 1);
@@ -635,14 +639,17 @@ export class GameScene extends Phaser.Scene {
     if (k) {
       const d = TOWER_DEFS[k], st = t ? this.stats(t) : d;
       title = `${d.name}  ${t ? 'Lv.' + t.lvl : '/ 건설 대기'}`;
+      const cell = t ?? this.hover;
+      const highGround = cell ? highGroundRangeBonus(this.map, cell.c, cell.r) : 0;
+      const terrainHint = highGround ? ` · 고지 +${highGround}` : '';
       if (k === 'bunker') {
         const crew = t?.passengers.filter((p): p is Tower => !!p) ?? [];
         title = `벙커  ${crew.length}/${BUNKER_CAPACITY} 주둔`;
-        msg = `보병 최대 4기 · 사거리 +${BUNKER_RANGE_BONUS}\n` + (crew.length ? crew.map(p => `${TOWER_DEFS[p.k].name} Lv.${p.lvl} · 스킬 ${p.skills.length}/2`).join('\n') : '현재 주둔 병력 없음\n빈 벙커는 공격하지 않습니다.\n명령 아이콘으로 탑승·구매');
+        msg = `보병 최대 4기 · 사거리 +${BUNKER_RANGE_BONUS}${terrainHint}\n` + (crew.length ? crew.map(p => `${TOWER_DEFS[p.k].name} Lv.${p.lvl} · 스킬 ${p.skills.length}/2`).join('\n') : '현재 주둔 병력 없음\n빈 벙커는 공격하지 않습니다.\n명령 아이콘으로 탑승·구매');
       } else if (k === 'support' || k === 'observer') {
-        msg = `지원 사거리 ${st.range.toFixed(0)}\n` + (k === 'support' ? `주변 공격 속도 +${20 + ((t?.lvl ?? 1) - 1) * 5}%\n같은 지원 효과는 중첩되지 않습니다.` : '적 하나의 약점을 3초 노출\n받는 피해 +35%') + '\n강화·특화로 지원 성능 개선';
+        msg = `지원 사거리 ${(st.range + (t ? 0 : this.bonuses.range + highGround)).toFixed(0)}${terrainHint}\n` + (k === 'support' ? `주변 공격 속도 +${20 + ((t?.lvl ?? 1) - 1) * 5}%\n같은 지원 효과는 중첩되지 않습니다.` : '적 하나의 약점을 3초 노출\n받는 피해 +35%') + '\n강화·특화로 지원 성능 개선';
       } else {
-        msg = `공격 ${st.dmg.toFixed(0)} · 사거리 ${st.range.toFixed(0)}\n공격 속도 ${(1 / st.rate).toFixed(1)}/초\n자동 스킬 ${t?.skills.length ?? 0}/${SKILL_SLOTS}`;
+        msg = `공격 ${st.dmg.toFixed(0)} · 사거리 ${(st.range + (t ? 0 : this.bonuses.range + highGround)).toFixed(0)}${terrainHint}\n공격 속도 ${(1 / st.rate).toFixed(1)}/초\n자동 스킬 ${t?.skills.length ?? 0}/${SKILL_SLOTS}`;
         msg += t?.skills.length ? '\n' + t.skills.map(s => `${SKILL_DEFS[s.key].name} ${s.cd > 0 ? Math.ceil(s.cd) + '초' : '준비'}`).join('\n') : '\n명령 아이콘으로 스킬 장착';
         if (t?.host) title += ' / 탑승';
       }
@@ -874,7 +881,7 @@ export class GameScene extends Phaser.Scene {
     };
   }
   private supportRange(t: Tower): number {
-    return levelStats(t.k, t.lvl).range + this.bonuses.range + (['support', 'observer'].includes(t.k) && t.branch ? t.branch === 'power' ? 45 : 25 : 0);
+    return levelStats(t.k, t.lvl).range + this.bonuses.range + highGroundRangeBonus(this.map, t.c, t.r) + (['support', 'observer'].includes(t.k) && t.branch ? t.branch === 'power' ? 45 : 25 : 0);
   }
   private upgradeCost(t: Tower): number { return unitUpgradeCost(t); }
   private sellValue(t: Tower): number { return Math.round(t.spent * .7); }
@@ -1515,12 +1522,14 @@ export class GameScene extends Phaser.Scene {
     const preview = this.unloading?.k ?? this.building;
     if (h && preview && !this.over) {
       const d = TOWER_DEFS[preview], ok = this.cellFree(h.c, h.r) && (!!this.unloading || this.gold >= d.cost);
-      const color = ok ? 0xa9e875 : 0xe37962;
+      const highGround = highGroundRangeBonus(this.map, h.c, h.r);
+      const color = ok ? highGround ? 0xf3c77e : 0xa9e875 : 0xe37962;
       const x = (h.c + .5) * T, y = MAP_Y + (h.r + .5) * T;
+      const range = (this.unloading ? this.supportRange(this.unloading) - highGroundRangeBonus(this.map, this.unloading.c, this.unloading.r) : d.range + this.bonuses.range) + highGround;
       g.fillStyle(color, ok ? .12 : .25).fillRect(h.c * T, MAP_Y + h.r * T, T, T);
       g.lineStyle(1, color, .8).strokeRect(h.c * T + 2, MAP_Y + h.r * T + 2, T - 4, T - 4);
-      g.fillStyle(color, .05).fillCircle(x, y, d.range);
-      g.lineStyle(1, color, .55).strokeCircle(x, y, d.range);
+      g.fillStyle(color, .05).fillCircle(x, y, range);
+      g.lineStyle(1, color, .55).strokeCircle(x, y, range);
       g.lineStyle(2, color, .8).strokeCircle(x, y, 15);
       g.lineBetween(x - 9, y, x + 9, y).lineBetween(x, y - 9, x, y + 9);
     }

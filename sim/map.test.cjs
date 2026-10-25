@@ -5,7 +5,7 @@ const { createSourceLoader } = require('./helpers/load-source.cjs');
 // No Phaser or DOM substitutes: map data, geometry and layout are usable in Node.
 const load = createSourceLoader();
 const { MAP_DEFS } = load('./data/maps');
-const { createMapRuntime } = load('./game/map');
+const { createMapRuntime, highGroundRangeBonus } = load('./game/map');
 const { createLayoutConfig } = load('./interface/layout');
 
 test('기존 세 전장의 입구·출구 좌표와 모바일의 경로·건설 제한을 보존한다', () => {
@@ -55,4 +55,27 @@ test('원점 오프셋 없이 만든 경로는 화면과 독립된 맵 좌표로
   assert.ok(map.pathCells.has('1,9'));
   assert.ok(map.pathCells.has('4,7'));
   assert.ok(!map.pathCells.has('6,3'));
+});
+
+test('협곡 고지는 경로와 겹치지 않는 46칸이며 화면 배치와 다른 전장에 영향을 받지 않는다', () => {
+  const desktop = createMapRuntime('canyon', createLayoutConfig('desktop').mapY);
+  const mobile = createMapRuntime('canyon', createLayoutConfig('mobile').mapY);
+  assert.equal(desktop.highGroundCells.size, 46);
+  assert.deepEqual(desktop.highGroundCells, mobile.highGroundCells);
+  for (const cell of desktop.highGroundCells) {
+    assert.ok(!desktop.pathCells.has(cell));
+    const [c, r] = cell.split(',').map(Number);
+    assert.ok(c >= 0 && c < 20 && r >= 0 && r < 12);
+    assert.equal(highGroundRangeBonus(desktop, c, r), 24);
+  }
+  for (const [c, r] of [[4, 2], [13, 2], [6, 1], [6, 4], [5, 5], [6, 7], [6, 10]])
+    assert.equal(highGroundRangeBonus(desktop, c, r), 0);
+  for (const key of ['frontier', 'junction']) {
+    const map = createMapRuntime(key);
+    assert.equal(map.highGroundCells.size, 0);
+    assert.equal(highGroundRangeBonus(map, 6, 2), 0);
+  }
+  desktop.highGroundCells.clear();
+  assert.equal(mobile.highGroundCells.size, 46);
+  assert.equal(createMapRuntime('canyon').highGroundCells.size, 46);
 });

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { MapRuntime } from './game/map';
+import { drawCanyon } from './canyonArt';
 import { ENEMY_DEFS, FONT, MAP_H, RENDER_SCALE, T, TOWER_DEFS, VIEW_H, W } from './config';
 
 /** All art is generated locally: no image downloads or external assets. */
@@ -201,47 +202,50 @@ export function drawMap(scene: Phaser.Scene, cols: number, rows: number, map: Ma
     const texture = scene.textures.createCanvas(key, W * RENDER_SCALE, MAP_H * RENDER_SCALE)!;
     const ctx = texture.context;
     ctx.setTransform(RENDER_SCALE, 0, 0, RENDER_SCALE, 0, 0);
-    let seed = 842;
-    const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
-    ctx.fillStyle = '#343b37'; ctx.fillRect(0, 0, W, MAP_H);
-    for (let i = 0; i < 42000; i++) {
-      const light = rand() > .5;
-      ctx.fillStyle = light ? 'rgba(153,159,137,.055)' : 'rgba(0,0,0,.10)';
-      ctx.fillRect(rand() * W, rand() * MAP_H, 1 + rand() * 4, 1 + rand() * 3);
-    }
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-      const x = c * T, y = r * T, path = pathCells.has(c + ',' + r);
-      if (path) {
-        ctx.fillStyle = '#202827'; ctx.fillRect(x, y, T, T);
-        ctx.fillStyle = '#303a36'; ctx.fillRect(x + 2, y + 2, T - 4, T - 4);
-        for (let i = 5; i < T; i += 6) { ctx.fillStyle = '#252e2b'; ctx.fillRect(x + 3, y + i, T - 6, 2); }
-        ctx.fillStyle = '#50564a';
-        const sides = [[-1,0],[1,0],[0,-1],[0,1]];
-        sides.forEach(([dc, dr]) => {
-          if (!pathCells.has((c + dc) + ',' + (r + dr))) {
-            const xx = dc < 0 ? x : dc > 0 ? x + T - 3 : x;
-            const yy = dr < 0 ? y : dr > 0 ? y + T - 3 : y;
-            ctx.fillRect(xx, yy, dc ? 3 : T, dr ? 3 : T);
-            ctx.fillStyle = '#a49b5c';
-            if (dc) { ctx.fillRect(xx, y + 5, 2, 9); ctx.fillRect(xx, y + 30, 2, 9); }
-            else { ctx.fillRect(x + 5, yy, 9, 2); ctx.fillRect(x + 30, yy, 9, 2); }
-            ctx.fillStyle = '#50564a';
+    if (mapKey === 'canyon') drawCanyon(ctx, map);
+    else {
+      let seed = 842;
+      const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+      ctx.fillStyle = '#343b37'; ctx.fillRect(0, 0, W, MAP_H);
+      for (let i = 0; i < 42000; i++) {
+        const light = rand() > .5;
+        ctx.fillStyle = light ? 'rgba(153,159,137,.055)' : 'rgba(0,0,0,.10)';
+        ctx.fillRect(rand() * W, rand() * MAP_H, 1 + rand() * 4, 1 + rand() * 3);
+      }
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const x = c * T, y = r * T, path = pathCells.has(c + ',' + r);
+        if (path) {
+          ctx.fillStyle = '#202827'; ctx.fillRect(x, y, T, T);
+          ctx.fillStyle = '#303a36'; ctx.fillRect(x + 2, y + 2, T - 4, T - 4);
+          for (let i = 5; i < T; i += 6) { ctx.fillStyle = '#252e2b'; ctx.fillRect(x + 3, y + i, T - 6, 2); }
+          ctx.fillStyle = '#50564a';
+          const sides = [[-1,0],[1,0],[0,-1],[0,1]];
+          sides.forEach(([dc, dr]) => {
+            if (!pathCells.has((c + dc) + ',' + (r + dr))) {
+              const xx = dc < 0 ? x : dc > 0 ? x + T - 3 : x;
+              const yy = dr < 0 ? y : dr > 0 ? y + T - 3 : y;
+              ctx.fillRect(xx, yy, dc ? 3 : T, dr ? 3 : T);
+              ctx.fillStyle = '#a49b5c';
+              if (dc) { ctx.fillRect(xx, y + 5, 2, 9); ctx.fillRect(xx, y + 30, 2, 9); }
+              else { ctx.fillRect(x + 5, yy, 9, 2); ctx.fillRect(x + 30, yy, 9, 2); }
+              ctx.fillStyle = '#50564a';
+            }
+          });
+        } else {
+          ctx.strokeStyle = 'rgba(16,24,20,.24)'; ctx.strokeRect(x + .5, y + .5, T - 1, T - 1);
+          if (rand() > .72) {
+            ctx.fillStyle = 'rgba(106,116,91,.1)'; ctx.fillRect(x + 3, y + 3, T - 6, T - 6);
+            ctx.fillStyle = '#4d5647'; ctx.fillRect(x + 6, y + 6, 2, 2); ctx.fillRect(x + T - 8, y + T - 8, 2, 2);
           }
-        });
-      } else {
-        ctx.strokeStyle = 'rgba(16,24,20,.24)'; ctx.strokeRect(x + .5, y + .5, T - 1, T - 1);
-        if (rand() > .72) {
-          ctx.fillStyle = 'rgba(106,116,91,.1)'; ctx.fillRect(x + 3, y + 3, T - 6, T - 6);
-          ctx.fillStyle = '#4d5647'; ctx.fillRect(x + 6, y + 6, 2, 2); ctx.fillRect(x + T - 8, y + T - 8, 2, 2);
-        }
-        if (rand() > .7) {
-          ctx.strokeStyle = '#252f28'; ctx.beginPath(); ctx.moveTo(x + 7, y + 38); ctx.lineTo(x + 18, y + 26); ctx.lineTo(x + 16, y + 17); ctx.lineTo(x + 28, y + 8); ctx.stroke();
+          if (rand() > .7) {
+            ctx.strokeStyle = '#252f28'; ctx.beginPath(); ctx.moveTo(x + 7, y + 38); ctx.lineTo(x + 18, y + 26); ctx.lineTo(x + 16, y + 17); ctx.lineTo(x + 28, y + 8); ctx.stroke();
+          }
         }
       }
+      const shade = ctx.createRadialGradient(W / 2, MAP_H / 2, 100, W / 2, MAP_H / 2, W * .65);
+      shade.addColorStop(0, 'rgba(0,0,0,0)'); shade.addColorStop(1, 'rgba(3,10,7,.45)');
+      ctx.fillStyle = shade; ctx.fillRect(0, 0, W, MAP_H);
     }
-    const shade = ctx.createRadialGradient(W / 2, MAP_H / 2, 100, W / 2, MAP_H / 2, W * .65);
-    shade.addColorStop(0, 'rgba(0,0,0,0)'); shade.addColorStop(1, 'rgba(3,10,7,.45)');
-    ctx.fillStyle = shade; ctx.fillRect(0, 0, W, MAP_H);
     texture.refresh();
   }
   scene.add.image(0, mapY, key).setOrigin(0).setDisplaySize(W, MAP_H);
@@ -262,9 +266,11 @@ export function drawMap(scene: Phaser.Scene, cols: number, rows: number, map: Ma
   }
   const g = scene.add.graphics();
   // Landing-zone markings and a powered exit gate.
-  g.lineStyle(1, 0x859274, .2).strokeCircle(480, mapY + 357, 59).strokeCircle(480, mapY + 357, 66);
-  g.lineBetween(410, mapY + 357, 550, mapY + 357).lineBetween(480, mapY + 287, 480, mapY + 427);
-  scene.add.text(480, mapY + 347, 'F-07', { fontFamily: 'monospace', fontSize: '24px', color: '#6b7560' }).setOrigin(.5).setAlpha(.35);
+  if (mapKey !== 'canyon') {
+    g.lineStyle(1, 0x859274, .2).strokeCircle(480, mapY + 357, 59).strokeCircle(480, mapY + 357, 66);
+    g.lineBetween(410, mapY + 357, 550, mapY + 357).lineBetween(480, mapY + 287, 480, mapY + 427);
+    scene.add.text(480, mapY + 347, 'F-07', { fontFamily: 'monospace', fontSize: '24px', color: '#6b7560' }).setOrigin(.5).setAlpha(.35);
+  }
   const label = (x: number, y: number, text: string, color: string) => scene.add.text(x, y, text, {fontFamily: FONT, fontSize: '10px', color}).setDepth(2);
   routes.forEach(route => label(16, route[0].y - 37, '▶  적 진입', '#c1a271'));
   label(W - 103, waypoints[waypoints.length - 1].y + 30, '방어선  ▶', '#a7cd8d');

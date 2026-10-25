@@ -4,6 +4,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
+const { createSourceLoader } = require('./helpers/load-source.cjs');
+const { createLayoutConfig } = createSourceLoader()('./interface/layout');
+const desktopMapY = createLayoutConfig('desktop').mapY;
 const base = process.env.FRONTIER_URL || 'http://127.0.0.1:5173';
 const artifacts = path.resolve(__dirname, '../node_modules/.cache/frontier-qa');
 fs.mkdirSync(artifacts, { recursive: true });
@@ -26,7 +29,7 @@ const press = (page, key) => page.keyboard.press(key, { delay: 50 });
 async function cellClick(page, c, r, mobile = false) {
   const canvas = await page.locator('canvas').boundingBox();
   const scale = canvas.width / (mobile ? 1280 : 960);
-  const x = canvas.x + (c + .5) * 48 * scale, y = canvas.y + ((mobile ? 0 : 56) + (r + .5) * 48) * scale;
+  const x = canvas.x + (c + .5) * 48 * scale, y = canvas.y + ((mobile ? 0 : desktopMapY) + (r + .5) * 48) * scale;
   if (mobile) await page.touchscreen.tap(x, y); else await page.mouse.click(x, y);
 }
 async function shot(page, name) { await page.screenshot({ path: path.join(artifacts, name + '.png') }); }
@@ -59,7 +62,7 @@ async function dialogFits(page) {
     await page.waitForFunction(() => window.__frontierQA?.scene.getScene('game').options.map === 'junction');
     assert.deepEqual(await scene(page, s => s.options), { map: 'junction', difficulty: 'easy', mode: 'standard' });
     assert.deepEqual(await scene(page, s => ({ key: s.map.key, entrances: s.map.routes.map(r => r[0].y), buildable: s.cellFree(10, 1) })),
-      { key: 'junction', entrances: [128, 512], buildable: false });
+      { key: 'junction', entrances: [desktopMapY + 72, desktopMapY + 456], buildable: false });
     await page.getByRole('button', { name: '훈련 건너뛰기', exact: true }).click();
     await page.getByRole('button', { name: '프로토스 병력 9종 [R]', exact: true }).click();
     assert.deepEqual(await scene(page, s => s.commands().map(c => c.id)), ['frost', 'sniper', 'zealot', 'highTemplar', 'templar', 'reaver', 'scout', 'carrier', 'observer'].map(k => 'build:' + k));
@@ -91,8 +94,8 @@ async function dialogFits(page) {
     await shot(page, 'desktop-tactics');
     await page.getByRole('button', { name: '선택 병력 재배치 · ◆ 20', exact: true }).click();
     await cellClick(page, 8, 3); assert.equal(await scene(page, s => s.selected.c), 8);
-    await scene(page, s => s.openShop('units'));
-    await page.locator('button[data-action="choose"][data-key="support"]').click();
+    await page.getByRole('button', { name: '테란 병력 9종 [T]', exact: true }).click();
+    await press(page, '9');
     await cellClick(page, 9, 3); assert.equal(await scene(page, s => s.towers.at(-1).k), 'support');
     // Exercise an actual wave-completion boundary without waiting five full battles.
     await scene(page, s => { s.wave = 4; s.startWave(); s.spawnQ = []; for (const e of s.enemies) e.sprite.destroy(); s.enemies = []; s.step(1 / 60); });
@@ -139,6 +142,7 @@ async function dialogFits(page) {
     const mobile = await mobileContext.newPage(); lastPage = mobile; await instrument(mobile, errors); mobile.setDefaultTimeout(7000);
     await mobile.goto(base + '/?layout=mobile'); await mobile.getByRole('heading', { name: '작전실', exact: true }).waitFor();
     await mobile.getByRole('button', { name: '협곡', exact: true }).click();
+    assert.equal(await mobile.locator('.ops-map-canyon .ops-map-highland').count(), 3);
     await mobile.getByRole('button', { name: '어려움', exact: true }).click();
     await mobile.getByRole('button', { name: '벙커 부대', exact: true }).click();
     await dialogFits(mobile);
@@ -149,11 +153,15 @@ async function dialogFits(page) {
       { key: 'canyon', entrances: [72], buildable: false });
     await mobile.getByRole('button', { name: '훈련 건너뛰기', exact: true }).click();
     assert.equal(await mobile.getByRole('button', { name: '프로토스 병력 9종 [R]', exact: true }).isDisabled(), true);
-    await scene(mobile, s => s.openShop('units'));
-    assert.equal(await mobile.locator('button[data-action="choose"]').count(), 3);
-    await mobile.locator('button[data-action="choose"][data-key="bunker"]').click();
+    assert.deepEqual(await scene(mobile, s => s.commands().filter(c => c.enabled).map(c => c.id)), ['build:marine', 'build:firebat', 'build:bunker']);
+    await press(mobile, '8');
     await cellClick(mobile, 6, 3, true); await cellClick(mobile, 6, 3, true);
     assert.equal(await scene(mobile, s => s.towers[0].k), 'bunker');
+    assert.equal(await scene(mobile, s => s.map.highGroundCells.has('6,3')), true);
+    await scene(mobile, s => { s.gold = 10000; s.recruit(s.towers[0].id, 0, 'marine'); });
+    const highGroundRange = await scene(mobile, s => s.stats(s.towers[0].passengers[0]).range);
+    await scene(mobile, s => { s.selected = s.towers[0]; s.beginRelocate(); s.finishRelocate(3, 3); });
+    assert.equal(await scene(mobile, s => s.stats(s.towers[0].passengers[0]).range), highGroundRange - 24);
     await mobile.getByRole('button', { name: '작전실 [O]', exact: true }).click();
     await mobile.getByRole('button', { name: '도감 / 훈련', exact: true }).click(); await shot(mobile, 'mobile-codex');
     await dialogFits(mobile);
