@@ -2,11 +2,11 @@
 .supply-shop[open] { display:flex; flex-direction:column; }
 .supply-shop::backdrop { background:#030a08bd; backdrop-filter:blur(5px); }
 .supply-shop * { box-sizing:border-box; }
-.supply-shop button { font:inherit; color:inherit; cursor:pointer; border:1px solid #435b40; background:#203328; border-radius:9px; transition:background .15s,border-color .15s,transform .15s; }
+.supply-shop button { font:inherit; color:inherit; cursor:var(--cursor-command-active, pointer); border:1px solid #435b40; background:#203328; border-radius:9px; transition:background .15s,border-color .15s,transform .15s; }
 .supply-shop button:hover:not(:disabled) { border-color:#a8c37e; background:#30482f; }
 .supply-shop button:active:not(:disabled) { transform:translateY(1px); }
 .supply-shop button:focus-visible { outline:2px solid #d0ee9b; outline-offset:3px; }
-.supply-shop button:disabled { cursor:default; opacity:.4; }
+.supply-shop button:disabled { cursor:var(--cursor-command, default); opacity:.4; }
 .supply-shop button[aria-pressed="true"] { color:#e4f3c6; background:#304529; border-color:#bddb8c; box-shadow:inset 0 0 0 1px #bddb8c22; }
 .supply-shop button[aria-pressed="true"]:disabled { opacity:1; }
 .shop-icon { display:block; flex-shrink:0; object-fit:contain; }

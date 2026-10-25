@@ -1,0 +1,9 @@
+:root {
+  --cursor-command: url('./assets/cursors/command.svg') 2 2, default;
+  --cursor-command-active: url('./assets/cursors/command-active.svg') 2 2, pointer;
+}
+
+/* 브라우저 커서로 그려 프레임 속도·카메라 확대와 관계없이 클릭 지점을 맞춘다. */
+html, body, dialog::backdrop {
+  cursor: var(--cursor-command);
+}

@@ -17,6 +17,7 @@ import { createMapRuntime, type MapRuntime, type Point } from './game/map';
 import { ACHIEVEMENTS, allowedUnit, awardAchievements, Bonuses, bossPattern, Branch, COMMANDERS, CommanderKey, DEFAULT_OPTIONS, DIFFICULTIES, newStats, Profile, PROFILE_KEY, readProfile, readSave, REWARDS, RewardKey, rewardChoices, RunOptions, RunSave, RunStats, SavedUnit, SAVE_KEY, clearSave, TargetMode, validateSave, wavePlan, writeStored } from './campaign';
 import { BattleAudio } from './audio';
 import { OperationsCenter, OperationsView } from './operations';
+import { COMMAND_ACTIVE_CURSOR, COMMAND_CURSOR } from './cursors';
 
 interface Tower {
   id: string;
@@ -146,6 +147,7 @@ export class GameScene extends Phaser.Scene {
 
   // ---------- 생성 ----------
   create(data: { options?: RunOptions; resume?: RunSave; launched?: boolean } = {}): void {
+    this.input.setDefaultCursor(COMMAND_CURSOR);
     this.options = { ...(data.resume?.options ?? data.options ?? DEFAULT_OPTIONS) };
     this.map = createMapRuntime(this.options.map, MAP_Y);
     makeTextures(this);
@@ -477,7 +479,7 @@ export class GameScene extends Phaser.Scene {
   private addFullscreenButton(x: number, y: number, w: number, h: number, size: number): boolean {
     if (!this.touchUI || !this.scale.fullscreen.available) return false;
     mkBtn(this, x, y, w, h, '⛶ 전체화면', () => {}, size);
-    this.add.zone(x, y, w, h).setOrigin(0).setDepth(34).setInteractive().on('pointerup', () => {
+    this.add.zone(x, y, w, h).setOrigin(0).setDepth(34).setInteractive({ cursor: COMMAND_ACTIVE_CURSOR }).on('pointerup', () => {
       if (this.scale.isFullscreen) { this.scale.stopFullscreen(); return; }
       this.scale.startFullscreen();
       (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape').catch(() => {});
@@ -1636,10 +1638,10 @@ export class GameScene extends Phaser.Scene {
     this.add.text(W / 2, 334 + dy, win ? `${MAX_WAVE}개 웨이브를 모두 방어했습니다.` : (this.bossLeaked ? `웨이브 ${this.wave} · 적 지휘 개체가 방어선을 돌파했습니다.` : `웨이브 ${this.wave} · 기지 방어선이 무너졌습니다.`),
       { fontFamily: FONT, fontSize: '16px', color: '#aab99c' }).setOrigin(.5).setDepth(52);
     const btn = this.add.rectangle(W / 2, 410 + dy, 230, 46, 0x2c3d29).setStrokeStyle(1, 0x8aab6a)
-      .setInteractive({ useHandCursor: true }).setDepth(51);
+      .setInteractive({ cursor: COMMAND_ACTIVE_CURSOR }).setDepth(51);
     this.add.text(W / 2, 410 + dy, '↻  작전 재시작', { fontFamily: FONT, fontSize: '16px', color: '#d2e7b5' }).setOrigin(.5).setDepth(52);
     btn.on('pointerdown', () => this.scene.restart({ options: this.options, launched: true }));
-    const report = this.add.rectangle(W / 2, 458 + dy, 230, 32, 0x21372a).setStrokeStyle(1, 0x66825d).setInteractive({ useHandCursor: true }).setDepth(51);
+    const report = this.add.rectangle(W / 2, 458 + dy, 230, 32, 0x21372a).setStrokeStyle(1, 0x66825d).setInteractive({ cursor: COMMAND_ACTIVE_CURSOR }).setDepth(51);
     this.add.text(W / 2, 458 + dy, '전투 통계 / 업적', { fontFamily: FONT, fontSize: '13px', color: '#d2e7b5' }).setOrigin(.5).setDepth(52);
     report.on('pointerdown', () => this.operations?.show('stats'));
   }

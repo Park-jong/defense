@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME_W, H, RENDER_SCALE, setRenderScale, useMobileLayout } from './config';
 import { GameScene } from './GameScene';
 import { setupRotateHint } from './mobile';
+import './cursors.css';
 
 // 가로로 긴 터치 화면(휴대폰)은 맵 오른쪽에 패널을 둔 모바일 배치를 쓴다. ?layout=mobile|desktop으로 강제할 수 있다.
 const layout = new URLSearchParams(location.search).get('layout');

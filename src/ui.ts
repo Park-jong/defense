@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { FONT, RENDER_SCALE } from './config';
+import { COMMAND_ACTIVE_CURSOR } from './cursors';
 
 export interface Btn {
   enabled: boolean;
@@ -14,7 +15,7 @@ export function mkBtn(scene: Phaser.Scene, x: number, y: number, w: number, h: n
                       label: string, cb: () => void, size = 14, icon?: string, opts: { tap?: boolean } = {}): Btn {
   const frame = scene.add.graphics().setDepth(30);
   const hit = scene.add.zone(x, y, w, h).setOrigin(0).setDepth(33)
-    .setInteractive({ useHandCursor: true });
+    .setInteractive({ cursor: COMMAND_ACTIVE_CURSOR });
   const tx = scene.add.text(x + w / 2, y + (icon ? h - 23 : h / 2), label,
     { fontFamily: FONT, fontSize: size + 'px', color: '#c5ccb7', align: 'center', lineSpacing: 4 }).setOrigin(.5).setDepth(32);
   const art = icon ? scene.add.image(x + w / 2, y + 28, 'unit_' + icon).setDepth(31) : null;
@@ -42,7 +43,7 @@ export function mkBtn(scene: Phaser.Scene, x: number, y: number, w: number, h: n
       if (visible === v) return;
       visible = v;
       frame.setVisible(v); tx.setVisible(v); art?.setVisible(v);
-      hit.setVisible(v); if (v) hit.setInteractive({ useHandCursor: true }); else hit.disableInteractive();
+      hit.setVisible(v); if (v) hit.setInteractive({ cursor: COMMAND_ACTIVE_CURSOR }); else hit.disableInteractive();
     },
   };
   hit.on('pointerover', () => { hover = true; paint(); });

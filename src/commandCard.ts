@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
 import { FONT, RENDER_SCALE } from './config';
+import { COMMAND_ACTIVE_CURSOR } from './cursors';
 
 export interface UnitCommand {
   id: string; title: string; detail: string; texture: string; enabled: boolean;
@@ -24,7 +25,7 @@ export class CommandCard {
       const price = scene.add.text(left + cw - 3, top + ch - (labels ? 18 : 10), '', { fontFamily: FONT, fontSize: '8px', color: '#b5e1e6' }).setOrigin(1, 0).setDepth(32);
       const badge = scene.add.text(left + cw - 3, top + 2, '', { fontFamily: 'monospace', fontSize: '8px', color: '#d5eea2' }).setOrigin(1, 0).setDepth(32);
       const hotkey = scene.add.text(left + 4, top + 2, '', { fontFamily: 'monospace', fontSize: '8px', color: '#eadc8f' }).setDepth(32);
-      const hit = scene.add.zone(left, top, cw, ch).setOrigin(0).setDepth(33).setInteractive({ useHandCursor: true });
+      const hit = scene.add.zone(left, top, cw, ch).setOrigin(0).setDepth(33).setInteractive({ cursor: COMMAND_ACTIVE_CURSOR });
       let pressed: string | undefined;
       const slot = { command: undefined as UnitCommand | undefined, signature: '', render: () => {
         const c = slot.command, bright = c && (c.enabled || c.active);
