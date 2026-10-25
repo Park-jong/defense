@@ -14,13 +14,13 @@ export class CommandCard {
   private hovered = -1;
 
   constructor(scene: Phaser.Scene, x: number, y: number, w: number, h: number,
-    private describe: (command?: UnitCommand) => void, labels = false) {
+    private describe: (command?: UnitCommand) => void, labels = false, iconSize = labels ? 32 : 30) {
     const gap = 4, cw = (w - gap * 2) / 3, ch = (h - gap * 2) / 3;
     for (let i = 0; i < 9; i++) {
       const left = x + i % 3 * (cw + gap), top = y + Math.floor(i / 3) * (ch + gap);
       const frame = scene.add.graphics().setDepth(30);
       const art = scene.add.image(left + cw / 2, top + (labels ? 20 : ch / 2 - 3), 'cmd_empty')
-        .setDisplaySize(labels ? 32 : 30, labels ? 32 : 30).setDepth(31);
+        .setDisplaySize(iconSize, iconSize).setDepth(31);
       const label = scene.add.text(left + cw / 2, top + ch - 7, '', { fontFamily: FONT, fontSize: '9px', color: '#c6d8b4' }).setOrigin(.5).setDepth(32);
       const price = scene.add.text(left + cw - 3, top + ch - (labels ? 18 : 10), '', { fontFamily: FONT, fontSize: '8px', color: '#b5e1e6' }).setOrigin(1, 0).setDepth(32);
       const badge = scene.add.text(left + cw - 3, top + 2, '', { fontFamily: 'monospace', fontSize: '8px', color: '#d5eea2' }).setOrigin(1, 0).setDepth(32);

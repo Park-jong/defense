@@ -488,7 +488,7 @@ export class GameScene extends Phaser.Scene {
     return true;
   }
 
-  /** 휴대폰 가로 화면용: 맵 오른쪽 SIDE_W 패널 맨 위에 상황판(HTML 띠)을 두고, 그 아래에 상황판·유닛 정보·건설 명령을 세로로 쌓는다. */
+  /** 휴대폰 가로 화면용: 상태·선택 이름을 간결하게 모으고, 설명문 대신 큰 3×3 명령 아이콘에 공간을 준다. */
   private buildMobileUI(): void {
     const x0 = W, pw = SIDE_W, right = x0 + pw, L = x0 + 20, o = SIDE_RIBBON_H;
     const g = this.add.graphics().setDepth(25);
@@ -501,7 +501,7 @@ export class GameScene extends Phaser.Scene {
     };
     const text = (x: number, top: number, value: string, size: number, color: string) =>
       this.add.text(x, top, value, { fontFamily: FONT, fontSize: size + 'px', color }).setDepth(30);
-    this.portraitSize = 60;
+    this.portraitSize = 36;
     this.lifeMeter = { x: right - 86, y: o + 58, w: 66 };
 
     // 상황판: 웨이브 · 미네랄 · 기지 내구도 (위쪽 o px는 HTML 전술 상황판 자리)
@@ -513,20 +513,19 @@ export class GameScene extends Phaser.Scene {
     this.lifeTxt = text(right - 20, o + 32, '', 18, '#b7dc8e').setFontFamily('monospace').setOrigin(1, 0);
     this.miniGfx = this.add.graphics().setDepth(29);
 
-    // 유닛 정보
+    // 선택 이름·초상화만 남기고 상세 설명 자리는 명령 칸에 돌려준다.
     const u = o + 72;
-    box(u, 128);
-    this.unitTitle = text(L, u + 7, '기지 사령부', 15, '#c9d7b2').setFontStyle('bold');
-    this.add.rectangle(right - 84, u + 36, 64, 76, 0x0a1710).setOrigin(0).setStrokeStyle(1, 0x52634b).setDepth(27);
-    this.unitImage = this.add.image(right - 52, u + 74, 'portrait').setDisplaySize(60, 71).setDepth(28);
-    this.info = text(L, u + 34, '', 12, '#a5b897').setLineSpacing(3).setWordWrapWidth(200);
+    box(u, 48);
+    this.unitTitle = text(L, u + 16, '기지 사령부', 15, '#c9d7b2').setFontStyle('bold');
+    this.add.rectangle(right - 60, u + 2, 40, 44, 0x0a1710).setOrigin(0).setStrokeStyle(1, 0x52634b).setDepth(27);
+    this.unitImage = this.add.image(right - 40, u + 24, 'portrait').setDisplaySize(36, 43).setDepth(28);
+    this.info = text(L, u + 34, '', 12, '#a5b897').setVisible(false);
 
-    const c = u + 128 + 7;
+    const c = u + 48 + 7, commandY = c + 25, b = H - 56;
     this.commandTitle = text(L, c, '', 13, '#cedfb1').setFontStyle('bold');
-    this.commandHint = text(L, c + 21, '', 10, '#a3ba94').setLineSpacing(2).setWordWrapWidth(280);
+    this.commandHint = text(L, c + 21, '', 10, '#a3ba94').setVisible(false);
     this.shopBtn = mkBtn(this, right - 110, c - 5, 92, 24, '', () => this.selected ? this.cancelCommand() : this.openShop('manage'), 11);
-    this.commandCard = new CommandCard(this, x0 + 10, c + 69, pw - 20, 150, command => this.describeCommand(command), true);
-    const b = c + 69 + 150 + 6;
+    this.commandCard = new CommandCard(this, x0 + 10, commandY, pw - 20, b - commandY - 6, command => this.describeCommand(command), false, 72);
     this.goBtn = mkBtn(this, x0 + 10, b, 160, 50, '▶  웨이브 시작', () => this.startWave(), 15);
     this.goBtn.act(true);
     this.spdBtn = mkBtn(this, x0 + 176, b, 66, 50, '배속 ×1', () => {
@@ -770,7 +769,7 @@ export class GameScene extends Phaser.Scene {
   private describeCommand(command?: UnitCommand): void {
     const t = this.selected;
     this.commandTitle.setText(this.relocating ? '재배치 위치 지정' : this.unloading ? '하차 위치 지정' : t ? TOWER_DEFS[t.k].name + ' 명령' : FACTIONS[this.faction].name + ' / 9종 보급');
-    this.commandHint.setVisible(MOBILE_LAYOUT || !!command);
+    this.commandHint.setVisible(!MOBILE_LAYOUT && !!command);
     this.commandTip?.setVisible(!!command);
     const detail = command ? `${command.title}${command.price !== undefined ? ' · ◆ ' + command.price : ''}${!command.enabled && !command.active ? ' · 사용 불가' : ''}\n${MOBILE_LAYOUT ? command.detail.replace(/\n/g, ' ').slice(0, 48) : command.detail}`
       : this.unloading ? '빈 구역을 지정해 병력을 하차시키세요.\n취소하면 벙커에 그대로 남습니다.'
