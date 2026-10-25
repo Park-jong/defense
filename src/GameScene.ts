@@ -17,6 +17,8 @@ import { BUNKER_BARREL_LENGTH, BUNKER_CAPACITY, BUNKER_PORTS, BUNKER_RANGE_BONUS
 import { createMapRuntime, highGroundRangeBonus, type MapRuntime, type Point } from './game/map';
 import { ACHIEVEMENTS, allowedUnit, awardAchievements, Bonuses, bossPattern, Branch, COMMANDERS, CommanderKey, DEFAULT_OPTIONS, DIFFICULTIES, newStats, Profile, PROFILE_KEY, readProfile, readSave, REWARDS, RewardKey, rewardChoices, RunOptions, RunSave, RunStats, SavedUnit, SAVE_KEY, clearSave, TargetMode, validateSave, wavePlan, writeStored } from './campaign';
 import { BattleAudio } from './audio';
+import { CombatEffects } from './combatEffects';
+import { hasWeaponEffects } from './data/weaponEffects';
 import { OperationsCenter, OperationsView } from './operations';
 import { COMMAND_ACTIVE_CURSOR, COMMAND_CURSOR } from './cursors';
 
@@ -104,6 +106,7 @@ export class GameScene extends Phaser.Scene {
   private shopInputEnabled = true;
   private fields: SkillField[] = [];
   private damageNumbers?: DamageNumbers;
+  private combatEffects?: CombatEffects;
   private shopBtn!: Btn;
   private uiCache: { hud?: string; info?: string } = {};
   /** 맵 영역 전용 카메라(확대·이동·흔들림)와 전체 화면 UI 카메라. */
@@ -185,6 +188,8 @@ export class GameScene extends Phaser.Scene {
     this.runLaunched = !!data.launched || this.testMode; this.waveSpawnIndex = 0;
     this.damageNumbers = new DamageNumbers(this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.damageNumbers?.destroy());
+    this.combatEffects = new CombatEffects(this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.combatEffects?.destroy());
 
     this.gfx = this.add.graphics().setDepth(10);
     const emitter = (tint: number, speed: number, life: number) => this.add.particles(0, 0, 'spark', {
@@ -1088,6 +1093,9 @@ export class GameScene extends Phaser.Scene {
         this.stepAcc -= STEP_SEC;
       }
     } else this.stepAcc = 0;
+    // Let the last impact settle after victory/defeat, without advancing the battle itself.
+    if (this.over && !this.paused && !this.shopOpen && !this.operationsOpen) this.combatEffects?.update(Math.min(.05, elapsed));
+    this.combatEffects?.render();
     this.damageNumbers?.update(this.paused || this.shopOpen || this.operationsOpen ? 0 : Math.min(.05, elapsed));
     this.advanceTutorial();
     this.opsRefresh += elapsed;
@@ -1099,6 +1107,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private step(dt: number): void {
+    this.combatEffects?.update(dt);
     if (this.waveActive) {
       this.runStats.seconds += dt;
       for (const key of Object.keys(COMMANDERS) as CommanderKey[]) this.commander[key] = Math.max(0, this.commander[key] - dt);
@@ -1167,10 +1176,15 @@ export class GameScene extends Phaser.Scene {
         if (next) p.tgt = next;
       }
       const e = p.tgt;
-      if (e.dead) { p.dead = true; p.s.destroy(); continue; }
+      if (e.dead) { p.dead = true; this.combatEffects?.forget(p.s); p.s.destroy(); continue; }
       const dx = e.x - p.x, dy = e.y - p.y, dist = Math.hypot(dx, dy), mv = 420 * dt;
-      if (dist <= mv + e.r) { this.hit(p); p.dead = true; p.s.destroy(); }
-      else { p.x += dx / dist * mv; p.y += dy / dist * mv; p.s.setPosition(p.x, p.y).setRotation(Math.atan2(dy, dx)); }
+      if (dist <= mv + e.r) { this.hit(p); p.dead = true; this.combatEffects?.forget(p.s); p.s.destroy(); }
+      else {
+        const from = { x: p.x, y: p.y };
+        p.x += dx / dist * mv; p.y += dy / dist * mv;
+        p.s.setPosition(p.x, p.y).setRotation(Math.atan2(dy, dx));
+        this.combatEffects?.move(p.s, from, p, e);
+      }
     }
     this.projs = this.projs.filter(p => !p.dead);
     this.enemies = this.enemies.filter(e => !e.dead);
@@ -1285,21 +1299,15 @@ export class GameScene extends Phaser.Scene {
     const flightAngle = t.k === 'sniper' || t.k === 'templar' ? Math.atan2(best.y - muzzleY, best.x - muzzleX) : angle;
     const s = this.add.image(muzzleX, muzzleY, 'shot_' + t.k).setDepth(9).setRotation(flightAngle);
     this.projs.push({ s, x: muzzleX, y: muzzleY, tgt: best, k: t.k, st, source: t.id });
+    if (hasWeaponEffects(t.k)) {
+      this.combatEffects?.launch(t.k, { x: muzzleX, y: muzzleY }, flightAngle, s, t);
+      return;
+    }
     if (t.host) {
       const scale = t.k === 'firebat' ? 1 : .6;
       const flame = this.add.image(muzzleX, muzzleY, 'bunker_muzzle').setOrigin(0, .5).setRotation(angle).setScale(scale).setDepth(12);
       this.tweens.add({ targets: flame, scaleX: scale * 1.3, scaleY: scale * .65, alpha: 0,
         duration: t.k === 'firebat' ? 150 : 90, onComplete: () => flame.destroy() });
-    } else if (t.k === 'cannon') {
-      const flash = this.add.image(muzzleX, muzzleY, 'siege_muzzle').setOrigin(0, .5).setRotation(angle).setScale(.8).setDepth(12);
-      this.tweens.add({ targets: flash, scaleX: 1.3, scaleY: 1.1, alpha: 0, duration: 140, onComplete: () => flash.destroy() });
-      for (let i = 0; i < 3; i++) {
-        const x = muzzleX + Math.cos(angle) * (10 + i * 4) - Math.sin(angle) * (i - 1) * 5;
-        const y = muzzleY + Math.sin(angle) * (10 + i * 4) + Math.cos(angle) * (i - 1) * 5;
-        const smoke = this.add.image(x, y, 'siege_smoke').setScale(.35 + i * .1).setAlpha(.65).setDepth(11);
-        this.tweens.add({ targets: smoke, x: x + Math.cos(angle) * 14, y: y + Math.sin(angle) * 10 - 12,
-          scale: 1.1 + i * .2, alpha: 0, duration: 650 + i * 120, onComplete: () => smoke.destroy() });
-      }
     } else if (t.k === 'firebat') {
       for (const port of FIREBAT_MUZZLES) {
         const x = t.x + port.x * Math.cos(angle) - port.y * Math.sin(angle);
@@ -1319,13 +1327,9 @@ export class GameScene extends Phaser.Scene {
       const flash = this.add.circle(muzzleX, muzzleY, 5, d.proj, .7).setDepth(9);
       this.tweens.add({ targets: flash, scale: 1.8, alpha: 0, duration: 160, onComplete: () => flash.destroy() });
     }
-    if (t.k === 'cannon') {
-      const recoil = 6 * (UNIT_WORLD_SCALE.cannon ?? 1);
-      this.tweens.add({ targets: t.barrel, x: t.x - Math.cos(angle) * recoil, y: t.y - Math.sin(angle) * recoil,
-        duration: 80, hold: 30, yoyo: true, ease: 'Cubic.Out' });
-    } else if (t.k === 'frost' || t.k === 'templar') {
+    if (t.k === 'frost' || t.k === 'templar') {
       this.tweens.add({ targets: t.barrel, scale: { from: 1.1, to: 1 }, duration: 220 });
-    } else if (t.k === 'arrow' || t.k === 'cruiser' || t.k === 'sniper') {
+    } else if (t.k === 'cruiser' || t.k === 'sniper') {
       this.tweens.add({ targets: t.barrel, alpha: { from: .88, to: 1 }, duration: 140 });
     } else {
       this.tweens.add({ targets: t.barrel, scale: { from: .94, to: 1 }, duration: 100 });
@@ -1501,22 +1505,25 @@ export class GameScene extends Phaser.Scene {
 
   private hit(p: Projectile): void {
     const e = p.tgt, st = p.st;
+    const enhanced = hasWeaponEffects(p.k);
+    if (enhanced) {
+      this.combatEffects?.impact(p.k, e, p, st.splash);
+      this.audio.impact(p.k);
+    }
     if (st.splash) {
-      if (p.k === 'templar') this.archonBurst(e.x, e.y, st.splash);
-      else {
+      if (!enhanced && p.k === 'templar') this.archonBurst(e.x, e.y, st.splash);
+      else if (!enhanced) {
         this.fxBoom.explode(14, e.x, e.y);
-        if (p.k === 'cannon') {
-          const blast = this.add.image(e.x, e.y, 'siege_blast').setScale(st.splash / 50).setDepth(20);
-          this.tweens.add({ targets: blast, scale: st.splash / 30, alpha: 0, duration: 280, onComplete: () => blast.destroy() });
-        }
         const ring = this.add.circle(e.x, e.y, 6, 0xff8a65, .3).setStrokeStyle(2, 0xff8a65).setDepth(21);
         this.tweens.add({ targets: ring, scale: st.splash / 6, alpha: 0, duration: 300, onComplete: () => ring.destroy() });
       }
       for (const o of this.enemies) {
         if (o.dead || Math.hypot(o.x - e.x, o.y - e.y) > st.splash) continue;
+        if (enhanced) this.combatEffects?.hitTarget(p.k, o, p);
         this.damageEnemy(o, st.dmg, 'normal', p.source);
       }
     } else {
+      if (enhanced) this.combatEffects?.hitTarget(p.k, e, p);
       this.damageEnemy(e, st.dmg, 'normal', p.source);
     }
     if (st.slow && !e.dead) {
