@@ -31,7 +31,8 @@ const game = new Phaser.Game({
   width: GAME_W * RENDER_SCALE,
   height: H * RENDER_SCALE,
   backgroundColor: '#101512',
-  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+  // 전체화면은 문서 전체를 대상으로 한다. Phaser 기본값은 캔버스만 감싼 div를 띄워 body에 붙은 HTML 상황판이 가려진다.
+  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, fullscreenTarget: document.documentElement },
   // requestAnimationFrame은 숨겨진 탭에서 멈추므로 setTimeout 루프를 쓴다.
   fps: { target: 60, forceSetTimeOut: true },
   scene: GameScene,
