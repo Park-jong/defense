@@ -6,6 +6,7 @@ import { ACHIEVEMENTS, bossPattern, BRANCHES, COMMANDERS, CommanderKey, DIFFICUL
 import { adoptTitles, bindTips, createTip, placeTip, textTip } from './gameTip';
 import { supportTraits } from './support';
 import { AUGMENTS, AUGMENT_KEYS, AUGMENT_TIERS, AugmentKey, AugmentOffer, amonDue, branchCost, commanderCooldownScale, hasAugment, relocateCost } from './augments';
+import { rememberScroll } from './scrollMemory';
 import './operations.css';
 import { isBishoujo } from './themes';
 
@@ -292,11 +293,8 @@ export class OperationsCenter {
   private render(): void {
     const v = this.actions.view();
     const disclosures = Array.from(this.dialog.querySelectorAll<HTMLDetailsElement>('details[id]')).map(el => ({ id: el.id, open: el.open }));
-    // 병력 명부·탭 사이드바처럼 자체 스크롤하는 영역은 다시 그려도 보던 위치를 유지해 연속 조정이 끊기지 않게 한다.
-    const scrolls = ['.ops-roster', '.ops-nav'].map(selector => {
-      const el = this.dialog.querySelector<HTMLElement>(selector);
-      return { selector, top: el?.scrollTop ?? 0, left: el?.scrollLeft ?? 0 };
-    });
+    // 병력 명부·탭 사이드바·도감 비교표처럼 자체 스크롤하는 영역은 다시 그려도 보던 위치를 유지해 연속 조정이 끊기지 않게 한다.
+    const restoreScroll = rememberScroll(this.dialog, ['.ops-roster', '.ops-nav', '.ops-compare']);
     const choosing = this.section === 'reward' || this.section === 'augment', locked = v.pending.length > 0 || !!v.augmentOffer;
     this.dialog.classList.toggle('is-reward', choosing);
     this.dialog.innerHTML = `<header class="ops-header"><div class="ops-heading">${icon(this.section === 'reward' ? 'supply' : this.section === 'augment' ? 'augment' : 'manage')}<div><h1>${this.section === 'reward' ? '전장 보상 선택' : this.section === 'augment' ? '증강 선택' : '작전실'}</h1><p>${choosing ? `WAVE ${v.wave} CLEAR` : isBishoujo() ? '모에크래프트 · STARLIGHT COMMAND' : MAP_DEFS[v.options.map].name}</p></div></div><span class="ops-wallet" aria-label="미네랄 ${v.gold}">${icon('mineral')}${v.gold.toLocaleString()}</span>${locked ? '' : button('close', '', icon('close'), '전장 복귀', { className: 'ops-close', hint: '전장 복귀 [Esc / O]' })}</header>
@@ -306,7 +304,7 @@ export class OperationsCenter {
     for (const { id, open } of disclosures) {
       const details = this.dialog.querySelector<HTMLDetailsElement>(`#${id}`); if (details) details.open = open;
     }
-    for (const { selector, top, left } of scrolls) this.dialog.querySelector<HTMLElement>(selector)?.scrollTo({ top, left });
+    restoreScroll();
     adoptTitles(this.dialog, OPS_SILENT); this.hideTip();
   }
   private setup(v: OperationsView): string {

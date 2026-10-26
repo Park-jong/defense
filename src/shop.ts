@@ -8,6 +8,7 @@ import { RunOptions } from './campaign';
 import { adoptTitles, bindTips, createTip, placeTip, textTip } from './gameTip';
 import { OBSERVATION_BONUSES, supportTraits, vesselAuraBonus } from './support';
 import { bunkerCapacity, maxUnitLevel, placeCost, skillCost, skillLocked } from './augments';
+import { rememberScroll } from './scrollMemory';
 import './shop.css';
 
 /** 설명 창 없이 보이는 글자·아이콘만으로 충분한 상점 요소. */
@@ -100,7 +101,8 @@ export class SupplyShop {
         const skill = key as SkillKey;
         this.notice = this.actions.equip(skill, button.dataset.unit) ? `${SKILL_DEFS[skill].name} 장착 완료. 적을 만나면 자동으로 사용합니다.` : '장착할 유닛과 보유 미네랄을 확인해 주세요.';
       }
-      this.render(['equip-unit', 'upgrade', 'batch-upgrade', 'batch-equip', 'recruit', 'board', 'select-slot'].includes(action!) || action === 'select' && this.tab !== 'manage');
+      // 탭을 바꿀 때만 처음부터 보여 주고, 같은 탭 안의 조작은 보던 위치를 지킨다.
+      this.render(action !== 'tab');
       const next = this.dialog.querySelector<HTMLButtonElement>(`button[data-action="${action}"][data-key="${key}"]${button.dataset.slot !== undefined ? `[data-slot="${button.dataset.slot}"]` : ''}${button.dataset.unit ? `[data-unit="${button.dataset.unit}"]` : ''}`);
       if (next && !next.disabled) next.focus({ preventScroll: true });
       else if (this.tab === 'garrison') {
@@ -123,10 +125,13 @@ export class SupplyShop {
   }
   destroy(): void { this.close(); this.dialog.remove(); }
 
+  /**
+   * 다시 그려도 보던 위치를 지킨다. 탭 메뉴(모바일 세로 사이드바)는 늘 유지하고,
+   * 본문과 병력 명부·벙커 줄은 같은 탭 안에서의 조작(유닛 선택·강화·장착 등)일 때 유지한다.
+   */
   private render(preserveScroll = false): void {
-    const scrollTop = preserveScroll ? this.dialog.querySelector<HTMLElement>('.shop-content')?.scrollTop ?? 0 : 0;
-    const strips = ['.garrison-bunkers', '.garrison-available', '.army-roster'].map(selector => ({ selector,
-      left: preserveScroll ? this.dialog.querySelector<HTMLElement>(selector)?.scrollLeft ?? 0 : 0 }));
+    const restoreTabs = rememberScroll(this.dialog, ['.shop-tabs']);
+    const restore = preserveScroll ? rememberScroll(this.dialog, ['.shop-content', '.army-roster', '.garrison-bunkers', '.garrison-available']) : () => {};
     const state = this.actions.state();
     const selected = state.units.find(u => u.id === state.selectedId);
     const tabs = [
@@ -141,8 +146,7 @@ export class SupplyShop {
         ${this.tab === 'manage' ? `<p class="shop-notice" role="status">${icon(this.notice ? 'saved' : 'help')}${this.notice || '전장과 모든 벙커의 병력을 함께 관리합니다. 유닛 종류별로도 강화·스킬을 적용할 수 있습니다.'}</p>${this.batchControls(state, {}, '전체 부대 일괄 관리')}` : this.tab === 'garrison' ? this.garrisonView(state) : this.armyView(state, selected)}
       </div>
       <footer class="shop-footer"><span class="shop-hint">${icon('help')}<span>${this.tab === 'garrison' ? '강화·스킬 아이콘을 누르면 즉시 적용 · 체크 표시는 장착 완료 · 스킬은 자동 사용' : '유닛당 스킬 2개 · 적을 만나면 자동 발동 · 병력 구매는 명령 카드 또는 1–9 키 · 회수 시 비용 70% 환급'}</span></span><kbd>ESC</kbd></footer>`;
-    this.dialog.querySelector<HTMLElement>('.shop-content')!.scrollTop = scrollTop;
-    for (const { selector, left } of strips) this.dialog.querySelector<HTMLElement>(selector)?.scrollTo({ left });
+    restoreTabs(); restore();
     adoptTitles(this.dialog, SHOP_SILENT); this.tip.hidden = true;
   }
 
