@@ -15,7 +15,7 @@ allowed-tools: Read, Write, Bash(git:*), Bash(npm:*)
 1. `git status`, `git diff HEAD`, `git log -n 5`로 변경 내용과 최근 메시지 스타일을 확인한다. (새로 추가된 untracked 파일은 내용을 직접 읽어 파악한다.)
 2. 변경이 서로 다른 목적을 섞고 있으면 논리 단위별로 나눠 메시지를 각각 제안하고, 어떤 파일이 어느 메시지에 속하는지 함께 알려준다.
 3. 필요한 검증을 수행하고 아래 형식으로 메시지를 작성한다. 실제 줄바꿈을 보존한 파일로 저장해 `git commit --file <메시지 파일>`에 전달한다.
-4. 버전은 루트 `package.json`의 `version`을 읽어 본문 마지막에 `- 버전:` 줄로 적는다. 버전 변경이 작업 범위에 없으면 현재 값을 유지한다.
+4. 버전은 루트 `package.json`의 `version`이며 커밋 type에 따라 자동으로 올린다. `feat`는 `npm version minor --no-git-tag-version`, `fix`는 `npm version patch --no-git-tag-version`을 실행해 `package.json`·`package-lock.json`을 같은 커밋에 넣고, 본문 마지막에 `- 버전: <이전> → <새>`로 적는다. 다른 type은 현재 값을 유지해 `- 버전: <x.y.z>`로 적는다. Stop 훅(`git-workflow.cjs finish`)이 이번 세션의 feat·fix 커밋에 맞는 버전 상승이 없으면 마무리를 막는다.
 5. `.claude/settings.local.json`, `node_modules/`, `.env` 등 개인 설정·의존성·비밀 값은 스테이징하지 않는다. 이번 작업과 관계없는 기존 사용자 변경도 보존한다.
 6. 관련 파일만 명시적으로 `git add -- <파일...>`하고 커밋한다. 목적이 다른 변경은 별도 커밋으로 나눈다.
 7. 현재 브랜치의 upstream으로 `git push`한다. upstream이 없으면 `git push --set-upstream origin <현재 브랜치>`를 사용한다. 강제 푸시는 하지 않는다.
@@ -25,7 +25,7 @@ allowed-tools: Read, Write, Bash(git:*), Bash(npm:*)
 ## 출력 형식
 
 완료한 커밋 해시, 반영 내용, 원격 푸시와 배포 결과를 간결하게 보고한다. 커밋·푸시·배포를 할지 다시 묻지 않는다.
-사용자에게 보이는 기능·수정(feat/fix)이 들어갔는데 버전이 그대로면, 보고 끝에 버전을 올릴지 묻는 한 줄을 덧붙인다(제안: fix·chore는 patch, feat는 minor). 버전 파일은 사용자가 요청할 때만 고친다.
+버전을 올렸으면 보고에 `<이전> → <새>`를 함께 적는다.
 
 ## 메시지 형식
 

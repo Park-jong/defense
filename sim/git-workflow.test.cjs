@@ -189,3 +189,34 @@ test('an unpublished commit present at session start still requires deployment a
   assert.equal(finish(local).decision, 'block');
   deployed(local); assert.deepEqual(finish(local), {});
 });
+
+function versioned(cwd, version) {
+  fs.writeFileSync(path.join(cwd, 'package.json'), JSON.stringify({ name: 'fixture', version }) + '\n');
+  git(cwd, 'add', 'package.json');
+}
+function commit(cwd, subject, file = 'game.txt') {
+  fs.writeFileSync(path.join(cwd, file), subject + '\n'); git(cwd, 'add', file); git(cwd, 'commit', '-m', subject);
+}
+
+test('a feat commit keeps Stop pending until the minor version is raised', () => {
+  const { local } = fixture(); versioned(local, '0.1.0'); git(local, 'commit', '-m', 'version'); git(local, 'push'); before(local);
+  commit(local, '✨ feat: 새 기능'); git(local, 'push'); deployed(local);
+  versioned(local, '0.1.1'); git(local, 'commit', '-m', '🔧 chore: patch only'); git(local, 'push'); deployed(local);
+  const r = finish(local); assert.equal(r.decision, 'block'); assert.match(r.reason, /npm version minor/);
+  versioned(local, '0.2.0'); git(local, 'commit', '-m', '🔧 chore: 버전 0.2.0'); git(local, 'push'); deployed(local);
+  assert.deepEqual(finish(local), {});
+});
+
+test('a fix commit that raises the patch version in the same commit passes', () => {
+  const { local } = fixture(); versioned(local, '0.1.0'); git(local, 'commit', '-m', 'version'); git(local, 'push'); before(local);
+  versioned(local, '0.1.1'); commit(local, '🐛 fix: 버그 수정'); git(local, 'push'); deployed(local);
+  assert.deepEqual(finish(local), {});
+});
+
+test('style commits and another contributor’s feat commits do not demand a version bump', () => {
+  const { local, other } = fixture(); versioned(local, '0.1.0'); git(local, 'commit', '-m', 'version'); git(local, 'push'); before(local);
+  commit(local, '💄 style: 다듬기'); git(local, 'push');
+  git(other, 'config', 'user.email', 'other@example.invalid'); git(other, 'fetch'); git(other, 'reset', '--hard', 'origin/main');
+  commit(other, '✨ feat: 남의 기능', 'other.txt'); git(other, 'push'); before(local); deployed(local);
+  assert.deepEqual(finish(local), {});
+});

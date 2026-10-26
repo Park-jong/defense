@@ -41,6 +41,23 @@ function deployableHead() {
   return head;
 }
 
+// 이번 세션에서 직접 만든 feat 커밋은 minor, fix 커밋은 patch 이상 package.json의 version을 올려야 한다.
+const BUMP_LEVELS = ['patch', 'minor', 'major'];
+function versionAt(rev) {
+  try { return JSON.parse(git(['show', `${rev}:package.json`], true) || '{}').version?.split('.').map(Number) ?? null; }
+  catch { return null; }
+}
+function versionGap(base) {
+  const me = git(['config', 'user.email'], true);
+  const subjects = git(['log', '--no-merges', '--format=%ce%x00%s', `${base}..HEAD`]).split('\n').filter(Boolean)
+    .map(line => line.split('\0')).filter(([email]) => !me || email === me).map(([, subject]) => subject);
+  const need = Math.max(-1, ...subjects.map(s => ({ feat: 1, fix: 0 })[/^(?:\S+\s+)?(\w+)(?:\([^)]*\))?!?:/.exec(s)?.[1]] ?? -1));
+  const from = versionAt(base), to = versionAt('HEAD');
+  if (need < 0 || !from || !to) return null;
+  const raised = to[0] > from[0] ? 2 : to[0] < from[0] ? -1 : to[1] > from[1] ? 1 : to[1] < from[1] ? -1 : to[2] > from[2] ? 0 : -1;
+  return raised >= need ? null : { level: BUMP_LEVELS[need], from: from.join('.'), to: to.join('.') };
+}
+
 function acquireLock() {
   const deadline = Date.now() + 20000;
   while (true) {
@@ -126,14 +143,17 @@ function run(input) {
   const deployment = fs.existsSync(deploymentPath) ? JSON.parse(fs.readFileSync(deploymentPath, 'utf8')) : null;
   const publishing = state.publishing || head !== state.head || ahead > 0;
   const needsDeploy = publishing && deployment?.head !== head;
-  if (!pending.length && !ahead && !needsDeploy) { fs.unlinkSync(statePath); return {}; }
+  const gap = versionGap(state.head);
+  if (!pending.length && !ahead && !needsDeploy && !gap) { fs.unlinkSync(statePath); return {}; }
   if (publishing && !state.publishing) { state.publishing = true; fs.writeFileSync(statePath, JSON.stringify(state)); }
   const reason = [
     '이 프로젝트는 수정 완료 후 커밋·원격 푸시·GitHub Pages 배포를 자동으로 수행합니다. 사용자에게 재확인을 요청하지 말고 계속 처리하세요.',
     pending.length ? `미커밋 변경: ${pending.join(', ')}` : '',
     ahead ? `아직 게시되지 않은 커밋: ${ahead}개` : '',
     needsDeploy ? `아직 배포되지 않은 소스 커밋: ${head}` : '',
+    gap ? `버전 미반영: 이번 작업의 커밋에는 ${gap.level} 이상 버전 상승이 필요하지만 ${gap.from} → ${gap.to}입니다. npm version ${gap.level} --no-git-tag-version으로 올린 package.json·package-lock.json을 커밋하세요.` : '',
     '관련 검증을 완료하고 이번 작업의 변경만 명시적으로 스테이징한 뒤 한국어 메시지로 커밋하세요. 기존 사용자 변경은 포함하지 마세요.',
+    '커밋 type이 feat면 npm version minor, fix면 npm version patch를 --no-git-tag-version으로 실행해 package.json·package-lock.json을 같은 커밋에 넣고, 메시지 불릿 마지막에 "- 버전: 이전 → 새"를 적으세요. 다른 type은 버전을 유지합니다.',
     upstream ? '현재 브랜치의 기존 upstream으로 일반 git push를 실행하세요.' : `git push --set-upstream origin ${branch} 명령으로 현재 브랜치를 게시하세요.`,
     '푸시가 성공한 뒤 npm run deploy를 실행하고 성공 여부를 확인하세요. 기존 사용자 변경이 있으면 보존한 채 별도 작업 트리에서 배포하세요.',
     'git status와 로컬·원격 커밋 차이, 배포 결과로 완료를 확인하세요. 강제 푸시나 변경 폐기는 사용하지 마세요.',
