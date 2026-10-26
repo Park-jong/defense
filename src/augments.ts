@@ -3,11 +3,18 @@ import type { SkillKey } from './data/skills';
 import { MAX_UNIT_LEVEL } from './data/rules';
 import { Faction, TOWER_DEFS, TowerKey } from './data/units';
 
-// 증강 모드(docs/augments.md)의 증강 정의, 가격 배율, 후보 추첨. 현재는 골드·프리즘 등급이 구현되어 있다.
+// 증강 모드(docs/augments.md)의 증강 정의, 가격 배율, 후보 추첨. 실버·골드·프리즘 28종.
 export const AUGMENT_TIERS = { silver: '실버', gold: '골드', prism: '프리즘' };
 export type AugmentTier = keyof typeof AUGMENT_TIERS;
 export interface AugmentDef { name: string; tier: AugmentTier; icon: string; desc: string; faction?: Faction; unit?: TowerKey }
 export const AUGMENTS = {
+  bonds: { name: '전시 채권', tier: 'silver', icon: 'mineral', desc: '웨이브 시작 시 보유 미네랄의 10% 이자 (최대 100)' },
+  scrap: { name: '고철 회수', tier: 'silver', icon: 'sell', desc: '판매 시 투자한 미네랄을 전액 환급' },
+  infantry: { name: '보병 교리', tier: 'silver', icon: 'stim', faction: 'terran', desc: '마린·파이어뱃 공격력 +25%' },
+  resonance: { name: '사이오닉 공명', tier: 'silver', icon: 'warp', faction: 'protoss', unit: 'templar', desc: '아칸 주변 150 안의 병력 공격 속도 +15%' },
+  mass: { name: '물량 공세', tier: 'silver', icon: 'move', desc: '같은 유닛 3기마다 그 유닛 공격력 +10% (중첩)' },
+  lastStand: { name: '최후의 저항', tier: 'silver', icon: 'repair', desc: '기지 내구도 5 이하에서 모든 병력 공격력 +40%' },
+  analysis: { name: '약점 분석', tier: 'silver', icon: 'range', desc: '옵저버·사이언스 베슬 범위 안의 적이 받는 피해 +15%' },
   bounty: { name: '현상금 사냥', tier: 'gold', icon: 'weak', desc: '특수 적(의무병·분열체·보호막 지원병) 처치 보상 3배' },
   investment: { name: '선행 투자', tier: 'gold', icon: 'saved', desc: '즉시 미네랄 400 · 대신 웨이브 클리어 보너스 절반' },
   fortress: { name: '요새화', tier: 'gold', icon: 'empty', faction: 'terran', unit: 'bunker', desc: '벙커 사격구 4 → 6칸 · 주둔 보병 사거리 +30' },
@@ -58,6 +65,16 @@ export const HANGAR_INTERCEPTORS = 4;
 export const STASIS_TIME = 3;
 export const STASIS_BOSS_TIME = 1;
 const BOUNTY_TARGETS = ['medic', 'splitter', 'shielder'];
+export const BOND_RATE = .1;
+export const BOND_CAP = 100;
+export const RESONANCE_RADIUS = 150;
+export const RESONANCE_HASTE = 1.15;
+export const LAST_STAND_LIVES = 5;
+export const ANALYSIS_BONUS = 1.15;
+/** 전시 채권: 웨이브 시작 시 받는 이자. */
+export const bondInterest = (gold: number): number => active.has('bonds') ? Math.min(BOND_CAP, Math.floor(Math.max(0, gold) * BOND_RATE)) : 0;
+/** 고철 회수가 있으면 투자액 전액, 없으면 70%를 돌려받는다. */
+export const sellRate = (): number => active.has('scrap') ? 1 : .7;
 
 /** 증강 선택지: 카드 3장과 카드별 리롤 사용 여부. */
 export interface AugmentOffer { cards: AugmentKey[]; rerolled: boolean[] }
@@ -90,14 +107,16 @@ export const upgradePrice = (k: TowerKey, base: number): number => priced(base, 
 export const skillLocked = (unit: TowerKey): boolean => unit === 'cruiser' && active.has('yamato');
 
 /** 배치된 병력(벙커 제외)의 수와 종족 구성. 정예 소대·연합 전선·단일 혈통이 쓴다. */
-export interface Army { size: number; terran: number; protoss: number }
+export interface Army { size: number; terran: number; protoss: number; kinds?: Partial<Record<TowerKey, number>>; lives?: number }
 /** 병력 하나가 주는 기본 공격·스킬 피해 배율. 정예 소대는 공격 속도에도 같은 배율을 쓴다. */
 export function damageMultiplier(unit: TowerKey, army: Army): number {
   const pure = army.size > 0 && (army.terran === 0 || army.protoss === 0);
   return (active.has('inflation') ? 4 : 1) * (active.has('aiur') && unit === 'zealot' ? 4 : 1)
     * (active.has('xelnaga') && TOWER_DEFS[unit].faction === 'protoss' ? 2 : 1) * eliteBonus(army.size)
     * (active.has('glassCannon') ? 1.5 : 1) * (active.has('alliance') && army.terran >= 3 && army.protoss >= 3 ? 1.2 : 1)
-    * (active.has('pureBlood') && pure ? 1.3 : 1);
+    * (active.has('pureBlood') && pure ? 1.3 : 1) * (active.has('infantry') && (unit === 'marine' || unit === 'firebat') ? 1.25 : 1)
+    * (active.has('mass') ? 1 + Math.floor((army.kinds?.[unit] ?? 0) / 3) * .1 : 1)
+    * (active.has('lastStand') && army.lives !== undefined && army.lives <= LAST_STAND_LIVES ? 1.4 : 1);
 }
 /** 왕관 사냥꾼: 병력이 보스(아몬 포함)에게 주는 피해 +30%. */
 export const bossDamageMultiplier = (): number => active.has('crownHunter') ? 1.3 : 1;

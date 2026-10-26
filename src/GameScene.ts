@@ -15,7 +15,7 @@ import { ShopState, SupplyShop } from './shop';
 import { levelStats, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
 import { BUNKER_BARREL_LENGTH, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
 import { createMapRuntime, highGroundRangeBonus, type MapRuntime, type Point } from './game/map';
-import { AIUR_LIMIT, Army, FORTRESS_RANGE, HANGAR_INTERCEPTORS, INVESTMENT_GOLD, SIEGE_RANGE, STASIS_BOSS_TIME, STASIS_TIME, bossDamageMultiplier, bountyMultiplier, bunkerCapacity, clearBonusMultiplier, commanderCooldownScale, maxLives, maxUnitLevel, AIUR_RANGE, AMON_LEAK, AMON_SCALE, AUGMENTS, AUGMENT_WAVES, AugmentKey, AugmentOffer, YAMATO_WIDTH, STORM_FREE_CASTS, amonDue, augmentEligible, augmentOffer, branchCost, damageMultiplier, drawAugment, eliteBonus, placeCost, relocateCost, setActiveAugments, skillCost, skillLocked, hasAugment } from './augments';
+import { ANALYSIS_BONUS, RESONANCE_HASTE, RESONANCE_RADIUS, bondInterest, sellRate, AIUR_LIMIT, Army, FORTRESS_RANGE, HANGAR_INTERCEPTORS, INVESTMENT_GOLD, SIEGE_RANGE, STASIS_BOSS_TIME, STASIS_TIME, bossDamageMultiplier, bountyMultiplier, bunkerCapacity, clearBonusMultiplier, commanderCooldownScale, maxLives, maxUnitLevel, AIUR_RANGE, AMON_LEAK, AMON_SCALE, AUGMENTS, AUGMENT_WAVES, AugmentKey, AugmentOffer, YAMATO_WIDTH, STORM_FREE_CASTS, amonDue, augmentEligible, augmentOffer, branchCost, damageMultiplier, drawAugment, eliteBonus, placeCost, relocateCost, setActiveAugments, skillCost, skillLocked, hasAugment } from './augments';
 import { ACHIEVEMENTS, allowedUnit, awardAchievements, Bonuses, bossPattern, Branch, BranchState, COMMANDERS, hasBranch, CommanderKey, DEFAULT_OPTIONS, DIFFICULTIES, newStats, normalizeStats, Profile, PROFILE_KEY, readProfile, readSave, REWARDS, RewardKey, rewardChoices, RunOptions, RunSave, RunStats, SavedUnit, SAVE_KEY, clearSave, TargetMode, TestScope, validateSave, wavePlan, writeStored } from './campaign';
 import { BattleAudio } from './audio';
 import { CombatEffects } from './combatEffects';
@@ -433,9 +433,20 @@ export class GameScene extends Phaser.Scene {
   }
   private army(): Army {
     const units = this.towers.filter(t => t.k !== 'bunker');
-    return { size: units.length, terran: units.filter(t => TOWER_DEFS[t.k].faction === 'terran').length, protoss: units.filter(t => TOWER_DEFS[t.k].faction === 'protoss').length };
+    const kinds: Partial<Record<TowerKey, number>> = {};
+    for (const t of units) kinds[t.k] = (kinds[t.k] ?? 0) + 1;
+    return { size: units.length, terran: units.filter(t => TOWER_DEFS[t.k].faction === 'terran').length, protoss: units.filter(t => TOWER_DEFS[t.k].faction === 'protoss').length, kinds, lives: this.lives };
   }
   private armySize(): number { return this.army().size; }
+  /** 약점 분석: 옵저버·사이언스 베슬의 지원 범위 안에 든 적은 병력 피해를 15% 더 받는다. */
+  private analysisBonus(e: Enemy): number {
+    return hasAugment('analysis') && this.towers.some(t => (t.k === 'observer' || t.k === 'support') && Math.hypot(e.x - t.x, e.y - t.y) <= this.supportRange(t)) ? ANALYSIS_BONUS : 1;
+  }
+  /** 사이오닉 공명: 아칸(자신 포함) 반경 150 안의 병력은 공격 속도 +15%. */
+  private resonance(t: StatsUnit): number {
+    return hasAugment('resonance') && t.x !== undefined && t.y !== undefined
+      && this.towers.some(a => a.k === 'templar' && Math.hypot(a.x - t.x!, a.y - t.y!) <= RESONANCE_RADIUS) ? RESONANCE_HASTE : 1;
+  }
 
   private toggleAutoCommander(key: CommanderKey): void {
     if (this.autoCommander.delete(key)) { this.banner(COMMANDERS[key].name + ' 자동 사용 해제'); return; }
@@ -841,7 +852,7 @@ export class GameScene extends Phaser.Scene {
           '기본 능력 · 자동 적용\n' + trait.text, () => {}, false), active: true,
           badge: cooldown > 0 ? Math.ceil(cooldown) + 's' : 'AUTO', progress: emp ? 1 - cooldown / VESSEL_EMP.cooldown : undefined };
       });
-      cells[3] = make('sell:' + t.id, '유닛 회수', 'cmd_sell', `투자한 미네랄의 70%인 ${this.sellValue(t)}을 돌려받습니다.`,
+      cells[3] = make('sell:' + t.id, '유닛 회수', 'cmd_sell', `투자한 미네랄의 ${Math.round(sellRate() * 100)}%인 ${this.sellValue(t)}을 돌려받습니다.`,
         () => { if (this.selected?.id === t.id) this.sell(); });
       cells[3].hotkey = this.kb('S');
       cells[4] = make('manage', '부대 일괄 관리', 'cmd_manage', '전장과 모든 벙커의 병력을 함께 강화하거나 스킬을 일괄 장착합니다.', () => this.openShop('manage'));
@@ -995,7 +1006,7 @@ export class GameScene extends Phaser.Scene {
       aura = vesselAuraMultiplier(this.towers.filter(ally => ally.id !== t.id && ally.k === 'support'
         && Math.hypot(ally.x - t.x!, ally.y - t.y!) <= this.supportRange(ally)).map(ally => ally.lvl));
     }
-    const haste = (t.buffs ?? []).reduce((v, b) => v * b.haste, 1) * aura * (1 + this.bonuses.haste) * (hasBranch(t.branch, 'rapid') ? 1.4 : 1) * eliteBonus(this.armySize());
+    const haste = (t.buffs ?? []).reduce((v, b) => v * b.haste, 1) * aura * (1 + this.bonuses.haste) * (hasBranch(t.branch, 'rapid') ? 1.4 : 1) * eliteBonus(this.armySize()) * this.resonance(t);
     const power = (t.buffs ?? []).reduce((v, b) => v * b.power, 1);
     return {
       dmg: base.dmg * power * (1 + this.bonuses.power) * (hasBranch(t.branch, 'power') ? 1.7 : 1),
@@ -1014,7 +1025,7 @@ export class GameScene extends Phaser.Scene {
       + (t.k === 'zealot' && hasAugment('aiur') ? AIUR_RANGE : 0) + (t.k === 'cannon' && hasAugment('siegeMode') ? SIEGE_RANGE : 0);
   }
   private upgradeCost(t: Tower): number { return unitUpgradeCost(t); }
-  private sellValue(t: Tower): number { return Math.round(t.spent * .7); }
+  private sellValue(t: Tower): number { return Math.round(t.spent * sellRate()); }
 
   private cellFree(c: number, r: number): boolean {
     return c >= 0 && r >= 0 && c < COLS && r < ROWS && !this.map.pathCells.has(c + ',' + r)
@@ -1153,6 +1164,9 @@ export class GameScene extends Phaser.Scene {
     }
     this.waveStart = { kills: this.runStats.kills, lost: this.runStats.lost, seconds: this.runStats.seconds };
     this.spawnQ = q; this.spawnT = 0; this.waveActive = true;
+    // 전시 채권: 웨이브를 시작할 때 보유 미네랄의 10%를 이자로 받는다(최대 100).
+    const interest = bondInterest(this.gold);
+    if (interest > 0) { this.gold += interest; this.opsNotice = `전시 채권 이자 +${interest} 미네랄`; }
     const boss = q.includes('boss') || q.includes('amon');
     this.banner(boss ? `웨이브 ${w} — ${bossPattern(w)}` : this.testMode && this.testScope === 'line' ? `웨이브 ${w} — 라인 테스트` : `웨이브 ${w}`);
     if (boss) this.audio.play('boss');
@@ -1550,7 +1564,7 @@ export class GameScene extends Phaser.Scene {
     if (e.dead || !Number.isFinite(dmg) || dmg <= 0) return;
     // 증강의 피해 배율은 병력이 주는 기본 공격·스킬·지속 피해에 모두 적용한다(사령관 지원 제외).
     const unit = source && source !== 'commander' ? this.towers.find(t => t.id === source) : undefined;
-    const amount = dmg * (1 + weaknessBonus(e)) * (unit ? damageMultiplier(unit.k, this.army()) * (e.type === 'boss' ? bossDamageMultiplier() : 1) : 1);
+    const amount = dmg * (1 + weaknessBonus(e)) * (unit ? damageMultiplier(unit.k, this.army()) * (e.type === 'boss' ? bossDamageMultiplier() : 1) * this.analysisBonus(e) : 1);
     const absorbed = Math.min(e.shield ?? 0, amount);
     e.shield = Math.max(0, (e.shield ?? 0) - absorbed);
     const dealt = Math.min(e.hp, amount - absorbed);

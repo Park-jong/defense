@@ -38,8 +38,10 @@ test('증강 후보는 카드마다 등급을 굴리고, 출현한 증강과 같
   assert.equal(offer.cards.length, 3); assert.equal(new Set(offer.cards).size, 3);
   assert.ok(!offer.cards.includes('factory') && !offer.cards.includes('yamato'));
   assert.deepEqual(offer.rerolled, [false, false, false]);
-  // 실버가 아직 없으므로 실버가 나오면 가까운 등급(골드)으로 넘어간다.
-  assert.equal(aug.AUGMENTS[aug.drawAugment(10, new Set(), all, sequence([0, 0]))].tier, 'gold');
+  // 굴린 등급(실버)이 바닥나면 가까운 등급(골드)으로 넘어간다.
+  const silvers = new Set(aug.AUGMENT_KEYS.filter(k => aug.AUGMENTS[k].tier === 'silver'));
+  assert.equal(aug.AUGMENTS[aug.drawAugment(10, new Set(), all, sequence([0, 0]))].tier, 'silver');
+  assert.equal(aug.AUGMENTS[aug.drawAugment(10, silvers, all, sequence([0, 0]))].tier, 'gold');
   const seen = new Set(aug.AUGMENT_KEYS.slice(0, -1));
   assert.deepEqual(aug.augmentOffer(30, seen, all).cards, [aug.AUGMENT_KEYS.at(-1)]);
   assert.equal(aug.drawAugment(30, new Set(aug.AUGMENT_KEYS), all), null);
@@ -248,4 +250,41 @@ test('내 목숨을 아이어에 이후 질럿은 전장에 1기만 배치할 �
   s.selected = first; s.sell(); assert.ok(place(s, 'zealot', 8, 1));
   aug.setActiveAugments([]); const plain = setup(); place(plain, 'zealot'); place(plain, 'zealot', 8, 1);
   assert.equal(plain.towers.length, 2);
+});
+
+test('실버 7종이 모두 정의되어 있고 등급별 수는 실버 7·골드 12·프리즘 9다', () => {
+  const count = t => aug.AUGMENT_KEYS.filter(k => aug.AUGMENTS[k].tier === t).length;
+  assert.deepEqual([count('silver'), count('gold'), count('prism')], [7, 12, 9]);
+});
+
+test('전시 채권은 웨이브 시작 때 보유 미네랄의 10%(최대 100)를, 고철 회수는 판매 때 투자액 전액을 돌려준다', () => {
+  const s = setup(['bonds']); s.gold = 650; s.wave = 3; s.startWave(); assert.equal(s.gold, 715);
+  const rich = setup(['bonds']); rich.gold = 5000; rich.wave = 3; rich.startWave(); assert.equal(rich.gold, 5100);
+  aug.setActiveAugments(['scrap']); const t = setup(['scrap']), m = place(t, 'marine'), gold = t.gold;
+  t.selected = m; t.sell(); assert.equal(t.gold - gold, config.TOWER_DEFS.marine.cost);
+});
+
+test('보병 교리·물량 공세·최후의 저항은 조건에 맞는 병력의 피해를 올린다', () => {
+  setup(['infantry']);
+  assert.equal(aug.damageMultiplier('marine', { size: 1, terran: 1, protoss: 0 }), 1.25);
+  assert.equal(aug.damageMultiplier('cannon', { size: 1, terran: 1, protoss: 0 }), 1);
+  aug.setActiveAugments(['mass']);
+  assert.equal(aug.damageMultiplier('marine', { size: 2, terran: 2, protoss: 0, kinds: { marine: 2 } }), 1);
+  assert.ok(Math.abs(aug.damageMultiplier('marine', { size: 7, terran: 7, protoss: 0, kinds: { marine: 7 } }) - 1.2) < 1e-9);
+  aug.setActiveAugments(['lastStand']);
+  assert.equal(aug.damageMultiplier('marine', { size: 1, terran: 1, protoss: 0, lives: 6 }), 1);
+  assert.equal(aug.damageMultiplier('marine', { size: 1, terran: 1, protoss: 0, lives: 5 }), 1.4);
+  const s = setup(['lastStand']), t = place(s, 'marine'), e = spawn(s); e.hp = e.max = 1000; s.lives = 4;
+  s.damageEnemy(e, 10, 'normal', t.id); assert.equal(e.hp, 986);
+});
+
+test('사이오닉 공명은 아칸 주변 150 안의 병력 공격 속도를, 약점 분석은 옵저버·베슬 범위 안 적의 피해를 15% 올린다', () => {
+  const s = setup(), m = place(s, 'marine'), base = s.stats(m).rate;
+  place(s, 'templar', 7, 1); aug.setActiveAugments(['resonance']);
+  assert.ok(Math.abs(s.stats(m).rate - base / 1.15) < 1e-9);
+  const a = setup(['analysis']), t = place(a, 'marine'), o = place(a, 'observer', 9, 1);
+  const near = spawn(a, 'grunt', o.x, o.y + 40), far = spawn(a, 'grunt', o.x + 2000, o.y);
+  near.hp = near.max = far.hp = far.max = 1000;
+  a.damageEnemy(near, 100, 'normal', t.id); a.damageEnemy(far, 100, 'normal', t.id);
+  assert.equal(1000 - near.hp, 115); assert.equal(1000 - far.hp, 100);
 });
