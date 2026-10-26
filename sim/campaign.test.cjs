@@ -394,7 +394,7 @@ test('Lv.3 특화는 한 번만 비용을 차감하고 화력·연사·지원 �
   assert.ok(s.stats(t).dmg > base.dmg); assert.ok(s.stats(t).rate > base.rate); assert.equal(s.specialize('rapid'), false);
   const rapid = place(s, 'cannon', 7); rapid.lvl = 3; s.selected = rapid; assert.equal(s.specialize('rapid'), true);
   assert.ok(s.stats(rapid).rate < base.rate); assert.ok(s.stats(rapid).splash > base.splash);
-  const support = place(s, 'support', 8); support.lvl = 3; const range = s.supportRange(support); s.selected = support; s.specialize('power'); assert.equal(s.supportRange(support), range + 45);
+  const support = place(s, 'support', 8); support.lvl = 3; const range = s.supportRange(support); s.selected = support; s.specialize('power'); assert.equal(s.supportRange(support), range + 15);
 });
 
 test('모든 전투·지원 유닛은 Lv.5까지 강화되고 최대 단계에서는 추가 비용을 차감하지 않는다', () => {
@@ -855,7 +855,7 @@ test('캐리어 강화·연사 특화·재출격이 실제 출격 주기를 줄�
   unit.cd = 100;
   for (let i = 0; i < 60; i++) s.step(1 / 60);
   const { levelStats } = load('./management');
-  assert.ok(Math.abs(s.runStats.units[0].damage - launches * config.attackDamage('carrier', levelStats('carrier', 3).dmg)) < 1e-7);
+  assert.ok(Math.abs(s.runStats.units[0].damage - launches * config.attackDamage('carrier', levelStats('carrier', 3).dmg * 1.1)) < 1e-7);
   assert.equal(s.projs.length, 0);
 });
 

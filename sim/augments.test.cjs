@@ -142,7 +142,7 @@ test('이중 특화는 두 갈래를 모두 고르게 하고 두 효과를 함�
   assert.ok(s.specialize('power')); assert.equal(s.specialize('power'), false); assert.ok(s.specialize('rapid'));
   assert.equal(t.branch, 'both'); assert.equal(s.specialize('rapid'), false);
   const st = s.stats(t);
-  assert.ok(Math.abs(st.dmg - base.dmg * 1.7) < 1e-6); assert.ok(Math.abs(st.rate - base.rate * 1.15 / 1.4) < 1e-6);
+  assert.ok(Math.abs(st.dmg - base.dmg * 1.15) < 1e-6); assert.ok(Math.abs(st.rate - base.rate * .6) < 1e-6);
   aug.setActiveAugments([]); const plain = setup(), u = place(plain, 'marine'); u.lvl = 3; plain.selected = u; plain.saveCheckpoint = () => {};
   assert.ok(plain.specialize('power')); assert.equal(plain.specialize('rapid'), false);
 });

@@ -79,7 +79,7 @@ async function dialogFits(page) {
     await press(page, 'o');
     await page.getByRole('heading', { name: '작전실', exact: true }).waitFor();
     await page.getByRole('button', { name: '보스 우선', exact: true }).click();
-    await page.getByRole('button', { name: '집중 화력 선택', exact: true }).click();
+    await page.getByRole('button', { name: '장거리 요격 선택', exact: true }).click();
     assert.equal(await scene(page, s => s.selected.target), 'boss');
     assert.equal(await scene(page, s => s.selected.branch), 'power');
     await page.getByRole('button', { name: '전장 복귀', exact: true }).click();

@@ -24,8 +24,8 @@ export const DEFAULT_OPTIONS: RunOptions = { map: 'frontier', difficulty: 'norma
 export const TARGETS = { first: '선두', strong: '체력 높은 적', weak: '체력 낮은 적', boss: '보스' };
 export type TargetMode = keyof typeof TARGETS;
 export const BRANCHES = {
-  power: { name: '집중 화력', desc: '공격력 +70% · 공격 간격 +15% · 지원 유닛은 지원 사거리 +45' },
-  rapid: { name: '전술 확장', desc: '공격 속도 +40% · 범위 공격 반경 +35% · 지원 유닛은 지원 사거리 +45' },
+  power: { name: '전용 특화 I', desc: '병력별 첫 번째 특화 · 도감과 특화 설명에서 효과 확인' },
+  rapid: { name: '전용 특화 II', desc: '병력별 두 번째 특화 · 도감과 특화 설명에서 효과 확인' },
 };
 export type Branch = keyof typeof BRANCHES;
 /** 이중 특화 증강으로 두 갈래를 모두 고르면 'both'. */

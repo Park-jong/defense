@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import {
-  CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE, COLS, SUPPORT_BRANCH_RANGE, CONSOLE_Y, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, FINAL_BOSS_HP_MULT, FONT, GAME_W, H, MAP_H, MAP_Y, MAX_CATCHUP_SEC, MAX_WAVE, MOBILE_LAYOUT, RENDER_SCALE, RIBBON_BAND, ROWS, SIDE_RIBBON_H, SIDE_W, STEP_SEC, T, TEST_GOLD, TOP_BAR_H, TOWER_DEFS, TowerKey, VIEW_H, W,
+  CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE, COLS, CONSOLE_Y, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, FINAL_BOSS_HP_MULT, FONT, GAME_W, H, MAP_H, MAP_Y, MAX_CATCHUP_SEC, MAX_WAVE, MOBILE_LAYOUT, RENDER_SCALE, RIBBON_BAND, ROWS, SIDE_RIBBON_H, SIDE_W, STEP_SEC, T, TEST_GOLD, TOP_BAR_H, TOWER_DEFS, TowerKey, VIEW_H, W,
 } from './config';
 import { drawMap, loadEnemyArt, makeTextures } from './textures';
 import { ENEMY_ART, ENEMY_FRAME_COUNT, ENEMY_FRAME_SIZE } from './enemyArt';
@@ -17,7 +17,7 @@ import { levelStats, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCo
 import { BUNKER_BARREL_LENGTH, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
 import { createMapRuntime, highGroundRangeBonus, type MapRuntime, type Point } from './game/map';
 import { YAMATO_CHARGE_EVERY, YAMATO_CHARGE_POWER, ANALYSIS_BONUS, RESONANCE_HASTE, RESONANCE_RADIUS, bondInterest, sellRate, AIUR_LIMIT, Army, FORTRESS_RANGE, HANGAR_INTERCEPTORS, INVESTMENT_GOLD, SIEGE_RANGE, STASIS_BOSS_TIME, STASIS_TIME, bossDamageMultiplier, bountyMultiplier, bunkerCapacity, clearBonusMultiplier, commanderCooldownScale, maxLives, maxUnitLevel, AIUR_RANGE, AMON_LEAK, AMON_SCALE, AUGMENTS, AUGMENT_WAVES, AugmentKey, AugmentOffer, YAMATO_WIDTH, STORM_FREE_CASTS, amonDue, augmentEligible, augmentOffer, branchCost, damageMultiplier, drawAugment, eliteBonus, placeCost, relocateCost, setActiveAugments, skillCost, skillLocked, hasAugment } from './augments';
-import { ACHIEVEMENTS, allowedUnit, awardAchievements, Bonuses, bossPattern, Branch, BranchState, COMMANDERS, hasBranch, CommanderKey, DEFAULT_OPTIONS, DIFFICULTIES, newStats, normalizeStats, Profile, PROFILE_KEY, readProfile, readSave, REWARDS, RewardKey, rewardChoices, RunOptions, RunSave, RunStats, SavedUnit, SAVE_KEY, clearSave, TargetMode, TestScope, validateSave, wavePlan, writeStored } from './campaign';
+import { ACHIEVEMENTS, allowedUnit, awardAchievements, Bonuses, bossPattern, Branch, BranchState, COMMANDERS, CommanderKey, DEFAULT_OPTIONS, DIFFICULTIES, newStats, normalizeStats, Profile, PROFILE_KEY, readProfile, readSave, REWARDS, RewardKey, rewardChoices, RunOptions, RunSave, RunStats, SavedUnit, SAVE_KEY, clearSave, TargetMode, TestScope, validateSave, wavePlan, writeStored } from './campaign';
 import { BattleAudio } from './audio';
 import { CombatEffects } from './combatEffects';
 import { hasWeaponEffects } from './data/weaponEffects';
@@ -31,6 +31,7 @@ import { createMoePortraits } from './moePortraits';
 import { MoePresentation, type MoeActor } from './moePresentation';
 import { MOE_CHARACTERS } from './moeCharacters';
 import { OBSERVATION_BONUSES, OBSERVATION_DURATION, Observation, observationCount, supportTraits, VESSEL_AURA, vesselAuraBonus, vesselAuraMultiplier, VESSEL_EMP, weaknessBonus } from './support';
+import { specialization, specializationEffects } from './specializations';
 
 interface Tower {
   id: string;
@@ -56,7 +57,7 @@ interface Enemy {
   amon?: boolean;
 }
 
-interface TowerStats { dmg: number; range: number; rate: number; splash: number; slow: number }
+interface TowerStats { dmg: number; range: number; rate: number; splash: number; slow: number; slowDuration: number; fieldDuration: number }
 type StatsUnit = Pick<Tower, 'k' | 'lvl'> & Partial<Pick<Tower, 'id' | 'c' | 'r' | 'x' | 'y' | 'buffs' | 'host' | 'branch'>>;
 
 interface Projectile {
@@ -497,7 +498,7 @@ export class GameScene extends Phaser.Scene {
     const second = !!t?.branch && hasAugment('dualBranch') && t.branch !== 'both' && t.branch !== key;
     if (!t || this.over || t.k === 'bunker' || t.lvl < 3 || t.branch && !second || this.gold < branchCost(t.k)) return false;
     const cost = branchCost(t.k); this.gold -= cost; t.spent += cost; t.branch = second ? 'both' : key;
-    this.audio.play('build'); this.opsNotice = '특화가 적용되었습니다.'; this.saveCheckpoint(false); return true;
+    this.audio.play('build'); this.opsNotice = `${specialization(t.k, key)!.name} 특화가 적용되었습니다.`; this.saveCheckpoint(false); return true;
   }
 
   private beginRelocate(): boolean {
@@ -902,9 +903,10 @@ export class GameScene extends Phaser.Scene {
         title = `벙커  ${crew.length}/${bunkerCapacity()} 주둔`;
         msg = `보병 최대 ${bunkerCapacity()}기 · 사거리 +${BUNKER_RANGE_BONUS + (hasAugment('fortress') ? FORTRESS_RANGE : 0)}${terrainHint}\n` + (crew.length ? crew.map(p => `${TOWER_DEFS[p.k].name} Lv.${p.lvl} · 스킬 ${p.skills.length}/2`).join('\n') : '현재 주둔 병력 없음\n빈 벙커는 공격하지 않습니다.\n명령 아이콘으로 탑승·구매');
       } else if (k === 'support' || k === 'observer') {
+        const spec = specializationEffects(k, t?.branch);
         msg = `지원 사거리 ${st.range.toFixed(0)}${terrainHint}\n` + (k === 'support'
-          ? `공속 +${Math.round(vesselAuraBonus(t?.lvl ?? 1) * 100)}% · 2대 중첩(추가 ${VESSEL_AURA.secondary * 100}%)\nEMP · ${VESSEL_EMP.cooldown}초마다 보호막 ${VESSEL_EMP.shieldFraction * 100}% 제거\n표적 주변 반경 ${VESSEL_EMP.radius} · 자동 사용`
-          : `미표식 우선 · 관측 ${OBSERVATION_DURATION}초\n받는 피해 +${OBSERVER_INFO_BONUSES}\n기체별 중첩 · 반복 관측은 갱신`);
+          ? `공속 +${Math.round((vesselAuraBonus(t?.lvl ?? 1) + spec.aura) * 100)}% · 2대 중첩(추가 ${VESSEL_AURA.secondary * 100}%)\nEMP · ${VESSEL_EMP.cooldown * spec.empCooldown}초마다 보호막 ${(VESSEL_EMP.shieldFraction + spec.empFraction) * 100}% 제거\n표적 주변 반경 ${VESSEL_EMP.radius + spec.empRadius} · 자동 사용`
+          : `미표식 우선 · 관측 ${OBSERVATION_DURATION + spec.observationDuration}초\n받는 피해 +${OBSERVER_INFO_BONUSES}\n기체별 중첩 · 반복 관측은 갱신`);
       } else {
         msg = `공격 ${st.dmg.toFixed(0)}${attackCount(k) > 1 ? ` × ${attackCount(k)}` : ''} · 사거리 ${st.range.toFixed(0)}${terrainHint}\n공격 속도 ${(1 / st.rate).toFixed(1)}/초\n자동 스킬 ${t?.skills.length ?? 0}/${SKILL_SLOTS}`;
         msg += t?.skills.length ? '\n' + t.skills.map(s => `${SKILL_DEFS[s.key].name} ${s.cd > 0 ? Math.ceil(s.cd) + '초' : '준비'}`).join('\n') : '\n명령 아이콘으로 스킬 장착';
@@ -982,13 +984,13 @@ export class GameScene extends Phaser.Scene {
           (skillLocked(t.k) ? '야마토 프로토콜로 스킬 비활성화\n' : owned ? '장착 완료 · 적을 만나면 자동 사용\n' : '누르면 영구 장착 · 이후 자동 사용\n') + def.desc,
           () => this.equipSkill(key, t.id), !owned && !skillLocked(t.k) && t.skills.length < SKILL_SLOTS && this.gold >= skillCost(key), owned ? undefined : skillCost(key)),
           hotkey: this.kb(i === 0 ? 'Z' : 'X'), active: !!owned, badge: owned ? owned.cd > 0 ? Math.ceil(owned.cd) + 's' : 'AUTO' : '',
-          progress: owned ? 1 - owned.cd / def.cooldown : undefined };
+          progress: owned ? Math.max(0, 1 - owned.cd / (def.cooldown * specializationEffects(t.k, t.branch, !!t.host).skillCooldown)) : undefined };
       });
-      supportTraits(t.k, t.lvl).forEach((trait, i) => {
+      supportTraits(t.k, t.lvl, t.branch).forEach((trait, i) => {
         const emp = trait.icon === 'emp', cooldown = emp ? t.cd : 0;
         cells[1 + i] = { ...make('passive:' + trait.icon + ':' + t.id, trait.name, 'cmd_' + trait.icon,
           '기본 능력 · 자동 적용\n' + trait.text, () => {}, false), active: true,
-          badge: cooldown > 0 ? Math.ceil(cooldown) + 's' : 'AUTO', progress: emp ? 1 - cooldown / VESSEL_EMP.cooldown : undefined };
+          badge: cooldown > 0 ? Math.ceil(cooldown) + 's' : 'AUTO', progress: emp ? Math.max(0, 1 - cooldown / (VESSEL_EMP.cooldown * specializationEffects(t.k, t.branch).empCooldown)) : undefined };
       });
       cells[3] = make('sell:' + t.id, '유닛 회수', 'cmd_sell', `투자한 미네랄의 ${Math.round(sellRate() * 100)}%인 ${this.sellValue(t)}을 돌려받습니다.`,
         () => { if (this.selected?.id === t.id) this.sell(); });
@@ -1109,7 +1111,7 @@ export class GameScene extends Phaser.Scene {
     return { gold: this.gold, selectedId: this.selected?.id ?? null, mode: this.options.mode,
       units: this.towers.map(t => ({ id: t.id, k: t.k, lvl: t.lvl, skills: t.skills, c: t.c, r: t.r,
         stats: this.stats(t), nextStats: this.stats({ ...t, lvl: Math.min(maxUnitLevel(), t.lvl + 1) }),
-        hostId: t.host?.id, passengers: t.passengers.map(p => p?.id ?? null) })) };
+        hostId: t.host?.id, branch: t.branch, passengers: t.passengers.map(p => p?.id ?? null) })) };
   }
 
   private openShop(tab: 'army' | 'garrison' | 'manage' = 'army'): void {
@@ -1142,21 +1144,23 @@ export class GameScene extends Phaser.Scene {
 
   private stats(t: StatsUnit): TowerStats {
     const d: { dmg: number; range: number; rate: number; splash?: number; slow?: number } = TOWER_DEFS[t.k];
-    const l = t.lvl - 1, base = levelStats(t.k, t.lvl);
+    const l = t.lvl - 1, base = levelStats(t.k, t.lvl), spec = specializationEffects(t.k, t.branch, !!t.host);
     let aura = 1;
     if (t.x !== undefined && t.y !== undefined) {
-      aura = vesselAuraMultiplier(this.towers.filter(ally => ally.id !== t.id && ally.k === 'support'
-        && Math.hypot(ally.x - t.x!, ally.y - t.y!) <= this.supportRange(ally)).map(ally => ally.lvl));
+      const vessels = this.towers.filter(ally => ally.id !== t.id && ally.k === 'support'
+        && Math.hypot(ally.x - t.x!, ally.y - t.y!) <= this.supportRange(ally));
+      aura = vesselAuraMultiplier(vessels.map(ally => ally.lvl), vessels.map(ally => specializationEffects(ally.k, ally.branch).aura));
     }
-    const haste = (t.buffs ?? []).reduce((v, b) => v * b.haste, 1) * aura * (1 + this.bonuses.haste) * (hasBranch(t.branch, 'rapid') ? 1.4 : 1) * eliteBonus(this.armySize()) * this.resonance(t);
+    const haste = (t.buffs ?? []).reduce((v, b) => v * b.haste, 1) * aura * (1 + this.bonuses.haste) * eliteBonus(this.armySize()) * this.resonance(t);
     const power = (t.buffs ?? []).reduce((v, b) => v * b.power, 1);
     return {
       // 증강의 병력 피해 배율까지 넣어 정보창·보급 상점의 공격력과 실제 피해가 같은 값이 되게 한다.
-      dmg: this.cheatPower(base.dmg * power * (1 + this.bonuses.power) * (hasBranch(t.branch, 'power') ? 1.7 : 1)) * damageMultiplier(t.k, this.army()),
+      dmg: this.cheatPower(base.dmg * power * (1 + this.bonuses.power) * spec.damage) * damageMultiplier(t.k, this.army()),
       range: this.supportRange(t) + (t.host ? BUNKER_RANGE_BONUS + (hasAugment('fortress') ? FORTRESS_RANGE : 0) : 0),
-      rate: base.rate * (hasBranch(t.branch, 'power') ? 1.15 : 1) * (t.k === 'cannon' && hasAugment('siegeMode') ? 1.2 : 1) / haste,
-      splash: d.splash ? d.splash * (1 + .1 * l) * (hasBranch(t.branch, 'rapid') ? 1.35 : 1) * this.splashAugment(t.k) : 0,
-      slow: d.slow ? Math.max(.2, d.slow - .08 * l) : 0,
+      rate: base.rate * spec.interval * (t.k === 'cannon' && hasAugment('siegeMode') ? 1.2 : 1) / haste,
+      splash: Math.max((d.splash ?? 0) * (1 + .1 * l) * spec.splash, spec.splashRadius) * this.splashAugment(t.k),
+      slow: d.slow ? Math.max(.08, Math.min(.9, Math.max(.2, d.slow - .08 * l) + spec.slow)) : 0,
+      slowDuration: 2 + spec.slowDuration, fieldDuration: 2 + spec.fieldDuration,
     };
   }
   /** 시즈 모드 확장(시즈 탱크 +30%)과 확장 격납고(리버 스캐럽 +40%)의 폭발 범위 배율. */
@@ -1168,7 +1172,7 @@ export class GameScene extends Phaser.Scene {
     return this.powerStacks ? Math.max(dmg, Math.min(dmg * 2 ** this.powerStacks, CHEAT_POWER_CAP)) : dmg;
   }
   private supportRange(t: StatsUnit): number {
-    return levelStats(t.k, t.lvl).range + this.bonuses.range + highGroundRangeBonus(this.map, t.c ?? -1, t.r ?? -1) + (['support', 'observer'].includes(t.k) && t.branch ? SUPPORT_BRANCH_RANGE : 0)
+    return levelStats(t.k, t.lvl).range + this.bonuses.range + highGroundRangeBonus(this.map, t.c ?? -1, t.r ?? -1) + specializationEffects(t.k, t.branch, !!t.host).range
       + (t.k === 'zealot' && hasAugment('aiur') ? AIUR_RANGE : 0) + (t.k === 'cannon' && hasAugment('siegeMode') ? SIEGE_RANGE : 0);
   }
   private upgradeCost(t: Tower): number { return unitUpgradeCost(t); }
@@ -1579,15 +1583,16 @@ export class GameScene extends Phaser.Scene {
     t.cd = Math.max(0, t.cd - dt);
     if (t.k === 'support') {
       if (t.cd > 0) return;
+      const spec = specializationEffects(t.k, t.branch), radius = VESSEL_EMP.radius + spec.empRadius;
       const target = this.findTarget(t, e => (e.shield ?? 0) > 0);
       if (!target) return;
       for (const e of this.enemies) {
-        if (e.dead || (e.shield ?? 0) <= 0 || Math.hypot(e.x - target.x, e.y - target.y) > VESSEL_EMP.radius) continue;
-        e.shield = (e.shield ?? 0) * (1 - VESSEL_EMP.shieldFraction);
+        if (e.dead || (e.shield ?? 0) <= 0 || Math.hypot(e.x - target.x, e.y - target.y) > radius) continue;
+        e.shield = (e.shield ?? 0) * (1 - VESSEL_EMP.shieldFraction - spec.empFraction);
       }
-      t.cd = VESSEL_EMP.cooldown;
+      t.cd = VESSEL_EMP.cooldown * spec.empCooldown;
       this.skillBeam(t, target, 0x81ceeb, 3);
-      this.skillRing(target.x, target.y, VESSEL_EMP.radius, 0x81ceeb);
+      this.skillRing(target.x, target.y, radius, 0x81ceeb);
       this.audio.play('skill');
       return;
     }
@@ -1606,8 +1611,9 @@ export class GameScene extends Phaser.Scene {
       if (t.cd <= 0) {
         best.observations ??= [];
         const own = best.observations.find(mark => mark.source === t.id);
-        if (own) own.left = OBSERVATION_DURATION;
-        else best.observations.push({ source: t.id, left: OBSERVATION_DURATION });
+        const duration = OBSERVATION_DURATION + specializationEffects(t.k, t.branch).observationDuration;
+        if (own) own.left = duration;
+        else best.observations.push({ source: t.id, left: duration });
         t.cd = this.stats(t).rate;
         this.skillBeam(t, best, 0xc4a1ff);
       }
@@ -1620,7 +1626,7 @@ export class GameScene extends Phaser.Scene {
       t.barrel.rotation = ['frost', 'sniper', 'templar', 'highTemplar'].includes(t.k) ? 0 : Math.atan2(best.y - t.y, best.x - t.x);
       this.autoSkill(t, skill.key, best);
       const free = skill.key === 'psionicStorm' && (t.stormFree ?? 0) > 0 ? --t.stormFree! : -1;
-      skill.cd = free > 0 ? .5 : SKILL_DEFS[skill.key].cooldown;
+      skill.cd = free > 0 ? .5 : SKILL_DEFS[skill.key].cooldown * specializationEffects(t.k, t.branch, !!t.host).skillCooldown;
     }
     if (best?.dead) best = this.findTarget(t);
     if (!best) return;
@@ -1645,10 +1651,13 @@ export class GameScene extends Phaser.Scene {
     if (t.k === 'cruiser' && hasAugment('yamato')) { this.yamatoLine(t, angle, st); return; }
     if (t.k === 'zealot') {
       for (const offset of [-7, 7]) this.skillBeam({ x: t.x - Math.sin(angle) * offset, y: t.y + Math.cos(angle) * offset }, best, d.proj, 3);
-      this.damageEnemy(best, st.dmg, 'normal', t.id); return;
+      const targets = st.splash ? this.enemies.filter(e => !e.dead && Math.hypot(e.x - best.x, e.y - best.y) <= st.splash) : [best];
+      if (st.splash) this.skillRing(best.x, best.y, st.splash, d.proj);
+      for (const enemy of targets) this.damageEnemy(enemy, st.dmg, 'normal', t.id);
+      return;
     }
     if (t.k === 'highTemplar') {
-      this.fields.push({ x: best.x, y: best.y, radius: st.splash, left: 2, tick: .5, dmg: st.dmg, color: d.proj, source: t.id });
+      this.fields.push({ x: best.x, y: best.y, radius: st.splash, left: st.fieldDuration, tick: .5, dmg: st.dmg, color: d.proj, source: t.id });
       this.skillRing(best.x, best.y, st.splash, d.proj); return;
     }
     if (t.k === 'carrier' || t.k === 'goliath' || t.k === 'scout') {
@@ -1926,6 +1935,11 @@ export class GameScene extends Phaser.Scene {
       this.combatEffects?.impact(p.k, e, p, st.splash);
       this.audio.impact(p.k);
     }
+    const slow = (target: Enemy) => {
+      if (!st.slow || target.dead) return;
+      target.slow = Math.min(target.slow, st.slow); target.slowT = Math.max(target.slowT, st.slowDuration);
+      this.fxFrost.explode(4, target.x, target.y);
+    };
     if (st.splash) {
       if (!enhanced && p.k === 'templar') this.archonBurst(e.x, e.y, st.splash);
       else if (!enhanced) {
@@ -1937,14 +1951,12 @@ export class GameScene extends Phaser.Scene {
         if (o.dead || Math.hypot(o.x - e.x, o.y - e.y) > st.splash) continue;
         if (enhanced) this.combatEffects?.hitTarget(p.k, o, p);
         this.damageEnemy(o, st.dmg, 'normal', p.source);
+        slow(o);
       }
     } else {
       if (enhanced) this.combatEffects?.hitTarget(p.k, e, p);
       this.damageEnemy(e, st.dmg, 'normal', p.source);
-    }
-    if (st.slow && !e.dead) {
-      e.slow = Math.min(e.slow, st.slow); e.slowT = Math.max(e.slowT, 2);
-      this.fxFrost.explode(4, e.x, e.y);
+      slow(e);
     }
   }
 

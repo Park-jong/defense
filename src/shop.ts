@@ -4,12 +4,13 @@ import { unitPortraitUrl } from './unitArt';
 import { commandIconUrl } from './commandIcons';
 import { BUNKER_INFANTRY, InfantryKey, isInfantry } from './bunker';
 import { OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
-import { RunOptions } from './campaign';
+import { BranchState, RunOptions } from './campaign';
 import { adoptTitles, bindTips, createTip, placeTip, textTip } from './gameTip';
 import { OBSERVATION_BONUSES, supportTraits, vesselAuraBonus } from './support';
 import { bunkerCapacity, maxUnitLevel, placeCost, skillCost, skillLocked } from './augments';
 import { rememberScroll } from './scrollMemory';
 import './shop.css';
+import { specializationEffects } from './specializations';
 
 /** 설명 창 없이 보이는 글자·아이콘만으로 충분한 상점 요소. */
 const SHOP_SILENT = '.shop-tabs button, .army-unit, .army-stat, .garrison-unload[data-action="tab"]';
@@ -19,7 +20,7 @@ const icon = (key: string): string => `<img class="shop-icon" src="${commandIcon
 export interface ShopUnit {
   id: string; k: TowerKey; lvl: number; skills: EquippedSkill[]; c: number; r: number;
   stats: { dmg: number; range: number; rate: number }; nextStats: { dmg: number; range: number; rate: number };
-  hostId?: string; passengers: (string | null)[];
+  hostId?: string; branch?: BranchState; passengers: (string | null)[];
 }
 export interface ShopState { gold: number; units: ShopUnit[]; selectedId: string | null; mode?: RunOptions['mode'] }
 interface ShopActions {
@@ -168,13 +169,13 @@ export class SupplyShop {
     const toGarrison = `<button type="button" class="garrison-unload" data-action="tab" data-key="garrison" aria-label="벙커 탭으로 이동" title="벙커 탭으로 이동"><img src="${unitPortraitUrl('bunker')}" alt="" width="22" height="22"></button>`;
     if (u.k === 'bunker') return `<section class="army-detail army-pointer"><img src="${unitPortraitUrl('bunker')}" alt="" width="64" height="64"><p>벙커는 벙커 탭에서 주둔 병력을 관리합니다</p>${toGarrison}</section>`;
     const max = u.lvl >= maxUnitLevel(), cost = unitUpgradeCost(u), cur = u.stats, next = u.nextStats;
-    const support = u.k === 'support' || u.k === 'observer';
+    const support = u.k === 'support' || u.k === 'observer', spec = specializationEffects(u.k, u.branch, !!u.hostId);
     const stat = (art: string, label: string, now: number, then: number, digits = 0): string => {
       const text = (v: number) => String(+v.toFixed(digits)), changed = !max && text(now) !== text(then);
       return `<div class="army-stat" title="${label}" aria-label="${label} ${text(now)}${changed ? ` → ${text(then)}` : ''}">${icon(art)}<b>${text(now)}</b>${changed ? `<i>→ ${text(then)}</i>` : ''}<small>${label}</small></div>`;
     };
     const stats = support
-      ? stat('range', '지원 반경', cur.range, next.range) + (u.k === 'support' ? stat('overdrive', '주변 공속 +%', vesselAuraBonus(u.lvl) * 100, vesselAuraBonus(u.lvl + 1) * 100) : stat('weak', '받는 피해 +%', OBSERVATION_BONUSES[0] * 100, OBSERVATION_BONUSES[0] * 100))
+      ? stat('range', '지원 반경', cur.range, next.range) + (u.k === 'support' ? stat('overdrive', '주변 공속 +%', (vesselAuraBonus(u.lvl) + spec.aura) * 100, (vesselAuraBonus(u.lvl + 1) + spec.aura) * 100) : stat('weak', '받는 피해 +%', OBSERVATION_BONUSES[0] * 100, OBSERVATION_BONUSES[0] * 100))
       : stat('siege', '공격력', attackDamage(u.k, cur.dmg), attackDamage(u.k, next.dmg)) + stat('range', '사거리', cur.range, next.range) + stat('overdrive', '초당 공격', 1 / cur.rate, 1 / next.rate, 2) + stat('barrage', 'DPS', attackDamage(u.k, cur.dmg) / cur.rate, attackDamage(u.k, next.dmg) / next.rate, 1);
     const skills = SKILL_KEYS.filter(key => SKILL_DEFS[key].unit === u.k);
     return `<section class="army-detail" aria-label="${d.name} 상세">
@@ -186,10 +187,10 @@ export class SupplyShop {
         detail: max ? '최대 강화 완료' : `Lv.${u.lvl} → Lv.${u.lvl + 1} · 공격력 ×1.6 · 사거리 +8% · 공격 간격 감소${state.gold < cost ? ' · 미네랄 부족' : ''}` })}${skills.map(key => {
         const sk = SKILL_DEFS[key], owned = u.skills.some(e => e.key === key), full = u.skills.length >= SKILL_SLOTS;
         return this.garrisonButton('equip-unit', key, sk.name, commandIconUrl(key), { unit: u.id, active: owned, disabled: owned || full || skillLocked(u.k) || state.gold < skillCost(key),
-          meta: owned ? '자동 사용' : skillLocked(u.k) ? '비활성' : full ? '슬롯 가득' : `◆ ${skillCost(key)}`, detail: `${sk.desc} · 재사용 ${sk.cooldown}초${owned ? ' · 장착 완료' : full ? ' · 슬롯 가득 참' : state.gold < skillCost(key) ? ' · 미네랄 부족' : ''}` });
+          meta: owned ? '자동 사용' : skillLocked(u.k) ? '비활성' : full ? '슬롯 가득' : `◆ ${skillCost(key)}`, detail: `${sk.desc} · 재사용 ${+(sk.cooldown * spec.skillCooldown).toFixed(2)}초${owned ? ' · 장착 완료' : full ? ' · 슬롯 가득 참' : state.gold < skillCost(key) ? ' · 미네랄 부족' : ''}` });
       }).join('')}</div>
-      ${support ? `<ul class="army-skill-notes army-support-notes">${supportTraits(u.k, u.lvl).map(trait => `<li><img src="${commandIconUrl(trait.icon)}" alt="" width="18" height="18"><span><b>${trait.name}</b> ${trait.text}</span></li>`).join('')}</ul>` : ''}
-      ${skills.length ? `<ul class="army-skill-notes">${skills.map(key => `<li><img src="${commandIconUrl(key)}" alt="" width="18" height="18"><span><b>${SKILL_DEFS[key].name}</b> ${SKILL_DEFS[key].desc} · ↻ ${SKILL_DEFS[key].cooldown}초</span></li>`).join('')}</ul>` : ''}</section>`;
+      ${support ? `<ul class="army-skill-notes army-support-notes">${supportTraits(u.k, u.lvl, u.branch).map(trait => `<li><img src="${commandIconUrl(trait.icon)}" alt="" width="18" height="18"><span><b>${trait.name}</b> ${trait.text}</span></li>`).join('')}</ul>` : ''}
+      ${skills.length ? `<ul class="army-skill-notes">${skills.map(key => `<li><img src="${commandIconUrl(key)}" alt="" width="18" height="18"><span><b>${SKILL_DEFS[key].name}</b> ${SKILL_DEFS[key].desc} · ↻ ${+(SKILL_DEFS[key].cooldown * spec.skillCooldown).toFixed(2)}초</span></li>`).join('')}</ul>` : ''}</section>`;
   }
 
   private orderButton(state: ShopState, order: UnitOrder, scope: UnitScope, label: string): string {

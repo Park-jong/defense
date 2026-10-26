@@ -1,4 +1,4 @@
-import { attackCount, attackDamage, SUPPORT_BRANCH_RANGE, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, GAME_W, MAP_DEFS, MAX_WAVE, MOBILE_LAYOUT, TEST_GOLD, SIDE_W, TOP_BAR_H, TOWER_DEFS, TowerKey, TOWER_KEYS, W } from './config';
+import { attackCount, attackDamage, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, GAME_W, MAP_DEFS, MAX_WAVE, MOBILE_LAYOUT, TEST_GOLD, SIDE_W, TOP_BAR_H, TOWER_DEFS, TowerKey, TOWER_KEYS, W } from './config';
 import { SKILL_DEFS, SKILL_KEYS } from './catalog';
 import { unitPortraitUrl } from './unitArt';
 import { enemyPortraitUrl } from './enemyArt';
@@ -10,6 +10,7 @@ import { AUGMENTS, AUGMENT_KEYS, AUGMENT_TIERS, AugmentKey, AugmentOffer, amonDu
 import { rememberScroll } from './scrollMemory';
 import './operations.css';
 import { isBishoujo } from './themes';
+import { specialization } from './specializations';
 
 export interface OperationsView {
   options: RunOptions; wave: number; gold: number; lives: number; active: boolean; over: boolean; paused: boolean;
@@ -242,7 +243,11 @@ export class OperationsCenter {
     const d = TOWER_DEFS[k], traits = unitTraits(k), skills = SKILL_KEYS.filter(s => SKILL_DEFS[s].unit === k);
     return `<article class="ops-unit-card" aria-label="${escape(`${d.name} · ${d.role}`)}"><header>${this.art(k)}<div><h3>${d.name}</h3><small>${d.role}</small></div>${d.dmg ? `<span class="ops-unit-cost ops-unit-dmg" title="공격력 · Lv.1 한 번 공격의 총 피해" aria-label="공격력 ${attackDamage(k)}">${icon('siege')}${attackDamage(k)}</span>` : ''}<span class="ops-unit-cost" title="배치 비용" aria-label="비용 ${d.cost}">${icon('mineral')}${d.cost}</span></header>
       <p>${d.desc}</p>${traits.length ? `<ul class="ops-unit-traits">${traits.map(t => `<li>${t}</li>`).join('')}</ul>` : ''}
-      ${skills.length ? `<ul class="ops-unit-skills">${skills.map(s => `<li><img src="${commandIconUrl(s)}" width="26" height="26" alt=""><div><b>${SKILL_DEFS[s].name}<small>${icon('clock')}${SKILL_DEFS[s].cooldown}초</small></b><span>${SKILL_DEFS[s].desc}</span></div></li>`).join('')}</ul>` : ''}</article>`;
+      ${skills.length ? `<ul class="ops-unit-skills">${skills.map(s => `<li><img src="${commandIconUrl(s)}" width="26" height="26" alt=""><div><b>${SKILL_DEFS[s].name}<small>${icon('clock')}${SKILL_DEFS[s].cooldown}초</small></b><span>${SKILL_DEFS[s].desc}</span></div></li>`).join('')}</ul>` : ''}
+      ${k !== 'bunker' ? `<div class="ops-unit-doctrines" aria-label="Lv.3 전용 특화">${(['power', 'rapid'] as const).map(branch => {
+        const spec = specialization(k, branch)!;
+        return `<details><summary aria-label="${spec.name} 효과">${icon(spec.icon)}<b>${spec.name}</b></summary><p>${spec.desc}</p></details>`;
+      }).join('')}</div>` : ''}</article>`;
   }
   private showTip(el: HTMLElement, tip: HTMLElement = this.tip): void {
     tip.innerHTML = this.tipContent(el.dataset.tip!, el);
@@ -332,10 +337,9 @@ export class OperationsCenter {
     if (!v.units.length) return `${forecast}${augments}<div class="ops-empty">${this.art(v.faction === 'terran' ? 'marine' : 'zealot')}<h2>방어선을 세워볼까요?</h2><p>병력을 골라 길 옆에 배치하세요.</p>${button('close', '', `${icon('deploy')}<span>병력 배치</span>`, '병력 배치', { className: 'ops-primary' })}</div>`;
     return `${forecast}${augments}<div class="ops-section-heading"><h2>내 병력 <small>${v.units.length}</small></h2></div><div class="ops-roster" role="group" aria-label="배치된 병력">${v.units.map(t => button('select', t.id, `${this.art(t.k)}<span class="ops-level" aria-hidden="true">${t.hostId ? '↳ ' : ''}${'•'.repeat(t.lvl)}</span>`, `${TOWER_DEFS[t.k].name} #${t.id} · Lv.${t.lvl}${t.hostId ? ' · 주둔' : ''}`, { selected: t.id === u?.id })).join('')}</div>
       ${u ? `<section class="ops-unit"><div class="ops-unit-heading">${this.art(u.k)}<div><h2>${TOWER_DEFS[u.k].name}<small>Lv.${u.lvl}</small></h2><p>${TOWER_DEFS[u.k].role}</p></div>${button('move', '', `${icon('move')}<small>◆ ${relocateCost(u.k)}</small>`, `선택 병력 재배치 · ◆ ${relocateCost(u.k)}`, { disabled: v.over || v.active || !!u.hostId || v.gold < relocateCost(u.k), className: 'ops-move', hint: '준비 시간에 빈 칸으로 재배치 · ◆ 20 · 빈 칸 선택 시 비용 차감' })}</div>${u.k !== 'bunker' ? `<div class="ops-targets" role="group" aria-label="공격 대상 우선순위">${(Object.keys(TARGETS) as TargetMode[]).map(k => button('target', k, `${icon(targetIcons[k])}<span>${targetNames[k]}</span>`, TARGETS[k] + ' 우선', { disabled: v.over, selected: u.target === k })).join('')}</div><div class="ops-section-heading ops-branch-heading"><h3>특화</h3><span>${u.branch === 'both' || u.branch && !hasAugment('dualBranch') ? '선택 완료' : `Lv.3 · ◆ ${branchCost(u.k)} · ${hasAugment('dualBranch') ? '이중 특화 가능' : '선택 후 변경 불가'}`}</span></div><div class="ops-branches">${(Object.keys(BRANCHES) as (keyof typeof BRANCHES)[]).map(k => {
-        const support = u.k === 'support' || u.k === 'observer';
-        const value = support ? `+${SUPPORT_BRANCH_RANGE}` : k === 'power' ? '+70%' : '+40%';
-        const detail = support ? '지원 사거리' : k === 'power' ? '공격력 · 간격 +15%' : '공속 · 범위 +35%';
-        return button('branch', k, `${icon(k === 'power' ? 'siege' : 'overdrive')}<span><b>${BRANCHES[k].name}</b><small>${detail}</small></span><strong>${value}</strong>`, hasBranch(u.branch, k) ? '선택 완료' : BRANCHES[k].name + ' 선택', { disabled: v.over || u.lvl < 3 || hasBranch(u.branch, k) || !!u.branch && !hasAugment('dualBranch') || v.gold < branchCost(u.k), selected: hasBranch(u.branch, k), hint: `${BRANCHES[k].name} · ${BRANCHES[k].desc} · ◆ ${branchCost(u.k)} · 선택 후 변경 불가` });
+        const spec = specialization(u.k, k)!;
+        const note = hasAugment('dualBranch') && u.k === 'cannon' ? ' · 이중 특화 시 광역 포격 유지' : '';
+        return `<div class="ops-branch-option">${button('branch', k, `${icon(spec.icon)}<span><b>${spec.name}</b><small>${spec.role}</small></span>`, spec.name + (hasBranch(u.branch, k) ? ' 선택 완료' : ' 선택'), { disabled: v.over || u.lvl < 3 || hasBranch(u.branch, k) || !!u.branch && !hasAugment('dualBranch') || v.gold < branchCost(u.k), selected: hasBranch(u.branch, k), hint: `${spec.name} · ${spec.desc} · ◆ ${branchCost(u.k)}${note} · ${hasAugment('dualBranch') ? '이중 특화 가능' : '선택 후 변경 불가'}` })}<details class="ops-branch-info"><summary aria-label="${spec.name} 효과">${icon('help')}</summary><p>${spec.desc}${note}</p></details></div>`;
       }).join('')}</div>` : `<p class="ops-muted">보병 보급과 강화는 벙커 명령 아이콘에서.</p>`}</section>` : '<p class="ops-muted">병력을 선택해 전술을 바꾸세요.</p>'}`;
   }
   /** 테스트 출현 범위 선택. 교전 중에는 다음 교전부터 바꿀 수 있도록 잠근다. */
