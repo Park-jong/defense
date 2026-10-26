@@ -7,7 +7,7 @@ import { applyThemeDocument } from './themes';
 import './themes.css';
 import { registerBishoujoPortraits } from './bishoujoPortraitAssets';
 import { registerMoeAtlas } from './moePortraits';
-import moeAtlasUrl from './assets/bishoujo-roster-v2.png';
+import moeAtlasUrl from './assets/bishoujo-roster-homage.png';
 import './moePresentation.css';
 import './commandConsole.css';
 import './themeUnlock.css';
