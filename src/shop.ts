@@ -7,6 +7,7 @@ import { MAX_UNIT_LEVEL, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgra
 import { RunOptions } from './campaign';
 import { adoptTitles, bindTips, createTip, placeTip, textTip } from './gameTip';
 import { OBSERVATION_BONUSES, supportTraits, vesselAuraBonus } from './support';
+import { placeCost, skillCost, skillLocked } from './augments';
 import './shop.css';
 
 /** 설명 창 없이 보이는 글자·아이콘만으로 충분한 상점 요소. */
@@ -181,8 +182,8 @@ export class SupplyShop {
         disabled: max || state.gold < cost, active: max, meta: max ? 'MAX' : `◆ ${cost}`,
         detail: max ? '최대 강화 완료' : `Lv.${u.lvl} → Lv.${u.lvl + 1} · 공격력 ×1.6 · 사거리 +8% · 공격 간격 감소${state.gold < cost ? ' · 미네랄 부족' : ''}` })}${skills.map(key => {
         const sk = SKILL_DEFS[key], owned = u.skills.some(e => e.key === key), full = u.skills.length >= SKILL_SLOTS;
-        return this.garrisonButton('equip-unit', key, sk.name, commandIconUrl(key), { unit: u.id, active: owned, disabled: owned || full || state.gold < sk.cost,
-          meta: owned ? '자동 사용' : full ? '슬롯 가득' : `◆ ${sk.cost}`, detail: `${sk.desc} · 재사용 ${sk.cooldown}초${owned ? ' · 장착 완료' : full ? ' · 슬롯 가득 참' : state.gold < sk.cost ? ' · 미네랄 부족' : ''}` });
+        return this.garrisonButton('equip-unit', key, sk.name, commandIconUrl(key), { unit: u.id, active: owned, disabled: owned || full || skillLocked(u.k) || state.gold < skillCost(key),
+          meta: owned ? '자동 사용' : skillLocked(u.k) ? '비활성' : full ? '슬롯 가득' : `◆ ${skillCost(key)}`, detail: `${sk.desc} · 재사용 ${sk.cooldown}초${owned ? ' · 장착 완료' : full ? ' · 슬롯 가득 참' : state.gold < skillCost(key) ? ' · 미네랄 부족' : ''}` });
       }).join('')}</div>
       ${support ? `<ul class="army-skill-notes army-support-notes">${supportTraits(u.k, u.lvl).map(trait => `<li><img src="${commandIconUrl(trait.icon)}" alt="" width="18" height="18"><span><b>${trait.name}</b> ${trait.text}</span></li>`).join('')}</ul>` : ''}
       ${skills.length ? `<ul class="army-skill-notes">${skills.map(key => `<li><img src="${commandIconUrl(key)}" alt="" width="18" height="18"><span><b>${SKILL_DEFS[key].name}</b> ${SKILL_DEFS[key].desc} · ↻ ${SKILL_DEFS[key].cooldown}초</span></li>`).join('')}</ul>` : ''}</section>`;
@@ -236,7 +237,7 @@ export class SupplyShop {
     const selected = state.units.find(u => u.id === state.selectedId);
     const bunkers = state.units.filter(u => u.k === 'bunker');
     const bunker = bunkers.find(u => u.id === selected?.id || u.id === selected?.hostId) ?? bunkers[0];
-    if (!bunker) return `<section class="bunker-empty"><img src="${this.images.get('bunker')}" alt="벙커" width="128" height="128"><h3>먼저 빈 벙커를 건설하세요.</h3><p>마린·파이어뱃 4기를 조합해 나만의 방어 거점을 만드세요.</p><button type="button" class="shop-purchase" data-action="choose" data-key="bunker" ${state.gold < TOWER_DEFS.bunker.cost ? 'disabled' : ''}>벙커 건설 · ◆ ${TOWER_DEFS.bunker.cost}</button></section>`;
+    if (!bunker) return `<section class="bunker-empty"><img src="${this.images.get('bunker')}" alt="벙커" width="128" height="128"><h3>먼저 빈 벙커를 건설하세요.</h3><p>마린·파이어뱃 4기를 조합해 나만의 방어 거점을 만드세요.</p><button type="button" class="shop-purchase" data-action="choose" data-key="bunker" ${state.gold < placeCost('bunker') ? 'disabled' : ''}>벙커 건설 · ◆ ${placeCost('bunker')}</button></section>`;
     const available = state.units.filter(u => !u.hostId && isInfantry(u.k));
     const preferred = this.boarding?.bunkerId === bunker.id ? this.boarding.slot : -1;
     const targetSlot = preferred >= 0 && preferred < BUNKER_CAPACITY && !bunker.passengers[preferred]
@@ -259,11 +260,11 @@ export class SupplyShop {
           })}${SKILL_KEYS.filter(key => SKILL_DEFS[key].unit === unit.k).map(key => {
             const d = SKILL_DEFS[key], owned = unit.skills.some(s => s.key === key);
             return this.garrisonButton('equip-unit', key, d.name, commandIconUrl(key), { unit: unit.id, active: owned,
-              disabled: owned || unit.skills.length >= SKILL_SLOTS || state.gold < d.cost,
-              meta: owned ? '자동 사용' : `◆ ${d.cost}`, detail: `${d.desc}${owned ? ' · 장착 완료' : unit.skills.length >= SKILL_SLOTS ? ' · 슬롯 가득 참' : state.gold < d.cost ? ' · 미네랄 부족' : ''}` });
+              disabled: owned || unit.skills.length >= SKILL_SLOTS || state.gold < skillCost(key),
+              meta: owned ? '자동 사용' : `◆ ${skillCost(key)}`, detail: `${d.desc}${owned ? ' · 장착 완료' : unit.skills.length >= SKILL_SLOTS ? ' · 슬롯 가득 참' : state.gold < skillCost(key) ? ' · 미네랄 부족' : ''}` });
           }).join('')}</div><button type="button" class="garrison-unload" data-action="unload" data-key="${unit.id}" title="빈 구역을 지정하면 하차합니다. 강화와 스킬은 유지됩니다."><img src="${commandIconUrl('unload')}" alt="" width="22" height="22">하차 <small>전장에 배치</small></button>`
           : `<div class="garrison-recruits">${BUNKER_INFANTRY.map(k => this.garrisonButton('recruit', bunker.id, TOWER_DEFS[k].name, this.images.get(k)!, {
-            unit: k, slot, disabled: state.gold < TOWER_DEFS[k].cost, meta: `◆ ${TOWER_DEFS[k].cost}`, detail: `구매 즉시 ${slot + 1}번 사격구 탑승${state.gold < TOWER_DEFS[k].cost ? ' · 미네랄 부족' : ''}`,
+            unit: k, slot, disabled: state.gold < placeCost(k), meta: `◆ ${placeCost(k)}`, detail: `구매 즉시 ${slot + 1}번 사격구 탑승${state.gold < placeCost(k) ? ' · 미네랄 부족' : ''}`,
           })).join('')}</div><p class="garrison-vacancy-hint">기존 보병은 아래 아이콘으로 무료 탑승</p>`}</section>`;
       }).join('')}</div>
       <section class="garrison-batch" aria-label="이 벙커 병력 일괄 관리"><header><h3>벙커 전체 명령</h3><span>각 1단계 강화 · 이미 장착한 스킬 제외</span></header><div class="garrison-batch-actions">

@@ -2,9 +2,10 @@ import { attackCount, attackDamage, SUPPORT_BRANCH_RANGE, ENEMY_DEFS, EnemyKey, 
 import { SKILL_DEFS, SKILL_KEYS } from './catalog';
 import { unitImageUrl } from './unitArt';
 import { commandIconUrl } from './commandIcons';
-import { ACHIEVEMENTS, bossPattern, BRANCHES, COMMANDERS, CommanderKey, DIFFICULTIES, ENEMY_INFO, MODES, Profile, REWARDS, RewardKey, RunOptions, RunSave, RunStats, SavedUnit, TARGETS, TargetMode, TEST_SCOPES, TestScope, UnitRecord, wavePlan } from './campaign';
+import { ACHIEVEMENTS, bossPattern, BRANCHES, COMMANDERS, CommanderKey, DIFFICULTIES, ENEMY_INFO, MODES, Profile, REWARDS, RewardKey, RunOptions, RunSave, RunStats, SavedUnit, TARGETS, TargetMode, hasBranch, TEST_SCOPES, TestScope, UnitRecord, wavePlan } from './campaign';
 import { adoptTitles, bindTips, createTip, placeTip, textTip } from './gameTip';
 import { supportTraits } from './support';
+import { AUGMENTS, AUGMENT_KEYS, AUGMENT_TIERS, AugmentKey, AugmentOffer, amonDue, branchCost, hasAugment, relocateCost } from './augments';
 import './operations.css';
 
 export interface OperationsView {
@@ -12,6 +13,7 @@ export interface OperationsView {
   selected?: SavedUnit; units: SavedUnit[]; stats: RunStats; profile: Profile;
   commander: Record<CommanderKey, number>; autoCommander: CommanderKey[]; pending: RewardKey[]; checkpoint: RunSave | null;
   tutorial: number; notice: string; test: boolean; testScope: TestScope;
+  augments: AugmentKey[]; augmentOffer: AugmentOffer | null; amonSince: number | null; testAugments: AugmentKey[];
   faction: Faction;
 }
 export interface OperationsActions {
@@ -27,6 +29,9 @@ export interface OperationsActions {
   commander(key: CommanderKey): void;
   autoCommander(key: CommanderKey): void;
   testScope(key: TestScope): void;
+  testAugment(key: AugmentKey): void;
+  pickAugment(key: AugmentKey): void;
+  rerollAugment(index: number): boolean;
   reward(key: RewardKey): void;
   skin(key: Profile['skin']): void;
   volume(value: number): void;
@@ -54,7 +59,7 @@ const DAMAGE_VIEWS: Record<TestScope, { name: string; icon: string; unit: (u: Un
 const enemyIcons: Record<EnemyKey, string> = { grunt: 'first', runner: 'overdrive', tank: 'shield', boss: 'boss', medic: 'repair', splitter: 'shrapnel', shielder: 'plasma' };
 const rewardIcons: Record<RewardKey, string> = { power: 'siege', haste: 'overdrive', range: 'range', repair: 'repair', supply: 'supply' };
 const rewardValues: Record<RewardKey, string> = { power: '+12%', haste: '+10%', range: '+12', repair: '+4', supply: '+150' };
-const modeIcons: Record<RunOptions['mode'], string> = { standard: 'shield', endless: 'endless', bunker: 'empty', budget: 'mineral' };
+const modeIcons: Record<RunOptions['mode'], string> = { standard: 'shield', endless: 'endless', bunker: 'empty', budget: 'mineral', augment: 'augment' };
 const compareHead = [
   ['mineral', '비용', '배치 비용 · 미네랄'], ['siege', '공격력', 'Lv.1 한 번 공격의 총 피해 · 캐리어는 인터셉터 전체 합산'], ['range', '사거리', '공격 · 지원이 닿는 반경'],
   ['overdrive', '초당 공격', '1초에 공격하는 횟수'], ['barrage', 'DPS', '초당 피해 · 공격력 × 초당 공격'],
@@ -71,7 +76,7 @@ function unitTraits(k: TowerKey): string[] {
 const OPS_SILENT = [
   '.ops-nav button', '.ops-volume', '.ops-save-status', '[data-action="map"]', '[data-action="difficulty"]', '[data-action="mode"]',
   '[data-action="start"]', '[data-action="resume"]', '[data-action="target"]', '.ops-empty [data-action="close"]', '.ops-metrics > div',
-  '[data-action="tutorial"]', '[data-action="skin"]', '[data-action="reward"]', '[data-action="scope"]', '[data-action="damage"]',
+  '[data-action="tutorial"]', '[data-action="skin"]', '[data-action="reward"]', '[data-action="scope"]', '[data-action="damage"]', '[data-action="augment"]', '[data-action="test-augment"]',
 ].join(',');
 const tabs = {
   setup: { icon: 'flag', name: '출격', label: '작전 설정' },
@@ -142,7 +147,7 @@ export class OperationsCenter {
   show(section = 'tactics'): void {
     const v = this.actions.view();
     if (!this.open) this.draft = { ...v.options };
-    this.section = v.pending.length ? 'reward' : section;
+    this.section = v.pending.length ? 'reward' : v.augmentOffer ? 'augment' : section;
     this.actions.pause(true); this.render();
     if (!this.dialog.open) {
       this.dialog.showModal();
@@ -150,8 +155,9 @@ export class OperationsCenter {
     }
   }
   close(): void {
-    if (this.actions.view().pending.length) {
-      if (this.section !== 'reward') { this.section = 'reward'; this.render(); }
+    const v = this.actions.view(), choice = v.pending.length ? 'reward' : v.augmentOffer ? 'augment' : '';
+    if (choice) {
+      if (this.section !== choice) { this.section = choice; this.render(); }
       return;
     }
     this.dialog.close(); this.actions.pause(false);
@@ -258,7 +264,11 @@ export class OperationsCenter {
     if (a === 'branch') this.actions.branch(key as keyof typeof BRANCHES);
     if (a === 'select') this.actions.select(key);
     if (a === 'move' && this.actions.move()) { this.close(); return; }
-    if (a === 'reward') { this.actions.reward(key as RewardKey); this.close(); return; }
+    // 10·20·30웨이브는 보상 카드를 고른 뒤 이어서 증강을 고른다.
+    if (a === 'reward') { this.actions.reward(key as RewardKey); if (this.actions.view().augmentOffer) this.show('augment'); else this.close(); return; }
+    if (a === 'augment') { this.actions.pickAugment(key as AugmentKey); this.close(); return; }
+    if (a === 'reroll') this.actions.rerollAugment(Number(key));
+    if (a === 'test-augment') this.actions.testAugment(key as AugmentKey);
     if (a === 'skin') this.actions.skin(key as Profile['skin']);
     if (a === 'tutorial') { this.actions.tutorial(false); this.update(); }
     if (a === 'skip') { this.actions.tutorial(true); this.update(); if (!this.open) return; }
@@ -275,11 +285,12 @@ export class OperationsCenter {
       const el = this.dialog.querySelector<HTMLElement>(selector);
       return { selector, top: el?.scrollTop ?? 0, left: el?.scrollLeft ?? 0 };
     });
-    this.dialog.classList.toggle('is-reward', this.section === 'reward');
-    this.dialog.innerHTML = `<header class="ops-header"><div class="ops-heading">${icon(this.section === 'reward' ? 'supply' : 'manage')}<div><h1>${this.section === 'reward' ? '전장 보상 선택' : '작전실'}</h1><p>${this.section === 'reward' ? `WAVE ${v.wave} CLEAR` : MAP_DEFS[v.options.map].name}</p></div></div><span class="ops-wallet" aria-label="미네랄 ${v.gold}">${icon('mineral')}${v.gold.toLocaleString()}</span>${v.pending.length ? '' : button('close', '', icon('close'), '전장 복귀', { className: 'ops-close', hint: '전장 복귀 [Esc / O]' })}</header>
-      ${v.pending.length ? '' : `<nav class="ops-nav" aria-label="작전실 메뉴">${Object.entries(tabs).map(([key, tab]) => button('tab', key, `${icon(tab.icon)}<span>${tab.name}</span>`, tab.label, { selected: this.section === key })).join('')}</nav>`}
-      <main class="ops-content">${v.notice ? `<p class="ops-notice" role="status">${icon('saved')}${v.notice}</p>` : ''}${this.section === 'reward' ? this.rewards(v) : this.section === 'setup' ? this.setup(v) : this.section === 'tactics' ? this.tactics(v) : this.section === 'stats' ? this.stats(v) : this.section === 'codex' ? this.codex(v.faction) : this.medals(v)}</main>
-      ${v.pending.length ? '' : `<footer class="ops-footer"><label class="ops-volume" title="효과음 음량">${icon('volume')}<input id="battle-volume" aria-label="효과음 음량" type="range" min="0" max="100" value="${Math.round(v.profile.volume * 100)}"><output for="battle-volume">${Math.round(v.profile.volume * 100)}%</output></label><span class="ops-save-status" title="${v.test ? '테스트 모드 · 저장 및 업적 제외' : '웨이브 종료 시 자동 저장 · 교전 중 새로고침하면 마지막 준비 시점으로 복귀'}">${icon('saved')}${v.test ? 'TEST' : '자동 저장'}</span></footer>`}`;
+    const choosing = this.section === 'reward' || this.section === 'augment', locked = v.pending.length > 0 || !!v.augmentOffer;
+    this.dialog.classList.toggle('is-reward', choosing);
+    this.dialog.innerHTML = `<header class="ops-header"><div class="ops-heading">${icon(this.section === 'reward' ? 'supply' : this.section === 'augment' ? 'augment' : 'manage')}<div><h1>${this.section === 'reward' ? '전장 보상 선택' : this.section === 'augment' ? '증강 선택' : '작전실'}</h1><p>${choosing ? `WAVE ${v.wave} CLEAR` : MAP_DEFS[v.options.map].name}</p></div></div><span class="ops-wallet" aria-label="미네랄 ${v.gold}">${icon('mineral')}${v.gold.toLocaleString()}</span>${locked ? '' : button('close', '', icon('close'), '전장 복귀', { className: 'ops-close', hint: '전장 복귀 [Esc / O]' })}</header>
+      ${locked ? '' : `<nav class="ops-nav" aria-label="작전실 메뉴">${Object.entries(tabs).map(([key, tab]) => button('tab', key, `${icon(tab.icon)}<span>${tab.name}</span>`, tab.label, { selected: this.section === key })).join('')}</nav>`}
+      <main class="ops-content">${v.notice ? `<p class="ops-notice" role="status">${icon('saved')}${v.notice}</p>` : ''}${this.section === 'reward' ? this.rewards(v) : this.section === 'augment' ? this.augmentChoice(v) : this.section === 'setup' ? this.setup(v) : this.section === 'tactics' ? this.tactics(v) : this.section === 'stats' ? this.stats(v) : this.section === 'codex' ? this.codex(v.faction) : this.medals(v)}</main>
+      ${locked ? '' : `<footer class="ops-footer"><label class="ops-volume" title="효과음 음량">${icon('volume')}<input id="battle-volume" aria-label="효과음 음량" type="range" min="0" max="100" value="${Math.round(v.profile.volume * 100)}"><output for="battle-volume">${Math.round(v.profile.volume * 100)}%</output></label><span class="ops-save-status" title="${v.test ? '테스트 모드 · 저장 및 업적 제외' : '웨이브 종료 시 자동 저장 · 교전 중 새로고침하면 마지막 준비 시점으로 복귀'}">${icon('saved')}${v.test ? 'TEST' : '자동 저장'}</span></footer>`}`;
     for (const { id, open } of disclosures) {
       const details = this.dialog.querySelector<HTMLDetailsElement>(`#${id}`); if (details) details.open = open;
     }
@@ -291,6 +302,7 @@ export class OperationsCenter {
     return `<section class="ops-setup"><div class="ops-section-heading"><h2>${v.test ? '최종 웨이브 테스트' : '전장 선택'}</h2><span>${MAP_DEFS[draft.map].desc}</span></div><div class="ops-map-picker" role="group" aria-label="전장">${(Object.keys(MAP_DEFS) as RunOptions['map'][]).map(k => button('map', k, `${mapPreview(k)}<span>${MAP_DEFS[k].name}</span>`, MAP_DEFS[k].name, { selected: draft.map === k, hint: `${MAP_DEFS[k].name} · ${MAP_DEFS[k].desc}` })).join('')}</div>
       <div class="ops-rules"><div><h2>난이도</h2><div class="ops-difficulties" role="group" aria-label="난이도">${(Object.keys(DIFFICULTIES) as RunOptions['difficulty'][]).map((k, i) => button('difficulty', k, `${icon('shield')}<span>${DIFFICULTIES[k].name}</span><span class="ops-pips" aria-hidden="true">${'•'.repeat(i + 1)}</span>`, DIFFICULTIES[k].name, { selected: draft.difficulty === k })).join('')}</div></div><div><h2>모드</h2><div class="ops-modes" role="group" aria-label="작전 모드">${(Object.keys(MODES) as RunOptions['mode'][]).map(k => button('mode', k, k === 'bunker' ? this.art('bunker') : icon(modeIcons[k]), MODES[k].name, { selected: draft.mode === k, hint: `${MODES[k].name} · ${MODES[k].desc}` })).join('')}</div><p class="ops-mode-hint">${MODES[draft.mode].desc}</p></div></div>
       ${v.test ? `<div class="ops-section-heading"><h2>테스트 범위</h2><span>${TEST_SCOPES[v.testScope].desc}</span></div>${this.scopes(v)}` : ''}
+      ${v.test && draft.mode === 'augment' ? `<div class="ops-section-heading"><h2>테스트 증강 <small>${v.testAugments.length}</small></h2><span>켜 둔 증강으로 출격</span></div><div class="ops-test-augments" role="group" aria-label="테스트 증강">${AUGMENT_KEYS.map(k => button('test-augment', k, `${icon(AUGMENTS[k].icon)}<span>${AUGMENTS[k].name}</span>`, AUGMENTS[k].name, { selected: v.testAugments.includes(k), className: `ops-tier-${AUGMENTS[k].tier}`, hint: `${AUGMENTS[k].name} · ${AUGMENT_TIERS[AUGMENTS[k].tier]} · ${AUGMENTS[k].desc}` })).join('')}</div>` : ''}
       <div class="ops-launch">${v.checkpoint && !v.test ? `<div class="ops-checkpoint">${button('resume', '', `${icon('resume')}<span>이어하기</span><b>W ${String(v.checkpoint.wave).padStart(2, '0')}</b>`, '저장된 작전 이어하기', { className: 'ops-resume', hint: `${MAP_DEFS[v.checkpoint.options.map].name} · ${DIFFICULTIES[v.checkpoint.options.difficulty].name} · ${MODES[v.checkpoint.options.mode].name} · ${v.checkpoint.wave}웨이브 완료 · 기지 ${v.checkpoint.lives}/20 · 병력 ${v.checkpoint.units.length}기` })}<small>새 출격 시 기존 저장 교체</small></div>` : ''}${v.test
         ? button('start', '', `${icon(scopeIcons[v.testScope])}<span>${TEST_SCOPES[v.testScope].name} 테스트</span>`, `${TEST_SCOPES[v.testScope].name} 테스트 시작`, { className: 'ops-deploy', hint: `${MAP_DEFS[draft.map].name}에서 ${MAX_WAVE}웨이브 반복 · ${TEST_SCOPES[v.testScope].name}: ${TEST_SCOPES[v.testScope].desc} · ◆ ${TEST_GOLD.toLocaleString()} · 저장 및 업적 제외` })
         : button('start', '', `${icon('deploy')}<span>출격</span>`, '새 작전 시작', { className: 'ops-deploy', hint: v.checkpoint ? '새 작전 시작 · 기존 체크포인트를 교체합니다' : '새 작전 시작' })}</div></section>`;
@@ -300,19 +312,29 @@ export class OperationsCenter {
     const targetIcons: Record<TargetMode, string> = { first: 'first', strong: 'shield', weak: 'weak', boss: 'boss' };
     const targetNames: Record<TargetMode, string> = { first: '선두', strong: '강적', weak: '약적', boss: '보스' };
     const scope = v.test ? v.testScope : 'all';
-    const forecast = !v.over ? `<section class="ops-forecast"><div><small>${v.active ? '다음 교전' : '다음 웨이브'}</small><b>${String(next).padStart(2, '0')}</b></div><div class="ops-enemies">${this.enemies(next, scope)}</div>${wavePlan(next, scope).includes('boss') ? `<p class="ops-danger">${icon('boss')}${bossPattern(next)} · 놓치면 패배</p>` : ''}</section>${v.test ? this.scopes(v) : ''}` : '';
-    if (!v.units.length) return `${forecast}<div class="ops-empty">${this.art(v.faction === 'terran' ? 'marine' : 'zealot')}<h2>방어선을 세워볼까요?</h2><p>병력을 골라 길 옆에 배치하세요.</p>${button('close', '', `${icon('deploy')}<span>병력 배치</span>`, '병력 배치', { className: 'ops-primary' })}</div>`;
-    return `${forecast}<div class="ops-section-heading"><h2>내 병력 <small>${v.units.length}</small></h2></div><div class="ops-roster" role="group" aria-label="배치된 병력">${v.units.map(t => button('select', t.id, `${this.art(t.k)}<span class="ops-level" aria-hidden="true">${t.hostId ? '↳ ' : ''}${'•'.repeat(t.lvl)}</span>`, `${TOWER_DEFS[t.k].name} #${t.id} · Lv.${t.lvl}${t.hostId ? ' · 주둔' : ''}`, { selected: t.id === u?.id })).join('')}</div>
-      ${u ? `<section class="ops-unit"><div class="ops-unit-heading">${this.art(u.k)}<div><h2>${TOWER_DEFS[u.k].name}<small>Lv.${u.lvl}</small></h2><p>${TOWER_DEFS[u.k].role}</p></div>${button('move', '', `${icon('move')}<small>◆ 20</small>`, '선택 병력 재배치 · ◆ 20', { disabled: v.over || v.active || !!u.hostId || v.gold < 20, className: 'ops-move', hint: '준비 시간에 빈 칸으로 재배치 · ◆ 20 · 빈 칸 선택 시 비용 차감' })}</div>${u.k !== 'bunker' ? `<div class="ops-targets" role="group" aria-label="공격 대상 우선순위">${(Object.keys(TARGETS) as TargetMode[]).map(k => button('target', k, `${icon(targetIcons[k])}<span>${targetNames[k]}</span>`, TARGETS[k] + ' 우선', { disabled: v.over, selected: u.target === k })).join('')}</div><div class="ops-section-heading ops-branch-heading"><h3>특화</h3><span>${u.branch ? '선택 완료' : `Lv.3 · ◆ ${TOWER_DEFS[u.k].cost} · 선택 후 변경 불가`}</span></div><div class="ops-branches">${(Object.keys(BRANCHES) as (keyof typeof BRANCHES)[]).map(k => {
+    const forecast = !v.over ? `<section class="ops-forecast"><div><small>${v.active ? '다음 교전' : '다음 웨이브'}</small><b>${String(next).padStart(2, '0')}</b></div><div class="ops-enemies">${this.enemies(next, scope)}</div>${wavePlan(next, scope).includes('boss') ? `<p class="ops-danger">${icon('boss')}${bossPattern(next)} · 놓치면 패배</p>` : ''}${amonDue(next, v.amonSince) && scope !== 'line' ? `<p class="ops-danger">${icon('warp')}아몬 출현 · 놓치면 기지 -5</p>` : ''}</section>${v.test ? this.scopes(v) : ''}` : '';
+    const augments = v.augments.length ? `<div class="ops-augment-chips" role="list" aria-label="보유 증강">${v.augments.map(k => `<span role="listitem" class="ops-tier-${AUGMENTS[k].tier}" title="${AUGMENTS[k].name} · ${AUGMENTS[k].desc}" aria-label="${AUGMENTS[k].name}">${icon(AUGMENTS[k].icon)}</span>`).join('')}</div>` : '';
+    if (!v.units.length) return `${forecast}${augments}<div class="ops-empty">${this.art(v.faction === 'terran' ? 'marine' : 'zealot')}<h2>방어선을 세워볼까요?</h2><p>병력을 골라 길 옆에 배치하세요.</p>${button('close', '', `${icon('deploy')}<span>병력 배치</span>`, '병력 배치', { className: 'ops-primary' })}</div>`;
+    return `${forecast}${augments}<div class="ops-section-heading"><h2>내 병력 <small>${v.units.length}</small></h2></div><div class="ops-roster" role="group" aria-label="배치된 병력">${v.units.map(t => button('select', t.id, `${this.art(t.k)}<span class="ops-level" aria-hidden="true">${t.hostId ? '↳ ' : ''}${'•'.repeat(t.lvl)}</span>`, `${TOWER_DEFS[t.k].name} #${t.id} · Lv.${t.lvl}${t.hostId ? ' · 주둔' : ''}`, { selected: t.id === u?.id })).join('')}</div>
+      ${u ? `<section class="ops-unit"><div class="ops-unit-heading">${this.art(u.k)}<div><h2>${TOWER_DEFS[u.k].name}<small>Lv.${u.lvl}</small></h2><p>${TOWER_DEFS[u.k].role}</p></div>${button('move', '', `${icon('move')}<small>◆ ${relocateCost(u.k)}</small>`, `선택 병력 재배치 · ◆ ${relocateCost(u.k)}`, { disabled: v.over || v.active || !!u.hostId || v.gold < relocateCost(u.k), className: 'ops-move', hint: '준비 시간에 빈 칸으로 재배치 · ◆ 20 · 빈 칸 선택 시 비용 차감' })}</div>${u.k !== 'bunker' ? `<div class="ops-targets" role="group" aria-label="공격 대상 우선순위">${(Object.keys(TARGETS) as TargetMode[]).map(k => button('target', k, `${icon(targetIcons[k])}<span>${targetNames[k]}</span>`, TARGETS[k] + ' 우선', { disabled: v.over, selected: u.target === k })).join('')}</div><div class="ops-section-heading ops-branch-heading"><h3>특화</h3><span>${u.branch === 'both' || u.branch && !hasAugment('dualBranch') ? '선택 완료' : `Lv.3 · ◆ ${branchCost(u.k)} · ${hasAugment('dualBranch') ? '이중 특화 가능' : '선택 후 변경 불가'}`}</span></div><div class="ops-branches">${(Object.keys(BRANCHES) as (keyof typeof BRANCHES)[]).map(k => {
         const support = u.k === 'support' || u.k === 'observer';
         const value = support ? `+${SUPPORT_BRANCH_RANGE}` : k === 'power' ? '+70%' : '+40%';
         const detail = support ? '지원 사거리' : k === 'power' ? '공격력 · 간격 +15%' : '공속 · 범위 +35%';
-        return button('branch', k, `${icon(k === 'power' ? 'siege' : 'overdrive')}<span><b>${BRANCHES[k].name}</b><small>${detail}</small></span><strong>${value}</strong>`, u.branch === k ? '선택 완료' : BRANCHES[k].name + ' 선택', { disabled: v.over || u.lvl < 3 || !!u.branch || v.gold < TOWER_DEFS[u.k].cost, selected: u.branch === k, hint: `${BRANCHES[k].name} · ${BRANCHES[k].desc} · ◆ ${TOWER_DEFS[u.k].cost} · 선택 후 변경 불가` });
+        return button('branch', k, `${icon(k === 'power' ? 'siege' : 'overdrive')}<span><b>${BRANCHES[k].name}</b><small>${detail}</small></span><strong>${value}</strong>`, hasBranch(u.branch, k) ? '선택 완료' : BRANCHES[k].name + ' 선택', { disabled: v.over || u.lvl < 3 || hasBranch(u.branch, k) || !!u.branch && !hasAugment('dualBranch') || v.gold < branchCost(u.k), selected: hasBranch(u.branch, k), hint: `${BRANCHES[k].name} · ${BRANCHES[k].desc} · ◆ ${branchCost(u.k)} · 선택 후 변경 불가` });
       }).join('')}</div>` : `<p class="ops-muted">보병 보급과 강화는 벙커 명령 아이콘에서.</p>`}</section>` : '<p class="ops-muted">병력을 선택해 전술을 바꾸세요.</p>'}`;
   }
   /** 테스트 출현 범위 선택. 교전 중에는 다음 교전부터 바꿀 수 있도록 잠근다. */
   private scopes(v: OperationsView): string {
     return `<div class="ops-targets ops-scopes" role="group" aria-label="테스트 범위">${(Object.keys(TEST_SCOPES) as TestScope[]).map(k => button('scope', k, `${icon(scopeIcons[k])}<span>${TEST_SCOPES[k].name}</span>`, `${TEST_SCOPES[k].name} 테스트`, { disabled: v.active || v.over, selected: v.testScope === k })).join('')}</div>`;
+  }
+  /** 증강 카드 3장. 카드를 누르면 선택, 카드 아래 아이콘으로 그 자리만 한 번 다시 뽑는다. */
+  private augmentChoice(v: OperationsView): string {
+    const offer = v.augmentOffer;
+    if (!offer) return '';
+    return `<p class="ops-reward-hint">하나를 골라 전장의 규칙을 바꾸세요. 카드마다 한 번 다시 뽑을 수 있습니다.</p><div class="ops-rewards ops-augments">${offer.cards.map((k, i) => {
+      const a = AUGMENTS[k];
+      return `<div class="ops-augment ops-tier-${a.tier}">${button('augment', k, `${icon(a.icon)}<small>${AUGMENT_TIERS[a.tier]}</small><b>${a.name}</b><span>${a.desc}</span>`, `${a.name} 증강 선택`, { className: 'ops-reward', hint: `${a.name} · ${AUGMENT_TIERS[a.tier]} · ${a.desc}` })}${button('reroll', String(i), icon('resume'), offer.rerolled[i] ? '다시 뽑기 사용 완료' : `${a.name} 다시 뽑기`, { className: 'ops-reroll', disabled: offer.rerolled[i] })}</div>`;
+    }).join('')}</div>`;
   }
   private rewards(v: OperationsView): string {
     return `<p class="ops-reward-hint">하나를 골라 더 강해지세요.</p><div class="ops-rewards">${v.pending.map(k => button('reward', k, `${icon(rewardIcons[k])}<strong>${rewardValues[k]}</strong><b>${REWARDS[k].name}</b><span>${REWARDS[k].desc}</span>`, REWARDS[k].name + ' 획득', { hint: `${REWARDS[k].name} · ${REWARDS[k].desc}`, className: `ops-reward ops-reward-${k}` })).join('')}</div>`;

@@ -21,6 +21,7 @@ const glyphs: Record<string, string> = {
   shield: '<path d="m32 9 21 8-3 22-18 16-18-16-3-22Z" fill="#476957"/><path d="m22 31 7 7 14-15"/>',
   weak: '<path d="m32 9 21 8-3 22-18 16-18-16-3-22Z" fill="#476957"/><path d="m34 13-7 15 11 5-9 17"/>',
   emp: '<circle cx="32" cy="32" r="21" fill="#214c59"/><path d="m35 13-12 20h11l-6 18 16-23H33Z" fill="#99deee"/><path d="M13 21 9 17m42 4 4-4M13 43l-4 4m42-4 4 4"/>',
+  augment: '<path d="m32 8 20 12v24L32 56 12 44V20Z" fill="#5d4d8a"/><path d="M32 8v48M12 20l40 24M52 20 12 44"/>',
   boss: '<path d="m11 19 12 10 9-17 9 17 12-10-5 28H16Z" fill="#9b7c3e"/><path d="M17 53h30M25 38h14"/>',
   first: '<path d="M12 19h22M12 32h36M12 45h22m4-23 10 10-10 10M54 15v34"/>',
   range: '<circle cx="32" cy="32" r="9"/><path d="M18 10h-8v8m36-8h8v8M10 46v8h8m36-8v8h-8M32 13v7m0 24v7M13 32h7m24 0h7"/>',

@@ -4,6 +4,7 @@ import { MAP_DEFS, type MapKey } from './data/maps';
 import { TOWER_DEFS, type TowerKey } from './data/units';
 import { createMapRuntime } from './game/map';
 import { EquippedSkill, SKILL_DEFS, SKILL_SLOTS, UnitBuff } from './catalog';
+import { AugmentKey, AugmentOffer, isAugment } from './augments';
 
 export const DIFFICULTIES = {
   easy: { name: '쉬움', hp: .7, speed: .9, gold: 220 },
@@ -15,6 +16,7 @@ export const MODES = {
   endless: { name: '무한 방어', desc: '50웨이브 이후에도 계속 진행' },
   bunker: { name: '벙커 부대', desc: '벙커·마린·파이어뱃만 사용' },
   budget: { name: '제한 예산', desc: '시작 1,500미네랄 · 처치/클리어/보급 수입 없음' },
+  augment: { name: '증강 작전', desc: '10·20·30웨이브마다 증강 선택 · 50웨이브 방어' },
 };
 export interface RunOptions { map: MapKey; difficulty: keyof typeof DIFFICULTIES; mode: keyof typeof MODES }
 export const DEFAULT_OPTIONS: RunOptions = { map: 'frontier', difficulty: 'normal', mode: 'standard' };
@@ -25,6 +27,9 @@ export const BRANCHES = {
   rapid: { name: '전술 확장', desc: '공격 속도 +40% · 범위 공격 반경 +35% · 지원 유닛은 지원 사거리 +45' },
 };
 export type Branch = keyof typeof BRANCHES;
+/** 이중 특화 증강으로 두 갈래를 모두 고르면 'both'. */
+export type BranchState = Branch | 'both';
+export const hasBranch = (state: BranchState | undefined, key: Branch): boolean => state === key || state === 'both';
 export const REWARDS = {
   power: { name: '고출력 탄두', desc: '모든 병력 공격력 +12% (이후 배치 포함)' },
   haste: { name: '가속 장전', desc: '모든 병력 공격 속도 +10% (이후 배치 포함)' },
@@ -97,12 +102,14 @@ export function normalizeStats(stats: RunStats): RunStats {
 }
 export interface SavedUnit {
   id: string; k: TowerKey; c: number; r: number; lvl: number; spent: number;
-  skills: EquippedSkill[]; cd: number; buffs: UnitBuff[]; hostId?: string; slot?: number; target: TargetMode; branch?: Branch;
+  skills: EquippedSkill[]; cd: number; buffs: UnitBuff[]; hostId?: string; slot?: number; target: TargetMode; branch?: BranchState;
 }
 export interface RunSave {
   version: 1; options: RunOptions; wave: number; gold: number; lives: number; units: SavedUnit[];
   bonuses: Bonuses; stats: RunStats; commander: Record<CommanderKey, number>;
   pending: RewardKey[]; rewarded: number; tutorial: number; usedKinds: TowerKey[];
+  /** 증강 모드: 고른 증강, 한 번이라도 출현한 증강, 고르는 중인 선택지, 젤나가 맙소사를 고른 웨이브. */
+  augments?: AugmentKey[]; augmentSeen?: AugmentKey[]; augmentOffer?: AugmentOffer | null; amonSince?: number | null;
 }
 export interface Profile { version: 1; achievements: string[]; skin: 'standard' | 'gold' | 'ion'; bestWave: number; wins: number; tutorialDone: boolean; volume: number }
 export const ACHIEVEMENTS = {
@@ -135,7 +142,7 @@ export function validateSave(v: unknown): v is RunSave {
   for (const u of v.units) {
     if (!obj(u) || typeof u.id !== 'string' || !/^[1-9]\d*$/.test(u.id) || !num(Number(u.id), 1) || ids.has(u.id)
       || !has(TOWER_DEFS, u.k) || !allowedUnit(u.k, v.options.mode) || !integer(u.c, 0, COLS - 1) || !integer(u.r, 0, ROWS - 1)
-      || !integer(u.lvl, 1, MAX_UNIT_LEVEL) || !num(u.spent) || !has(TARGETS, u.target) || u.hostId !== undefined && typeof u.hostId !== 'string' || u.branch !== undefined && (!has(BRANCHES, u.branch) || u.lvl < 3 || u.k === 'bunker')
+      || !integer(u.lvl, 1, MAX_UNIT_LEVEL) || !num(u.spent) || !has(TARGETS, u.target) || u.hostId !== undefined && typeof u.hostId !== 'string' || u.branch !== undefined && (!(has(BRANCHES, u.branch) || u.branch === 'both') || u.lvl < 3 || u.k === 'bunker')
       || !num(u.cd, 0, 60) || !Array.isArray(u.buffs) || !u.buffs.every((b: unknown) => obj(b) && num(b.left, 0, 60) && num(b.haste, 1, 10) && num(b.power, 1, 10))
       || !Array.isArray(u.skills) || u.skills.length > SKILL_SLOTS) return false;
     ids.add(u.id);
@@ -156,6 +163,11 @@ export function validateSave(v: unknown): v is RunSave {
     || !Array.isArray(v.pending) || ![0, 3].includes(v.pending.length) || new Set(v.pending).size !== v.pending.length || v.pending.some((k: unknown) => !has(REWARDS, k) || v.options.mode === 'budget' && k === 'supply')
     || !integer(v.rewarded, 0, v.wave) || v.rewarded !== Math.floor(v.wave / 5) * 5 - (v.pending.length ? 5 : 0) || v.pending.length > 0 && (v.wave === 0 || v.wave % 5 !== 0)
     || !integer(v.tutorial, 0, 4) || !Array.isArray(v.usedKinds) || !v.usedKinds.every((k: unknown) => has(TOWER_DEFS, k))) return false;
+  const keys = (list: unknown): boolean => Array.isArray(list) && list.every(isAugment) && new Set(list).size === list.length;
+  const offer = v.augmentOffer;
+  if (v.augments !== undefined && !keys(v.augments) || v.augmentSeen !== undefined && !keys(v.augmentSeen)
+    || offer != null && (!obj(offer) || !keys(offer.cards) || offer.cards.length > 3 || !Array.isArray(offer.rerolled) || offer.rerolled.length !== offer.cards.length || !offer.rerolled.every((r: unknown) => typeof r === 'boolean'))
+    || v.amonSince != null && !integer(v.amonSince, 0, v.wave)) return false;
   const s = v.stats;
   return obj(s) && ['damage', 'kills', 'lost', 'seconds', 'commanderDamage'].every(k => num(s[k]))
     && Array.isArray(s.units) && s.units.every((u: unknown) => obj(u) && typeof u.id === 'string' && /^[1-9]\d*$/.test(u.id) && has(TOWER_DEFS, u.k) && num(u.damage) && (u.boss === undefined || num(u.boss)) && num(u.kills))

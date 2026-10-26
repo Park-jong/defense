@@ -1,6 +1,7 @@
 import { MAX_UNIT_LEVEL } from './data/rules';
 import { TOWER_DEFS, type TowerKey } from './data/units';
 import { EquippedSkill, SKILL_DEFS, SKILL_SLOTS, SkillKey } from './catalog';
+import { skillCost, skillLocked, upgradePrice } from './augments';
 
 export { MAX_UNIT_LEVEL } from './data/rules';
 export interface ManagedUnit {
@@ -11,7 +12,7 @@ export type UnitOrder = { type: 'upgrade' } | { type: 'skill'; key: SkillKey };
 export interface OrderResult { count: number; cost: number }
 
 export const unitUpgradeCost = (unit: Pick<ManagedUnit, 'k' | 'lvl'>): number =>
-  Math.round(TOWER_DEFS[unit.k].cost * .8 * unit.lvl);
+  upgradePrice(unit.k, Math.round(TOWER_DEFS[unit.k].cost * .8 * unit.lvl));
 
 /** 레벨별 기본 능력치(보너스·특화 제외). 게임 씬의 실제 계산과 보급 상점 비교가 같은 식을 쓴다. */
 export const levelStats = (k: TowerKey, lvl: number): { dmg: number; range: number; rate: number } => {
@@ -26,8 +27,8 @@ export function planOrder(units: ManagedUnit[], order: UnitOrder, scope: UnitSco
       || scope.kind !== undefined && unit.k !== scope.kind) return false;
     if (order.type === 'upgrade') return unit.lvl < MAX_UNIT_LEVEL;
     const skill = SKILL_DEFS[order.key];
-    return !!skill && skill.unit === unit.k && unit.skills.length < SKILL_SLOTS && !unit.skills.some(s => s.key === order.key);
+    return !!skill && skill.unit === unit.k && !skillLocked(unit.k) && unit.skills.length < SKILL_SLOTS && !unit.skills.some(s => s.key === order.key);
   });
   return { ids: eligible.map(unit => unit.id), cost: eligible.reduce((cost, unit) =>
-    cost + (order.type === 'upgrade' ? unitUpgradeCost(unit) : SKILL_DEFS[order.key].cost), 0) };
+    cost + (order.type === 'upgrade' ? unitUpgradeCost(unit) : skillCost(order.key)), 0) };
 }
