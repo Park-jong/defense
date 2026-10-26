@@ -288,3 +288,15 @@ test('사이오닉 공명은 아칸 주변 150 안의 병력 공격 속도를, �
   a.damageEnemy(near, 100, 'normal', t.id); a.damageEnemy(far, 100, 'normal', t.id);
   assert.equal(1000 - near.hp, 115); assert.equal(1000 - far.hp, 100);
 });
+
+test('야마토 프로토콜은 관통 포격 5발째마다 공격력 1200%의 강화 포격을 쏜다(보스는 그 2배)', () => {
+  const s = setup(['yamato']), t = place(s, 'cruiser'), st = s.stats(t);
+  const grunt = spawn(s, 'grunt', t.x + 60, t.y), boss = spawn(s, 'boss', t.x + 100, t.y);
+  grunt.hp = grunt.max = boss.hp = boss.max = 1e9;
+  const hits = [];
+  for (let i = 0; i < 10; i++) { const g = grunt.hp, b = boss.hp; s.fire(t, grunt, st); hits.push([g - grunt.hp, b - boss.hp]); }
+  for (const [i, [g, b]] of hits.entries()) {
+    const power = (i + 1) % 5 === 0 ? 12 : 1;
+    assert.ok(Math.abs(g - st.dmg * power) < 1e-6); assert.ok(Math.abs(b - st.dmg * power * 2) < 1e-6);
+  }
+});

@@ -15,7 +15,7 @@ import { ShopState, SupplyShop } from './shop';
 import { levelStats, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
 import { BUNKER_BARREL_LENGTH, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
 import { createMapRuntime, highGroundRangeBonus, type MapRuntime, type Point } from './game/map';
-import { ANALYSIS_BONUS, RESONANCE_HASTE, RESONANCE_RADIUS, bondInterest, sellRate, AIUR_LIMIT, Army, FORTRESS_RANGE, HANGAR_INTERCEPTORS, INVESTMENT_GOLD, SIEGE_RANGE, STASIS_BOSS_TIME, STASIS_TIME, bossDamageMultiplier, bountyMultiplier, bunkerCapacity, clearBonusMultiplier, commanderCooldownScale, maxLives, maxUnitLevel, AIUR_RANGE, AMON_LEAK, AMON_SCALE, AUGMENTS, AUGMENT_WAVES, AugmentKey, AugmentOffer, YAMATO_WIDTH, STORM_FREE_CASTS, amonDue, augmentEligible, augmentOffer, branchCost, damageMultiplier, drawAugment, eliteBonus, placeCost, relocateCost, setActiveAugments, skillCost, skillLocked, hasAugment } from './augments';
+import { YAMATO_CHARGE_EVERY, YAMATO_CHARGE_POWER, ANALYSIS_BONUS, RESONANCE_HASTE, RESONANCE_RADIUS, bondInterest, sellRate, AIUR_LIMIT, Army, FORTRESS_RANGE, HANGAR_INTERCEPTORS, INVESTMENT_GOLD, SIEGE_RANGE, STASIS_BOSS_TIME, STASIS_TIME, bossDamageMultiplier, bountyMultiplier, bunkerCapacity, clearBonusMultiplier, commanderCooldownScale, maxLives, maxUnitLevel, AIUR_RANGE, AMON_LEAK, AMON_SCALE, AUGMENTS, AUGMENT_WAVES, AugmentKey, AugmentOffer, YAMATO_WIDTH, STORM_FREE_CASTS, amonDue, augmentEligible, augmentOffer, branchCost, damageMultiplier, drawAugment, eliteBonus, placeCost, relocateCost, setActiveAugments, skillCost, skillLocked, hasAugment } from './augments';
 import { ACHIEVEMENTS, allowedUnit, awardAchievements, Bonuses, bossPattern, Branch, BranchState, COMMANDERS, hasBranch, CommanderKey, DEFAULT_OPTIONS, DIFFICULTIES, newStats, normalizeStats, Profile, PROFILE_KEY, readProfile, readSave, REWARDS, RewardKey, rewardChoices, RunOptions, RunSave, RunStats, SavedUnit, SAVE_KEY, clearSave, TargetMode, TestScope, validateSave, wavePlan, writeStored } from './campaign';
 import { BattleAudio } from './audio';
 import { CombatEffects } from './combatEffects';
@@ -32,7 +32,7 @@ interface Tower {
   skills: EquippedSkill[]; buffs: UnitBuff[];
   host?: Tower; passengers: (Tower | null)[];
   charge?: { target: Enemy; left: number };
-  target: TargetMode; branch?: BranchState; stormFree?: number;
+  target: TargetMode; branch?: BranchState; stormFree?: number; yamatoShots?: number;
 }
 
 interface Enemy {
@@ -1526,18 +1526,21 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** 야마토 프로토콜: 사거리 끝까지, 폭 0.7칸 안의 일직선상 모든 적에게 피해. 보스는 2배. */
+  /** 야마토 프로토콜: 사거리 끝까지, 폭 0.7칸 안의 일직선상 모든 적에게 피해. 보스는 2배, 5발째마다 공격력 1200%. */
   private yamatoLine(t: Tower, angle: number, st: TowerStats): void {
+    t.yamatoShots = ((t.yamatoShots ?? 0) % YAMATO_CHARGE_EVERY) + 1;
+    const charged = t.yamatoShots === YAMATO_CHARGE_EVERY, power = charged ? YAMATO_CHARGE_POWER : 1;
     const dx = Math.cos(angle), dy = Math.sin(angle), half = YAMATO_WIDTH * T / 2, reach = 29 * (UNIT_WORLD_SCALE.cruiser ?? 1);
     const bow = { x: t.x + dx * reach, y: t.y + dy * reach }, end = { x: t.x + dx * st.range, y: t.y + dy * st.range };
     for (const e of [...this.enemies]) {
       if (e.dead) continue;
       const along = (e.x - t.x) * dx + (e.y - t.y) * dy, across = Math.abs((e.x - t.x) * dy - (e.y - t.y) * dx);
-      if (along >= 0 && along <= st.range && across <= half) this.damageEnemy(e, st.dmg * (e.type === 'boss' ? 2 : 1), 'skill', t.id);
+      if (along >= 0 && along <= st.range && across <= half) this.damageEnemy(e, st.dmg * power * (e.type === 'boss' ? 2 : 1), 'skill', t.id);
     }
-    const core = this.add.circle(bow.x, bow.y, 6, 0xffda8a, .85).setStrokeStyle(2, 0xfff2c8).setDepth(12);
-    this.tweens.add({ targets: core, scale: 2.2, alpha: 0, duration: 300, onComplete: () => core.destroy() });
-    this.skillBeam(bow, end, SKILL_DEFS.yamato.color, half * 2);
+    const core = this.add.circle(bow.x, bow.y, charged ? 10 : 6, 0xffda8a, .85).setStrokeStyle(2, 0xfff2c8).setDepth(12);
+    this.tweens.add({ targets: core, scale: charged ? 3.2 : 2.2, alpha: 0, duration: charged ? 420 : 300, onComplete: () => core.destroy() });
+    this.skillBeam(bow, end, SKILL_DEFS.yamato.color, half * (charged ? 3 : 2));
+    if (charged) { this.fxBoom.explode(24, end.x, end.y); this.audio.play('skill'); }
   }
 
   private findTarget(t: Tower, eligible: (enemy: Enemy) => boolean = () => true): Enemy | null {
