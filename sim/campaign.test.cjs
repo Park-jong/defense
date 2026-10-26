@@ -4,6 +4,7 @@ const { createSourceLoader } = require('./helpers/load-source.cjs');
 
 // Use production rules; only Phaser, artwork and DOM views are substituted.
 const load = createSourceLoader({
+  './missionResult': { showMissionResult: () => () => {} },
   phaser: { Scene: class {} },
   './unitArt': { UNIT_WORLD_SCALE: {} },
   ...Object.fromEntries(['./shop', './textures', './ui', './operations'].map(name => [name, {}])),
@@ -608,6 +609,54 @@ test('게임 종료는 체크포인트를 정리하고 실패한 웨이브로 �
     const v = setup(); v.wave = 50; v.endGame(true); assert.ok(v.profile.achievements.includes('victory')); assert.ok(v.profile.achievements.includes('flawless'));
     v.profile.skin = 'gold'; const m = place(setup(), 'marine'); v.towers = [m]; v.applySkin(); assert.equal(m.base.tint, 0xffdb85);
   } finally { if (oldStorage === undefined) delete global.localStorage; else global.localStorage = oldStorage; }
+});
+
+test('50웨이브 승리 후 계속 플레이는 병력·자원·원래 작전 규칙과 승리 기록을 보존한다', () => {
+  const store = memory(), oldStorage = global.localStorage; global.localStorage = store;
+  try {
+    for (const mode of ['standard', 'bunker', 'budget', 'augment']) {
+      const s = setup(mode), marine = place(s, 'marine'); s.wave = 50; s.rewarded = 45;
+      s.runLaunched = true; const gold = s.gold; s.endGame(true); const wins = s.profile.wins;
+      let closed = 0, awake = 0; s.closeResult = () => closed++; s.stopIdleSleep = () => awake++;
+      s.continuePlaying();
+      assert.equal(s.over, false); assert.equal(s.continued, true); assert.equal(s.options.mode, mode);
+      assert.equal(s.towers[0], marine); assert.equal(s.lives, 20); assert.equal(s.profile.wins, wins);
+      assert.equal(closed, 1); assert.equal(awake, 1); assert.equal(s.waveActive, false);
+      assert.equal(s.gold, gold + (mode === 'budget' ? 0 : config.CLEAR_BONUS_BASE + 50 * config.CLEAR_BONUS_PER_WAVE));
+      assert.equal(s.pending.length, 3); if (mode === 'budget') assert.ok(!s.pending.includes('supply'));
+      const save = rules.readSave(store); assert.ok(save); assert.equal(save.continued, true); assert.equal(save.options.mode, mode);
+      s.continuePlaying(); assert.equal(closed, 1); assert.equal(s.gold, save.gold);
+      s.startWave(); assert.equal(s.wave, 50); // 50웨이브 보상을 먼저 고른다.
+      s.takeReward(s.pending[0]); s.startWave(); assert.equal(s.wave, 51);
+      s.spawnQ = []; s.step(.01); assert.equal(s.over, false); assert.equal(s.profile.wins, wins);
+      s.startWave(); assert.equal(s.wave, 52);
+      s.endGame(false); assert.equal(s.profile.wins, wins); assert.equal(s.profile.bestWave, 51);
+    }
+  } finally { if (oldStorage === undefined) delete global.localStorage; else global.localStorage = oldStorage; }
+});
+
+test('계속 플레이 체크포인트는 보상 선택 전후와 55웨이브에서 복원되어 다음 웨이브를 연다', () => {
+  for (const wave of [50, 55, 101]) for (const pending of [[], ['power', 'haste', 'range']]) {
+    if (pending.length && wave % 5 !== 0) continue;
+    const save = checkpoint(); save.wave = wave; save.continued = true; save.pending = pending;
+    save.rewarded = Math.floor(wave / 5) * 5 - (pending.length ? 5 : 0);
+    assert.equal(rules.validateSave(save), true);
+    const s = setup(); s.restoreCheckpoint(save); assert.equal(s.continued, true);
+    if (s.pending.length) s.takeReward(s.pending[0]);
+    s.startWave(); assert.equal(s.wave, wave + 1); assert.deepEqual(s.spawnQ, rules.wavePlan(wave + 1));
+  }
+});
+
+test('승리 전·패배·테스트에서는 계속 플레이를 열지 않고 잘못된 연장 저장은 거부한다', () => {
+  const s = setup(); s.wave = 50; s.startWave(); assert.equal(s.wave, 50);
+  s.continuePlaying(); assert.equal(s.continued, false);
+  s.endGame(false); s.continuePlaying(); assert.equal(s.over, true); assert.equal(s.continued, false);
+  const t = setup(); t.testMode = true; t.wave = 50; t.endGame(true); t.continuePlaying(); assert.equal(t.continued, false);
+  for (const value of ['true', 1, {}, null, true]) {
+    const save = checkpoint(); save.continued = value; assert.equal(rules.validateSave(save), false);
+  }
+  const save = checkpoint(); save.wave = 50; save.pending = []; save.rewarded = 50;
+  assert.equal(rules.validateSave(save), false); save.options.mode = 'endless'; assert.equal(rules.validateSave(save), true);
 });
 
 test('튜토리얼은 실제 배치·강화·스킬·탑승 완료로만 진행한다', () => {

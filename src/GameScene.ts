@@ -22,6 +22,7 @@ import { BattleAudio } from './audio';
 import { CombatEffects } from './combatEffects';
 import { hasWeaponEffects } from './data/weaponEffects';
 import { OperationsCenter, OperationsView } from './operations';
+import { showMissionResult } from './missionResult';
 import { COMMAND_ACTIVE_CURSOR, COMMAND_CURSOR } from './cursors';
 import { CommandConsole } from './commandConsole';
 import { playThemeUnlock } from './themeUnlock';
@@ -95,6 +96,10 @@ export class GameScene extends Phaser.Scene {
   private speed = 1;
   private paused = false;
   private over = false;
+  private continued = false;
+  private victory = false;
+  private closeResult?: () => void;
+  private stopIdleSleep?: () => void;
   /** 터치 위주 기기(손가락 입력)면 단축키 안내를 숨기고 두 번 탭 배치·취소 버튼을 쓴다. */
   private touchUI = false;
   private lastTick = 0;
@@ -216,6 +221,7 @@ export class GameScene extends Phaser.Scene {
     this.spawnQ = []; this.spawnT = 0; this.waveActive = false;
     this.building = null; this.selected = null; this.hover = null; this.faction = 'terran';
     this.speed = 1; this.paused = false; this.over = false; this.bossLeaked = false;
+    this.continued = false; this.victory = false;
     this.lastTick = 0; this.stepAcc = 0;
     this.touchUI = window.matchMedia('(pointer: coarse)').matches;
     this.uiCache = {};
@@ -345,7 +351,7 @@ export class GameScene extends Phaser.Scene {
     const save: RunSave = { version: 1, options: { ...this.options }, wave: this.wave, gold: this.gold, lives: this.lives,
       units: this.savedUnits(), bonuses: { ...this.bonuses }, stats: this.runStats, commander: { ...this.commander },
       pending: [...this.pending], rewarded: this.rewarded, tutorial: this.tutorial, usedKinds: [...this.usedKinds],
-      augments: [...this.augments], augmentSeen: [...this.augmentSeen], augmentOffer: this.augmentOffer && structuredClone(this.augmentOffer), amonSince: this.amonSince, cheated: this.cheated };
+      augments: [...this.augments], augmentSeen: [...this.augmentSeen], augmentOffer: this.augmentOffer && structuredClone(this.augmentOffer), amonSince: this.amonSince, cheated: this.cheated, continued: this.continued };
     if (!validateSave(save)) { if (notify) this.opsNotice = '현재 상태를 저장할 수 없습니다.'; return; }
     if (writeStored(SAVE_KEY, save)) {
       this.checkpoint = structuredClone(save);
@@ -360,6 +366,7 @@ export class GameScene extends Phaser.Scene {
     this.augmentOffer = save.augmentOffer ? structuredClone(save.augmentOffer) : null; this.amonSince = save.amonSince ?? null; this.cheated = save.cheated ?? false;
     setActiveAugments(this.augments);
     this.wave = save.wave; this.gold = save.gold; this.lives = save.lives;
+    this.continued = save.continued ?? false;
     const units = new Map<string, Tower>();
     for (const u of save.units) {
       const t = this.createTower(u.k, u.c, u.r);
@@ -873,13 +880,13 @@ export class GameScene extends Phaser.Scene {
     const hud = `${this.wave}/${this.gold}/${this.lives}/${remaining}/${this.paused}/${this.over}`;
     if (this.uiCache.hud !== hud) {
       this.uiCache.hud = hud;
-      this.hud.setText(`WAVE  ${String(this.wave).padStart(2, '0')} / ${this.options.mode === 'endless' ? '∞' : MAX_WAVE}`);
+      this.hud.setText(`WAVE  ${String(this.wave).padStart(2, '0')} / ${this.options.mode === 'endless' || this.continued ? '∞' : MAX_WAVE}`);
       this.mineralTxt.setText(this.gold.toLocaleString());
       this.lifeTxt.setText(`${Math.max(0, this.lives)} / ${maxLives()}`);
       this.lifeTxt.setColor(this.lives <= 5 ? '#e29a7f' : isBishoujo() ? '#efb9dd' : '#b7dc8e');
       this.goBtn.set(this.over ? '작전 종료' : this.waveActive ? `${MOBILE_LAYOUT ? '교전' : '교전 중'} · 남은 적 ${remaining}` : `▶  웨이브 시작${this.kb('  [SPACE]')}`);
     }
-    this.goBtn.en(!this.waveActive && !this.over && !this.paused && !this.shopOpen && !this.operationsOpen && !this.pending.length && !this.augmentOffer && (this.testMode || this.options.mode === 'endless' || this.wave < MAX_WAVE));
+    this.goBtn.en(!this.waveActive && !this.over && !this.paused && !this.shopOpen && !this.operationsOpen && !this.pending.length && !this.augmentOffer && (this.testMode || this.options.mode === 'endless' || this.continued || this.wave < MAX_WAVE));
     this.shopBtn.en(!this.over);
     const t = this.selected, k = t?.k ?? this.building;
     let title: string, msg: string;
@@ -1298,7 +1305,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private startWave(): void {
-    if (this.over || this.paused || this.shopOpen || this.operationsOpen || this.pending.length || this.augmentOffer || this.waveActive || (!this.testMode && this.options.mode !== 'endless' && this.wave >= MAX_WAVE)) return;
+    if (this.over || this.paused || this.shopOpen || this.operationsOpen || this.pending.length || this.augmentOffer || this.waveActive || (!this.testMode && this.options.mode !== 'endless' && !this.continued && this.wave >= MAX_WAVE)) return;
     this.runLaunched = true; this.saveCheckpoint(false); this.cancelCommand();
     if (this.testMode) this.repeat++; else this.wave++;
     const w = this.wave, scope = this.testMode ? this.testScope : 'all';
@@ -1509,23 +1516,36 @@ export class GameScene extends Phaser.Scene {
     if (this.waveActive && !this.spawnQ.length && !this.enemies.length && this.lives > 0) {
       this.waveActive = false;
       this.recordWave();
-      if (this.wave >= MAX_WAVE && !this.testMode && this.options.mode !== 'endless') this.endGame(true);
-      else {
-        const bonus = this.options.mode === 'budget' ? 0 : Math.round((CLEAR_BONUS_BASE + this.wave * CLEAR_BONUS_PER_WAVE) * clearBonusMultiplier());
-        this.gold += bonus;
-        this.banner(`구역 확보 · +${bonus} 미네랄`);
-        this.audio.play('clear');
-        this.moe?.clear(this.moeLead());
-        if (!this.testMode && this.wave % 5 === 0 && this.rewarded < this.wave) {
-          this.pending = rewardChoices(this.options.mode); this.opsNotice = '';
-        }
-        if (!this.testMode && this.options.mode === 'augment' && AUGMENT_WAVES.includes(this.wave) && !this.augmentOffer) this.offerAugments();
-        if (this.pending.length) this.operations?.show('reward');
-        else if (this.augmentOffer) this.operations?.show('augment');
-        this.saveCheckpoint(false);
-      }
+      if (this.wave >= MAX_WAVE && !this.testMode && this.options.mode !== 'endless' && !this.continued) this.endGame(true);
+      else this.completeWave();
     }
     if (this.lives <= 0) this.endGame(false);
+  }
+
+  private completeWave(): void {
+    const bonus = this.options.mode === 'budget' ? 0 : Math.round((CLEAR_BONUS_BASE + this.wave * CLEAR_BONUS_PER_WAVE) * clearBonusMultiplier());
+    this.gold += bonus;
+    this.banner(`구역 확보 · +${bonus} 미네랄`);
+    this.audio.play('clear');
+    this.moe?.clear(this.moeLead());
+    if (!this.testMode && this.wave % 5 === 0 && this.rewarded < this.wave) {
+      this.pending = rewardChoices(this.options.mode); this.opsNotice = '';
+    }
+    if (!this.testMode && this.options.mode === 'augment' && AUGMENT_WAVES.includes(this.wave) && !this.augmentOffer) this.offerAugments();
+    if (this.pending.length) this.operations?.show('reward');
+    else if (this.augmentOffer) this.operations?.show('augment');
+    this.saveCheckpoint(false);
+  }
+
+  private continuePlaying(): void {
+    if (!this.over || !this.victory || this.testMode || this.continued) return;
+    this.over = false; this.victory = false; this.continued = true;
+    this.closeResult?.(); this.closeResult = undefined;
+    this.stopIdleSleep?.(); this.stopIdleSleep = undefined;
+    this.paused = false; this.stepAcc = 0; this.lastTick = performance.now();
+    this.runLaunched = true;
+    this.completeWave();
+    this.operations?.update();
   }
 
   private enemyAct(e: Enemy, dt: number): void {
@@ -2070,6 +2090,7 @@ export class GameScene extends Phaser.Scene {
    * 누르거나 키를 치면 깨어나 그 입력을 처리하고, 다시 조용해지면 잠든다. 다음 출격에서는 늘 깨어 있다.
    */
   private sleepWhenIdle(): void {
+    this.stopIdleSleep?.();
     const loop = this.game?.loop;
     if (!loop?.sleep) return;
     let timer = 0;
@@ -2077,17 +2098,19 @@ export class GameScene extends Phaser.Scene {
     const wake = () => { if (!loop.running) loop.wake(); nap(); };
     const types = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'resize'];
     for (const type of types) window.addEventListener(type, wake, true);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+    const cleanup = () => {
       window.clearTimeout(timer);
       for (const type of types) window.removeEventListener(type, wake, true);
       if (!loop.running) loop.wake();
-    });
+    };
+    this.stopIdleSleep = cleanup;
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, cleanup);
     nap();
   }
 
   private endGame(win: boolean): void {
     if (this.over) return;
-    this.over = true;
+    this.over = true; this.victory = win;
     this.sleepWhenIdle();
     this.moe?.reset();
     if (!win && this.waveActive) this.recordWave(false);
@@ -2098,20 +2121,12 @@ export class GameScene extends Phaser.Scene {
     }
     this.operations?.update();
     this.pauseTxt.setVisible(false);
-    const dy = MOBILE_LAYOUT ? 0 : MAP_Y - TOP_BAR_H; // 맵이 내려간 만큼 결과 창도 내린다
-    this.add.rectangle(0, 0, GAME_W, H, 0x030906, .82).setOrigin(0).setDepth(50);
-    this.add.rectangle(W / 2, 330 + dy, 580, 280, 0x18221c).setStrokeStyle(2, 0x738361).setDepth(51);
-    this.add.rectangle(W / 2, 330 + dy, 568, 268).setStrokeStyle(1, 0x354530).setDepth(51);
-    this.add.text(W / 2, 226 + dy, win ? 'MISSION COMPLETE' : 'SIGNAL LOST', { fontFamily: 'monospace', fontSize: '12px', color: '#94a680' }).setLetterSpacing(3).setOrigin(.5).setDepth(52);
-    this.add.text(W / 2, 277 + dy, win ? '방어 작전 성공' : '기지 함락', { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: win ? '#c7e99e' : '#d79a7f' }).setOrigin(.5).setDepth(52);
-    this.add.text(W / 2, 334 + dy, win ? `${MAX_WAVE}개 웨이브를 모두 방어했습니다.` : (this.bossLeaked ? `웨이브 ${this.wave} · 적 지휘 개체가 방어선을 돌파했습니다.` : `웨이브 ${this.wave} · 기지 방어선이 무너졌습니다.`),
-      { fontFamily: FONT, fontSize: '16px', color: '#aab99c' }).setOrigin(.5).setDepth(52);
-    const btn = this.add.rectangle(W / 2, 410 + dy, 230, 46, 0x2c3d29).setStrokeStyle(1, 0x8aab6a)
-      .setInteractive({ cursor: COMMAND_ACTIVE_CURSOR }).setDepth(51);
-    this.add.text(W / 2, 410 + dy, '↻  작전 재시작', { fontFamily: FONT, fontSize: '16px', color: '#d2e7b5' }).setOrigin(.5).setDepth(52);
-    btn.on('pointerdown', () => this.scene.restart({ options: this.options, launched: true }));
-    const report = this.add.rectangle(W / 2, 458 + dy, 230, 32, 0x21372a).setStrokeStyle(1, 0x66825d).setInteractive({ cursor: COMMAND_ACTIVE_CURSOR }).setDepth(51);
-    this.add.text(W / 2, 458 + dy, '전투 통계 / 업적', { fontFamily: FONT, fontSize: '13px', color: '#d2e7b5' }).setOrigin(.5).setDepth(52);
-    report.on('pointerdown', () => this.operations?.show('stats'));
+    this.closeResult?.();
+    const close = showMissionResult({ win, wave: this.wave, bossLeaked: this.bossLeaked,
+      onContinue: win && !this.testMode ? () => this.continuePlaying() : undefined,
+      onRestart: () => this.scene.restart({ options: this.options, launched: true }),
+      onReport: () => this.operations?.show('stats') });
+    this.closeResult = close;
+    this.events?.once(Phaser.Scenes.Events.SHUTDOWN, close);
   }
 }

@@ -128,7 +128,7 @@ async function dialogFits(page) {
     await shot(page, 'desktop-stats');
     await page.getByRole('button', { name: '전장 복귀', exact: true }).click();
     await scene(page, s => { s.wave = 50; s.waveActive = false; s.runStats.lost = 0; s.endGame(true); });
-    await page.getByRole('button', { name: '작전실 [O]', exact: true }).click();
+    await page.getByRole('button', { name: '전투 통계 / 업적', exact: true }).click();
     await page.getByRole('button', { name: '업적 / 외형', exact: true }).click();
     await page.getByRole('button', { name: '황금 외형', exact: true }).click();
     assert.equal(await scene(page, s => s.towers[0].base.tintTopLeft), 0xffdb85);

@@ -4,6 +4,7 @@ const { createSourceLoader } = require('./helpers/load-source.cjs');
 
 // Use production rules; only Phaser, artwork and DOM views are substituted.
 const load = createSourceLoader({
+  './missionResult': { showMissionResult: () => () => {} },
   phaser: { Scene: class {} },
   './unitArt': { UNIT_WORLD_SCALE: { cannon: 1.15, cruiser: 1.3 } },
   ...Object.fromEntries(['./shop', './textures', './ui', './operations'].map(name => [name, {}])),

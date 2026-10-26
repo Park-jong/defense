@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { createSourceLoader } = require('./helpers/load-source.cjs');
 
 const load = createSourceLoader({
+  './missionResult': { showMissionResult: () => () => {} },
   phaser: { Scene: class {} },
   ...Object.fromEntries(['./shop', './textures', './ui', './operations'].map(name => [name, {}])),
 });

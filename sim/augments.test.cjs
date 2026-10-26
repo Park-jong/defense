@@ -4,6 +4,7 @@ const { createSourceLoader } = require('./helpers/load-source.cjs');
 
 // 증강 모드의 프리즘 증강을 실제 규칙과 게임 씬으로 확인한다. Phaser·그림·DOM만 대체한다.
 const load = createSourceLoader({
+  './missionResult': { showMissionResult: () => () => {} },
   phaser: { Scene: class {} },
   './unitArt': { UNIT_WORLD_SCALE: {} },
   ...Object.fromEntries(['./shop', './textures', './ui', './operations'].map(name => [name, {}])),
