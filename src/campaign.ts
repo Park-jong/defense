@@ -135,14 +135,14 @@ export function validOptions(v: unknown): v is RunOptions { return obj(v) && has
 /** Reject incompatible or corrupt checkpoints before constructing any scene objects. */
 export function validateSave(v: unknown): v is RunSave {
   if (!obj(v) || v.version !== 1 || !validOptions(v.options) || !integer(v.wave, 0, 10000)
-    || v.options.mode !== 'endless' && v.wave >= MAX_WAVE || !num(v.gold) || !integer(v.lives, 1, 20)
+    || v.options.mode !== 'endless' && v.wave >= MAX_WAVE || !num(v.gold) || !integer(v.lives, 1, v.augments?.includes('glassCannon') ? 10 : 20)
     || !Array.isArray(v.units) || v.units.length > COLS * ROWS * 5) return false;
   const ids = new Set<string>(), occupied = new Set<string>(), slots = new Set<string>();
   const paths = createMapRuntime(v.options.map as MapKey).pathCells;
   for (const u of v.units) {
     if (!obj(u) || typeof u.id !== 'string' || !/^[1-9]\d*$/.test(u.id) || !num(Number(u.id), 1) || ids.has(u.id)
       || !has(TOWER_DEFS, u.k) || !allowedUnit(u.k, v.options.mode) || !integer(u.c, 0, COLS - 1) || !integer(u.r, 0, ROWS - 1)
-      || !integer(u.lvl, 1, MAX_UNIT_LEVEL) || !num(u.spent) || !has(TARGETS, u.target) || u.hostId !== undefined && typeof u.hostId !== 'string' || u.branch !== undefined && (!(has(BRANCHES, u.branch) || u.branch === 'both') || u.lvl < 3 || u.k === 'bunker')
+      || !integer(u.lvl, 1, v.augments?.includes('veteran') ? 7 : MAX_UNIT_LEVEL) || !num(u.spent) || !has(TARGETS, u.target) || u.hostId !== undefined && typeof u.hostId !== 'string' || u.branch !== undefined && (!(has(BRANCHES, u.branch) || u.branch === 'both') || u.lvl < 3 || u.k === 'bunker')
       || !num(u.cd, 0, 60) || !Array.isArray(u.buffs) || !u.buffs.every((b: unknown) => obj(b) && num(b.left, 0, 60) && num(b.haste, 1, 10) && num(b.power, 1, 10))
       || !Array.isArray(u.skills) || u.skills.length > SKILL_SLOTS) return false;
     ids.add(u.id);
@@ -154,7 +154,7 @@ export function validateSave(v: unknown): v is RunSave {
     } else {
       const host = v.units.find((h: any) => h.id === u.hostId);
       const slot = `${u.hostId}:${u.slot}`;
-      if (!['marine', 'firebat'].includes(u.k) || !host || host.k !== 'bunker' || host.hostId || host.c !== u.c || host.r !== u.r || !integer(u.slot, 0, 3) || slots.has(slot)) return false;
+      if (!['marine', 'firebat'].includes(u.k) || !host || host.k !== 'bunker' || host.hostId || host.c !== u.c || host.r !== u.r || !integer(u.slot, 0, v.augments?.includes('fortress') ? 5 : 3) || slots.has(slot)) return false;
       slots.add(slot);
     }
   }

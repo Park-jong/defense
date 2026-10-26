@@ -12,10 +12,10 @@ import { loadCommandIcons } from './commandIcons';
 import { addConsoleChrome, CONSOLE_RISE, consoleContains, loadConsoleChrome } from './consoleChrome';
 import { DamageKind, DamageNumbers } from './damageNumbers';
 import { ShopState, SupplyShop } from './shop';
-import { levelStats, MAX_UNIT_LEVEL, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
-import { BUNKER_BARREL_LENGTH, BUNKER_CAPACITY, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
+import { levelStats, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
+import { BUNKER_BARREL_LENGTH, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
 import { createMapRuntime, highGroundRangeBonus, type MapRuntime, type Point } from './game/map';
-import { AIUR_RANGE, AMON_LEAK, AMON_SCALE, AUGMENTS, AUGMENT_WAVES, AugmentKey, AugmentOffer, YAMATO_WIDTH, STORM_FREE_CASTS, amonDue, augmentEligible, augmentOffer, branchCost, damageMultiplier, drawAugment, eliteBonus, placeCost, relocateCost, setActiveAugments, skillCost, skillLocked, hasAugment } from './augments';
+import { Army, FORTRESS_RANGE, HANGAR_INTERCEPTORS, INVESTMENT_GOLD, SIEGE_RANGE, STASIS_BOSS_TIME, STASIS_TIME, bossDamageMultiplier, bountyMultiplier, bunkerCapacity, clearBonusMultiplier, commanderCooldownScale, maxLives, maxUnitLevel, AIUR_RANGE, AMON_LEAK, AMON_SCALE, AUGMENTS, AUGMENT_WAVES, AugmentKey, AugmentOffer, YAMATO_WIDTH, STORM_FREE_CASTS, amonDue, augmentEligible, augmentOffer, branchCost, damageMultiplier, drawAugment, eliteBonus, placeCost, relocateCost, setActiveAugments, skillCost, skillLocked, hasAugment } from './augments';
 import { ACHIEVEMENTS, allowedUnit, awardAchievements, Bonuses, bossPattern, Branch, BranchState, COMMANDERS, hasBranch, CommanderKey, DEFAULT_OPTIONS, DIFFICULTIES, newStats, normalizeStats, Profile, PROFILE_KEY, readProfile, readSave, REWARDS, RewardKey, rewardChoices, RunOptions, RunSave, RunStats, SavedUnit, SAVE_KEY, clearSave, TargetMode, TestScope, validateSave, wavePlan, writeStored } from './campaign';
 import { BattleAudio } from './audio';
 import { CombatEffects } from './combatEffects';
@@ -205,6 +205,7 @@ export class GameScene extends Phaser.Scene {
     this.augments = testAugments; this.augmentSeen = [...testAugments]; this.augmentOffer = null; this.strikeEcho = 0;
     this.amonSince = testAugments.includes('xelnaga') ? 0 : null;
     setActiveAugments(this.augments);
+    this.lives = maxLives();
     this.operationsOpen = false; this.relocating = null; this.tutorial = this.profile.tutorialDone ? 4 : 0;
     this.opsNotice = ''; this.opsRefresh = 0; this.saveClock = 0; this.checkpoint = readSave();
     this.runLaunched = !!data.launched || this.testMode; this.waveSpawnIndex = 0;
@@ -387,9 +388,12 @@ export class GameScene extends Phaser.Scene {
 
   private useCommander(key: CommanderKey): void {
     if (this.over || this.paused || this.operationsOpen || this.shopOpen || !this.waveActive || this.commander[key] > 0 || key === 'supply' && this.options.mode === 'budget') return;
-    this.commander[key] = COMMANDERS[key].cooldown;
+    // 지휘 과부하: 재사용 대기시간 -40%, 대신 쓸 때마다 기지 내구도 1. 마지막 1칸은 지원으로 소모하지 않는다.
+    if (hasAugment('overload')) { if (this.lives <= 1) return; this.lives--; this.runStats.lost++; }
+    this.commander[key] = COMMANDERS[key].cooldown * commanderCooldownScale();
     if (key === 'supply') this.gold += 100;
     else if (key === 'strike') { this.orbitalStrike(); if (hasAugment('orbital')) this.strikeEcho = .8; }
+    else if (hasAugment('stasis')) for (const e of this.enemies) { if (!e.dead) e.stunT = Math.max(e.stunT, e.type === 'boss' ? STASIS_BOSS_TIME : STASIS_TIME); }
     else for (const e of this.enemies) if (!e.dead) { e.slow = Math.min(e.slow, .35); e.slowT = Math.max(e.slowT, 5); }
     this.audio.play('skill'); this.banner(COMMANDERS[key].name);
   }
@@ -421,9 +425,17 @@ export class GameScene extends Phaser.Scene {
     this.augments.push(key); this.augmentOffer = null; setActiveAugments(this.augments);
     if (key === 'aiur') for (const t of this.towers.filter(t => t.k === 'zealot')) this.sellTower(t);
     if (key === 'xelnaga') this.amonSince = this.wave;
+    if (key === 'investment') this.gold += INVESTMENT_GOLD;
+    if (key === 'glassCannon') this.lives = Math.min(this.lives, maxLives());
+    // 요새화: 이미 지은 벙커에도 5·6번 사격구를 연다.
+    if (key === 'fortress') for (const t of this.towers) if (t.k === 'bunker') while (t.passengers.length < bunkerCapacity()) t.passengers.push(null);
     this.opsNotice = AUGMENTS[key].name + ' 증강을 얻었습니다.'; this.saveCheckpoint(false);
   }
-  private armySize(): number { return this.towers.filter(t => t.k !== 'bunker').length; }
+  private army(): Army {
+    const units = this.towers.filter(t => t.k !== 'bunker');
+    return { size: units.length, terran: units.filter(t => TOWER_DEFS[t.k].faction === 'terran').length, protoss: units.filter(t => TOWER_DEFS[t.k].faction === 'protoss').length };
+  }
+  private armySize(): number { return this.army().size; }
 
   private toggleAutoCommander(key: CommanderKey): void {
     if (this.autoCommander.delete(key)) { this.banner(COMMANDERS[key].name + ' 자동 사용 해제'); return; }
@@ -435,7 +447,7 @@ export class GameScene extends Phaser.Scene {
     if (key === 'power') this.bonuses.power += .12;
     if (key === 'haste') this.bonuses.haste += .1;
     if (key === 'range') this.bonuses.range += 12;
-    if (key === 'repair') this.lives = Math.min(20, this.lives + 4);
+    if (key === 'repair') this.lives = Math.min(maxLives(), this.lives + 4);
     if (key === 'supply' && this.options.mode !== 'budget') this.gold += 150;
     this.rewarded = this.wave; this.pending = []; this.opsNotice = REWARDS[key].name + ' 보상을 획득했습니다.'; this.saveCheckpoint(false);
   }
@@ -721,7 +733,7 @@ export class GameScene extends Phaser.Scene {
       this.uiCache.hud = hud;
       this.hud.setText(`WAVE  ${String(this.wave).padStart(2, '0')} / ${this.options.mode === 'endless' ? '∞' : MAX_WAVE}`);
       this.mineralTxt.setText(this.gold.toLocaleString());
-      this.lifeTxt.setText(`${Math.max(0, this.lives)} / 20`);
+      this.lifeTxt.setText(`${Math.max(0, this.lives)} / ${maxLives()}`);
       this.lifeTxt.setColor(this.lives <= 5 ? '#e29a7f' : '#b7dc8e');
       this.goBtn.set(this.over ? '작전 종료' : this.waveActive ? `${MOBILE_LAYOUT ? '교전' : '교전 중'} · 남은 적 ${remaining}` : `▶  웨이브 시작${this.kb('  [SPACE]')}`);
     }
@@ -738,8 +750,8 @@ export class GameScene extends Phaser.Scene {
       const terrainHint = highGround ? ` · 고지 +${highGround}` : '';
       if (k === 'bunker') {
         const crew = t?.passengers.filter((p): p is Tower => !!p) ?? [];
-        title = `벙커  ${crew.length}/${BUNKER_CAPACITY} 주둔`;
-        msg = `보병 최대 4기 · 사거리 +${BUNKER_RANGE_BONUS}${terrainHint}\n` + (crew.length ? crew.map(p => `${TOWER_DEFS[p.k].name} Lv.${p.lvl} · 스킬 ${p.skills.length}/2`).join('\n') : '현재 주둔 병력 없음\n빈 벙커는 공격하지 않습니다.\n명령 아이콘으로 탑승·구매');
+        title = `벙커  ${crew.length}/${bunkerCapacity()} 주둔`;
+        msg = `보병 최대 ${bunkerCapacity()}기 · 사거리 +${BUNKER_RANGE_BONUS + (hasAugment('fortress') ? FORTRESS_RANGE : 0)}${terrainHint}\n` + (crew.length ? crew.map(p => `${TOWER_DEFS[p.k].name} Lv.${p.lvl} · 스킬 ${p.skills.length}/2`).join('\n') : '현재 주둔 병력 없음\n빈 벙커는 공격하지 않습니다.\n명령 아이콘으로 탑승·구매');
       } else if (k === 'support' || k === 'observer') {
         msg = `지원 사거리 ${st.range.toFixed(0)}${terrainHint}\n` + (k === 'support'
           ? `공속 +${Math.round(vesselAuraBonus(t?.lvl ?? 1) * 100)}% · 2대 중첩(추가 ${VESSEL_AURA.secondary * 100}%)\nEMP · ${VESSEL_EMP.cooldown}초마다 보호막 ${VESSEL_EMP.shieldFraction * 100}% 제거\n표적 주변 반경 ${VESSEL_EMP.radius} · 자동 사용`
@@ -793,7 +805,8 @@ export class GameScene extends Phaser.Scene {
       active: this.building === key, hotkey: this.kb(String(i + 1)),
     }));
     if (t.k === 'bunker') {
-      t.passengers.forEach((crew, i) => {
+      // 명령 카드는 4칸만 보여 준다. 요새화의 5·6번 사격구는 주둔 상세 관리에서 다룬다.
+      t.passengers.slice(0, 4).forEach((crew, i) => {
         cells[i] = crew ? make('crew:' + crew.id, `${TOWER_DEFS[crew.k].name} Lv.${crew.lvl}`, 'unit_' + crew.k,
           '탑승 병력을 선택합니다. 다음 명령 칸에서 하차 없이 강화·스킬을 장착할 수 있습니다.', () => this.selectUnit(crew.id))
           : make('empty:' + i, '빈 사격구', 'cmd_empty', '마린·파이어뱃 아이콘으로 병력을 구매하면 자동으로 탑승합니다.', () => {}, false);
@@ -810,8 +823,8 @@ export class GameScene extends Phaser.Scene {
         () => this.applyOrder({ type: 'upgrade' }, { bunkerId: t.id }), !!plan.ids.length && this.gold >= plan.cost, plan.cost);
       cells[7] = make('garrison:' + t.id, '주둔 상세 관리', 'cmd_manage', '병력 이동·하차와 벙커별 일괄 스킬을 관리합니다.', () => this.openShop('garrison'));
     } else {
-      const cost = this.upgradeCost(t), max = t.lvl >= MAX_UNIT_LEVEL;
-      cells[0] = { ...make('upgrade:' + t.id, '일반 강화', 'cmd_upgrade', max ? `최대 Lv.${MAX_UNIT_LEVEL} 강화가 완료되었습니다.`
+      const cost = this.upgradeCost(t), max = t.lvl >= maxUnitLevel();
+      cells[0] = { ...make('upgrade:' + t.id, '일반 강화', 'cmd_upgrade', max ? `최대 Lv.${maxUnitLevel()} 강화가 완료되었습니다.`
         : `Lv.${t.lvl} → Lv.${t.lvl + 1}\n공격력 ×1.6 · 기본 사거리 +8% · 공격 간격 감소`,
         () => this.upgradeUnit(t.id), !max && this.gold >= cost, max ? undefined : cost), hotkey: this.kb('U'), badge: max ? 'MAX' : 'Lv' + t.lvl, active: max };
       SKILL_KEYS.filter(key => SKILL_DEFS[key].unit === t.k).forEach((key, i) => {
@@ -936,7 +949,7 @@ export class GameScene extends Phaser.Scene {
   private shopState(): ShopState {
     return { gold: this.gold, selectedId: this.selected?.id ?? null, mode: this.options.mode,
       units: this.towers.map(t => ({ id: t.id, k: t.k, lvl: t.lvl, skills: t.skills, c: t.c, r: t.r,
-        stats: this.stats(t), nextStats: this.stats({ ...t, lvl: Math.min(MAX_UNIT_LEVEL, t.lvl + 1) }),
+        stats: this.stats(t), nextStats: this.stats({ ...t, lvl: Math.min(maxUnitLevel(), t.lvl + 1) }),
         hostId: t.host?.id, passengers: t.passengers.map(p => p?.id ?? null) })) };
   }
 
@@ -980,15 +993,19 @@ export class GameScene extends Phaser.Scene {
     const power = (t.buffs ?? []).reduce((v, b) => v * b.power, 1);
     return {
       dmg: base.dmg * power * (1 + this.bonuses.power) * (hasBranch(t.branch, 'power') ? 1.7 : 1),
-      range: this.supportRange(t) + (t.host ? BUNKER_RANGE_BONUS : 0),
-      rate: base.rate * (hasBranch(t.branch, 'power') ? 1.15 : 1) / haste,
-      splash: d.splash ? d.splash * (1 + .1 * l) * (hasBranch(t.branch, 'rapid') ? 1.35 : 1) : 0,
+      range: this.supportRange(t) + (t.host ? BUNKER_RANGE_BONUS + (hasAugment('fortress') ? FORTRESS_RANGE : 0) : 0),
+      rate: base.rate * (hasBranch(t.branch, 'power') ? 1.15 : 1) * (t.k === 'cannon' && hasAugment('siegeMode') ? 1.2 : 1) / haste,
+      splash: d.splash ? d.splash * (1 + .1 * l) * (hasBranch(t.branch, 'rapid') ? 1.35 : 1) * this.splashAugment(t.k) : 0,
       slow: d.slow ? Math.max(.2, d.slow - .08 * l) : 0,
     };
   }
+  /** 시즈 모드 확장(시즈 탱크 +30%)과 확장 격납고(리버 스캐럽 +40%)의 폭발 범위 배율. */
+  private splashAugment(k: TowerKey): number {
+    return k === 'cannon' && hasAugment('siegeMode') ? 1.3 : k === 'reaver' && hasAugment('hangar') ? 1.4 : 1;
+  }
   private supportRange(t: StatsUnit): number {
     return levelStats(t.k, t.lvl).range + this.bonuses.range + highGroundRangeBonus(this.map, t.c ?? -1, t.r ?? -1) + (['support', 'observer'].includes(t.k) && t.branch ? SUPPORT_BRANCH_RANGE : 0)
-      + (t.k === 'zealot' && hasAugment('aiur') ? AIUR_RANGE : 0);
+      + (t.k === 'zealot' && hasAugment('aiur') ? AIUR_RANGE : 0) + (t.k === 'cannon' && hasAugment('siegeMode') ? SIEGE_RANGE : 0);
   }
   private upgradeCost(t: Tower): number { return unitUpgradeCost(t); }
   private sellValue(t: Tower): number { return Math.round(t.spent * .7); }
@@ -1020,7 +1037,7 @@ export class GameScene extends Phaser.Scene {
     if (k === 'cruiser') this.tweens.add({ targets: barrel, y: y - 2, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
     if (k === 'frost') this.tweens.add({ targets: barrel, alpha: { from: .72, to: 1 }, duration: 1100, yoyo: true, repeat: -1 });
     this.fxPlace.explode(8, x, y);
-    const t: Tower = { id: String(++this.nextUnitId), k, c, r, x, y, lvl: 1, cd: 0, shotPort: 0, spent: placeCost(k), base, barrel, skills: [], buffs: [], passengers: Array(BUNKER_CAPACITY).fill(null), target: 'first' };
+    const t: Tower = { id: String(++this.nextUnitId), k, c, r, x, y, lvl: 1, cd: 0, shotPort: 0, spent: placeCost(k), base, barrel, skills: [], buffs: [], passengers: Array(bunkerCapacity()).fill(null), target: 'first' };
     this.towers.push(t);
     this.runStats.units.push({ id: t.id, k, damage: 0, boss: 0, kills: 0 });
     if (!this.usedKinds.includes(k)) this.usedKinds.push(k);
@@ -1030,7 +1047,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private boardingSlot(id: string, slot: number): Tower | undefined {
-    if (this.over || !Number.isInteger(slot) || slot < 0 || slot >= BUNKER_CAPACITY) return;
+    if (this.over || !Number.isInteger(slot) || slot < 0 || slot >= bunkerCapacity()) return;
     return this.towers.find(t => t.id === id && t.k === 'bunker' && !t.passengers[slot]);
   }
 
@@ -1089,7 +1106,7 @@ export class GameScene extends Phaser.Scene {
 
   private upgradeUnit(id: string): boolean {
     const t = this.towers.find(t => t.id === id);
-    if (this.over || !t || t.k === 'bunker' || t.lvl >= MAX_UNIT_LEVEL || this.gold < this.upgradeCost(t)) return false;
+    if (this.over || !t || t.k === 'bunker' || t.lvl >= maxUnitLevel() || this.gold < this.upgradeCost(t)) return false;
     const c = this.upgradeCost(t);
     this.gold -= c; t.spent += c; t.lvl++;
     const scale = UNIT_WORLD_SCALE[t.k] ?? 1;
@@ -1159,7 +1176,7 @@ export class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: sprite, scale: { from: 0, to: 1 }, duration: 200 });
     this.enemies.push({
       type, sprite, x: sprite.x, y: sprite.y, seg: parent?.seg ?? 1, hp, max: hp, speed: d.speed * DIFFICULTIES[this.options.difficulty].speed,
-      slow: 1, slowT: 0, reward: child ? 0 : d.reward + Math.floor(this.wave / 4), r: d.r,
+      slow: 1, slowT: 0, reward: child ? 0 : (d.reward + Math.floor(this.wave / 4)) * bountyMultiplier(type), r: d.r,
       route, shield: type === 'boss' ? hp * this.bossShield(this.wave) : 0, pulse: type === 'boss' ? 8 : 2, age: 0, spawned: child,
       stunT: 0, burnT: 0, burnDps: 0, vulnerableT: 0,
     });
@@ -1314,7 +1331,7 @@ export class GameScene extends Phaser.Scene {
       this.recordWave();
       if (this.wave >= MAX_WAVE && !this.testMode && this.options.mode !== 'endless') this.endGame(true);
       else {
-        const bonus = this.options.mode === 'budget' ? 0 : CLEAR_BONUS_BASE + this.wave * CLEAR_BONUS_PER_WAVE;
+        const bonus = this.options.mode === 'budget' ? 0 : Math.round((CLEAR_BONUS_BASE + this.wave * CLEAR_BONUS_PER_WAVE) * clearBonusMultiplier());
         this.gold += bonus;
         this.banner(`구역 확보 · +${bonus} 미네랄`);
         this.audio.play('clear');
@@ -1337,7 +1354,7 @@ export class GameScene extends Phaser.Scene {
     if (e.type === 'boss') {
       e.pulse = 8;
       const phase = this.wave >= 50 ? Math.floor(e.age / 8) % 3 : Math.floor(this.wave / 10) - 1;
-      if (phase === 0) { e.shield = Math.max(e.shield ?? 0, e.max * .18); this.skillRing(e.x, e.y, 40, 0x8ab6ff); }
+      if (phase === 0) { e.shield = Math.max(e.shield ?? 0, e.max * .18 * (hasAugment('crownHunter') ? .5 : 1)); this.skillRing(e.x, e.y, 40, 0x8ab6ff); }
       if (phase === 1) { this.spawn('grunt', e, true); this.spawn('grunt', e, true); this.spawn('medic', e, true); }
       if (phase === 2) {
         if (this.wave >= 50) { e.hasteT = 4; this.skillRing(e.x, e.y, 40, 0xffb76f); }
@@ -1434,7 +1451,7 @@ export class GameScene extends Phaser.Scene {
       this.skillRing(best.x, best.y, st.splash, d.proj); return;
     }
     if (t.k === 'carrier' || t.k === 'goliath' || t.k === 'scout') {
-      const count = t.k === 'carrier' ? attackCount(t.k) : 2;
+      const count = t.k === 'carrier' ? attackCount(t.k) + (hasAugment('hangar') ? HANGAR_INTERCEPTORS : 0) : 2;
       for (let i = 0; i < count; i++) {
         const offset = (i - (count - 1) / 2) * (t.k === 'carrier' ? 6 : 9);
         const x = t.x + Math.cos(angle) * 18 - Math.sin(angle) * offset;
@@ -1526,7 +1543,7 @@ export class GameScene extends Phaser.Scene {
     if (e.dead || !Number.isFinite(dmg) || dmg <= 0) return;
     // 증강의 피해 배율은 병력이 주는 기본 공격·스킬·지속 피해에 모두 적용한다(사령관 지원 제외).
     const unit = source && source !== 'commander' ? this.towers.find(t => t.id === source) : undefined;
-    const amount = dmg * (1 + weaknessBonus(e)) * (unit ? damageMultiplier(unit.k, this.armySize()) : 1);
+    const amount = dmg * (1 + weaknessBonus(e)) * (unit ? damageMultiplier(unit.k, this.army()) * (e.type === 'boss' ? bossDamageMultiplier() : 1) : 1);
     const absorbed = Math.min(e.shield ?? 0, amount);
     e.shield = Math.max(0, (e.shield ?? 0) - absorbed);
     const dealt = Math.min(e.hp, amount - absorbed);
@@ -1657,7 +1674,7 @@ export class GameScene extends Phaser.Scene {
         this.skillRing(target.x, target.y, 95, d.color); break;
       case 'khaydarin':
         t.buffs.push({ left: 6, haste: 1.3, power: 1.5 }); this.skillRing(t.x, t.y, 35, d.color); break;
-      case 'scarab': area(target.x, target.y, 110, 2.8); this.fxBoom.explode(24, target.x, target.y); break;
+      case 'scarab': area(target.x, target.y, 110 * this.splashAugment('reaver'), 2.8); this.fxBoom.explode(24, target.x, target.y); break;
       case 'scarabUpgrade':
         t.buffs.push({ left: 6, haste: 1, power: 1.6 }); this.skillRing(t.x, t.y, 35, d.color); break;
       case 'scoutVolley':
@@ -1837,7 +1854,7 @@ export class GameScene extends Phaser.Scene {
     // A small base-integrity meter beneath the top resource readout.
     const m = this.lifeMeter;
     mini.fillStyle(0x0b120e).fillRect(m.x, m.y, m.w, 9);
-    mini.fillStyle(this.lives <= 5 ? 0xcf8067 : 0x9dc278).fillRect(m.x + 2, m.y + 2, (m.w - 4) * Math.max(0, this.lives) / 20, 5);
+    mini.fillStyle(this.lives <= 5 ? 0xcf8067 : 0x9dc278).fillRect(m.x + 2, m.y + 2, (m.w - 4) * Math.max(0, this.lives) / maxLives(), 5);
   }
 
   private endGame(win: boolean): void {

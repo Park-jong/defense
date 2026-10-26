@@ -5,7 +5,7 @@ import { commandIconUrl } from './commandIcons';
 import { ACHIEVEMENTS, bossPattern, BRANCHES, COMMANDERS, CommanderKey, DIFFICULTIES, ENEMY_INFO, MODES, Profile, REWARDS, RewardKey, RunOptions, RunSave, RunStats, SavedUnit, TARGETS, TargetMode, hasBranch, TEST_SCOPES, TestScope, UnitRecord, wavePlan } from './campaign';
 import { adoptTitles, bindTips, createTip, placeTip, textTip } from './gameTip';
 import { supportTraits } from './support';
-import { AUGMENTS, AUGMENT_KEYS, AUGMENT_TIERS, AugmentKey, AugmentOffer, amonDue, branchCost, hasAugment, relocateCost } from './augments';
+import { AUGMENTS, AUGMENT_KEYS, AUGMENT_TIERS, AugmentKey, AugmentOffer, amonDue, branchCost, commanderCooldownScale, hasAugment, relocateCost } from './augments';
 import './operations.css';
 
 export interface OperationsView {
@@ -209,7 +209,7 @@ export class OperationsCenter {
     if (kind === 'commander') {
       const k = key as CommanderKey, v = this.actions.view(), cooldown = Math.ceil(v.commander[k]), auto = v.autoCommander.includes(k);
       const blocked = v.options.mode === 'budget' && k === 'supply';
-      return `<header>${icon(k)}<b>${COMMANDERS[k].name}<small>사령관 지원</small></b>${auto ? '<span class="ops-tip-auto">AUTO</span>' : ''}</header><p>${COMMANDERS[k].desc}</p><footer><span>${icon('clock')}재사용 ${COMMANDERS[k].cooldown}초</span>${cooldown > 0 ? `<span class="ops-tip-wait">남은 ${cooldown}초</span>` : ''}</footer>${blocked ? '<p class="ops-tip-note">제한 예산 작전에서는 사용할 수 없습니다.</p>' : ''}<p class="ops-tip-hint"><kbd>우클릭</kbd>쿨타임마다 자동 사용 ${auto ? '끄기' : '켜기'}</p>`;
+      return `<header>${icon(k)}<b>${COMMANDERS[k].name}<small>사령관 지원</small></b>${auto ? '<span class="ops-tip-auto">AUTO</span>' : ''}</header><p>${COMMANDERS[k].desc}</p><footer><span>${icon('clock')}재사용 ${Math.round(COMMANDERS[k].cooldown * commanderCooldownScale())}초</span>${cooldown > 0 ? `<span class="ops-tip-wait">남은 ${cooldown}초</span>` : ''}</footer>${blocked ? '<p class="ops-tip-note">제한 예산 작전에서는 사용할 수 없습니다.</p>' : ''}<p class="ops-tip-hint"><kbd>우클릭</kbd>쿨타임마다 자동 사용 ${auto ? '끄기' : '켜기'}</p>`;
     }
     if (kind === 'enemy') {
       const k = key as EnemyKey;

@@ -1,7 +1,7 @@
 import { MAX_UNIT_LEVEL } from './data/rules';
 import { TOWER_DEFS, type TowerKey } from './data/units';
 import { EquippedSkill, SKILL_DEFS, SKILL_SLOTS, SkillKey } from './catalog';
-import { skillCost, skillLocked, upgradePrice } from './augments';
+import { maxUnitLevel, skillCost, skillLocked, upgradePrice } from './augments';
 
 export { MAX_UNIT_LEVEL } from './data/rules';
 export interface ManagedUnit {
@@ -25,7 +25,7 @@ export function planOrder(units: ManagedUnit[], order: UnitOrder, scope: UnitSco
   const eligible = units.filter(unit => {
     if (unit.k === 'bunker' || scope.bunkerId !== undefined && unit.hostId !== scope.bunkerId
       || scope.kind !== undefined && unit.k !== scope.kind) return false;
-    if (order.type === 'upgrade') return unit.lvl < MAX_UNIT_LEVEL;
+    if (order.type === 'upgrade') return unit.lvl < maxUnitLevel();
     const skill = SKILL_DEFS[order.key];
     return !!skill && skill.unit === unit.k && !skillLocked(unit.k) && unit.skills.length < SKILL_SLOTS && !unit.skills.some(s => s.key === order.key);
   });

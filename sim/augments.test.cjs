@@ -38,8 +38,8 @@ test('증강 후보는 카드마다 등급을 굴리고, 출현한 증강과 같
   assert.equal(offer.cards.length, 3); assert.equal(new Set(offer.cards).size, 3);
   assert.ok(!offer.cards.includes('factory') && !offer.cards.includes('yamato'));
   assert.deepEqual(offer.rerolled, [false, false, false]);
-  // 실버·골드가 아직 없으므로 어떤 등급이 나와도 가까운 등급(프리즘)으로 넘어간다.
-  assert.ok(aug.drawAugment(10, new Set(), all, sequence([0, 0])));
+  // 실버가 아직 없으므로 실버가 나오면 가까운 등급(골드)으로 넘어간다.
+  assert.equal(aug.AUGMENTS[aug.drawAugment(10, new Set(), all, sequence([0, 0]))].tier, 'gold');
   const seen = new Set(aug.AUGMENT_KEYS.slice(0, -1));
   assert.deepEqual(aug.augmentOffer(30, seen, all).cards, [aug.AUGMENT_KEYS.at(-1)]);
   assert.equal(aug.drawAugment(30, new Set(aug.AUGMENT_KEYS), all), null);
@@ -144,10 +144,10 @@ test('이중 특화는 두 갈래를 모두 고르게 하고 두 효과를 함�
 
 test('정예 소대는 병력 6기 이하에서만 공격력·공격 속도 +60%다', () => {
   const s = setup(['elite']), t = place(s, 'marine');
-  assert.equal(aug.damageMultiplier('marine', s.armySize()), 1.6);
+  assert.equal(aug.damageMultiplier('marine', s.army()), 1.6);
   const fast = s.stats(t).rate;
   for (let c = 7; c <= 12; c++) place(s, 'marine', c, 1);
-  assert.equal(s.armySize(), 7); assert.equal(aug.damageMultiplier('marine', 7), 1);
+  assert.equal(s.armySize(), 7); assert.equal(aug.damageMultiplier('marine', { size: 7, terran: 7, protoss: 0 }), 1);
   assert.ok(Math.abs(s.stats(t).rate - fast * 1.6) < 1e-6);
 });
 
@@ -170,4 +170,71 @@ test('증강 상태는 저장 검증을 통과하고 잘못된 증강 값은 거
   assert.equal(rules.validateSave({ ...save, augments: ['nope'] }), false);
   assert.equal(rules.validateSave({ ...save, augmentOffer: { cards: ['factory'], rerolled: [] } }), false);
   assert.equal(rules.validateSave({ ...save, amonSince: 99 }), false);
+});
+
+test('현상금 사냥은 특수 적 처치 보상을 3배로, 선행 투자는 즉시 400과 함께 클리어 보너스를 절반으로 만든다', () => {
+  const s = setup(['bounty']); s.wave = 12;
+  const medic = spawn(s, 'medic'), grunt = spawn(s, 'grunt'), base = config.ENEMY_DEFS.medic.reward + 3;
+  assert.equal(medic.reward, base * 3); assert.equal(grunt.reward, config.ENEMY_DEFS.grunt.reward + 3);
+  const t = setup(), gold = t.gold; t.augmentOffer = { cards: ['investment'], rerolled: [false] }; t.saveCheckpoint = () => {};
+  t.pickAugment('investment'); assert.equal(t.gold - gold, 400); assert.equal(aug.clearBonusMultiplier(), .5);
+});
+
+test('요새화는 이미 지은 벙커까지 사격구를 6칸으로 늘리고 주둔 보병 사거리를 +30 한다', () => {
+  const s = setup(), b = place(s, 'bunker'); s.saveCheckpoint = () => {};
+  for (let i = 0; i < 4; i++) assert.ok(s.recruit(b.id, i, 'marine'));
+  assert.equal(s.boardingSlot(b.id, 4), undefined);
+  const before = s.stats(b.passengers[0]).range;
+  s.augmentOffer = { cards: ['fortress'], rerolled: [false] }; s.pickAugment('fortress');
+  assert.equal(b.passengers.length, 6); assert.ok(s.recruit(b.id, 5, 'firebat')); assert.equal(b.passengers[5].k, 'firebat');
+  assert.equal(s.stats(b.passengers[0]).range, before + 30);
+  assert.equal(place(s, 'bunker', 9, 1).passengers.length, 6);
+});
+
+test('시즈 모드 확장과 확장 격납고는 해당 병력의 사거리·범위·인터셉터를 바꾼다', () => {
+  const plain = setup(), tank = place(plain, 'cannon'), reaver = place(plain, 'reaver', 8, 1), a = plain.stats(tank), r = plain.stats(reaver);
+  aug.setActiveAugments(['siegeMode', 'hangar']);
+  const b = plain.stats(tank);
+  assert.equal(b.range, a.range + 60); assert.ok(Math.abs(b.splash - a.splash * 1.3) < 1e-9); assert.ok(Math.abs(b.rate - a.rate * 1.2) < 1e-9);
+  assert.ok(Math.abs(plain.stats(reaver).splash - r.splash * 1.4) < 1e-9);
+  const carrier = place(plain, 'carrier', 10, 1), e = spawn(plain); e.hp = e.max = 1e7; plain.projs = [];
+  plain.fire(carrier, e, plain.stats(carrier)); assert.equal(plain.projs.length, config.TOWER_DEFS.carrier.attackCount + 4);
+});
+
+test('연합 전선·단일 혈통·유리 대포는 병력 구성과 함께 피해 배율을 바꾸고, 유리 대포는 기지 내구도를 10으로 낮춘다', () => {
+  setup(['alliance']);
+  assert.equal(aug.damageMultiplier('marine', { size: 6, terran: 3, protoss: 3 }), 1.2);
+  assert.equal(aug.damageMultiplier('marine', { size: 5, terran: 3, protoss: 2 }), 1);
+  aug.setActiveAugments(['pureBlood']);
+  assert.equal(aug.damageMultiplier('zealot', { size: 4, terran: 0, protoss: 4 }), 1.3);
+  assert.equal(aug.damageMultiplier('zealot', { size: 5, terran: 1, protoss: 4 }), 1);
+  const s = setup(); s.lives = 18; s.augmentOffer = { cards: ['glassCannon'], rerolled: [false] }; s.saveCheckpoint = () => {};
+  s.pickAugment('glassCannon'); assert.equal(s.lives, 10); assert.equal(aug.maxLives(), 10);
+  assert.equal(aug.damageMultiplier('marine', { size: 1, terran: 1, protoss: 0 }), 1.5);
+  s.pending = ['repair']; s.wave = 5; s.rewarded = 0; s.lives = 8; s.takeReward('repair'); assert.equal(s.lives, 10);
+});
+
+test('숙련병은 최대 레벨을 7로 올리고 강화 비용을 30% 늘린다', () => {
+  const plain = setup(), t = place(plain, 'marine'); t.lvl = 5;
+  const base = load('./management').unitUpgradeCost({ k: 'marine', lvl: 5 });
+  assert.equal(plain.upgradeUnit(t.id), false);
+  aug.setActiveAugments(['veteran']); plain.augments = ['veteran'];
+  assert.equal(load('./management').unitUpgradeCost({ k: 'marine', lvl: 5 }), Math.round(base * 1.3));
+  assert.ok(plain.upgradeUnit(t.id)); assert.ok(plain.upgradeUnit(t.id)); assert.equal(t.lvl, 7); assert.equal(plain.upgradeUnit(t.id), false);
+});
+
+test('지휘 과부하는 재사용 대기시간을 40% 줄이고 쓸 때마다 기지 내구도 1을 쓰며, 정지장은 시간 교란을 완전 정지로 바꾼다', () => {
+  const s = setup(['overload', 'stasis']); s.waveActive = true; s.lives = 5;
+  const e = spawn(s), boss = spawn(s, 'boss');
+  s.useCommander('slow');
+  assert.equal(s.commander.slow, rules.COMMANDERS.slow.cooldown * .6); assert.equal(s.lives, 4);
+  assert.equal(e.stunT, 3); assert.equal(boss.stunT, 1); assert.equal(e.slow, 1);
+  s.lives = 1; s.useCommander('strike'); assert.equal(s.commander.strike, 0); assert.equal(s.lives, 1);
+});
+
+test('왕관 사냥꾼은 보스에게 주는 병력 피해를 30% 늘리고 보스 보호막 재생을 절반으로 줄인다', () => {
+  const s = setup(['crownHunter']), t = place(s, 'marine'); s.wave = 10;
+  const boss = spawn(s, 'boss'); boss.hp = boss.max = 1000;
+  s.damageEnemy(boss, 10, 'normal', t.id); assert.equal(boss.hp, 987);
+  boss.pulse = 0; boss.age = 0; boss.shield = 0; s.enemyAct(boss, .1); assert.ok(Math.abs(boss.shield - boss.max * .09) < 1e-9);
 });
