@@ -1532,15 +1532,33 @@ export class GameScene extends Phaser.Scene {
     const charged = t.yamatoShots === YAMATO_CHARGE_EVERY, power = charged ? YAMATO_CHARGE_POWER : 1;
     const dx = Math.cos(angle), dy = Math.sin(angle), half = YAMATO_WIDTH * T / 2, reach = 29 * (UNIT_WORLD_SCALE.cruiser ?? 1);
     const bow = { x: t.x + dx * reach, y: t.y + dy * reach }, end = { x: t.x + dx * st.range, y: t.y + dy * st.range };
+    const hits: Enemy[] = [];
     for (const e of [...this.enemies]) {
       if (e.dead) continue;
       const along = (e.x - t.x) * dx + (e.y - t.y) * dy, across = Math.abs((e.x - t.x) * dy - (e.y - t.y) * dx);
-      if (along >= 0 && along <= st.range && across <= half) this.damageEnemy(e, st.dmg * power * (e.type === 'boss' ? 2 : 1), 'skill', t.id);
+      if (along >= 0 && along <= st.range && across <= half) { hits.push(e); this.damageEnemy(e, st.dmg * power * (e.type === 'boss' ? 2 : 1), 'skill', t.id); }
     }
-    const core = this.add.circle(bow.x, bow.y, charged ? 10 : 6, 0xffda8a, .85).setStrokeStyle(2, 0xfff2c8).setDepth(12);
-    this.tweens.add({ targets: core, scale: charged ? 3.2 : 2.2, alpha: 0, duration: charged ? 420 : 300, onComplete: () => core.destroy() });
-    this.skillBeam(bow, end, SKILL_DEFS.yamato.color, half * (charged ? 3 : 2));
-    if (charged) { this.fxBoom.explode(24, end.x, end.y); this.audio.play('skill'); }
+    if (charged) { this.yamatoChargeFx(t, bow, end, half, hits); return; }
+    const core = this.add.circle(bow.x, bow.y, 6, 0xffda8a, .85).setStrokeStyle(2, 0xfff2c8).setDepth(12);
+    this.tweens.add({ targets: core, scale: 2.2, alpha: 0, duration: 300, onComplete: () => core.destroy() });
+    this.skillBeam(bow, end, SKILL_DEFS.yamato.color, half * 2);
+  }
+
+  /** 5발째 강화 포격: 주황 포선 대신 붉은 외광·흰 심지의 3겹 포선, 포구로 빨려드는 충전 고리, 명중마다 충격파, 끝점 대폭발과 화면 흔들림. */
+  private yamatoChargeFx(t: Tower, bow: Point, end: Point, half: number, hits: Enemy[]): void {
+    const gather = this.add.circle(bow.x, bow.y, 24, 0xff6a4a, .25).setStrokeStyle(3, 0xffc0a0).setDepth(12);
+    this.tweens.add({ targets: gather, scale: { from: 1.6, to: .2 }, alpha: { from: .9, to: 0 }, duration: 260, onComplete: () => gather.destroy() });
+    const flash = this.add.circle(bow.x, bow.y, 12, 0xffffff, .95).setStrokeStyle(3, 0xff7a5a).setDepth(13);
+    this.tweens.add({ targets: flash, scale: 4, alpha: 0, duration: 520, onComplete: () => flash.destroy() });
+    this.skillBeam(bow, end, 0xff4b3a, half * 4);
+    this.skillBeam(bow, end, 0xffe2b0, half * 1.6);
+    this.skillBeam(bow, end, 0xffffff, 3);
+    for (const e of hits) this.skillRing(e.x, e.y, 34, 0xff6a4a);
+    this.skillRing(end.x, end.y, 64, 0xffb681);
+    this.fxBoom.explode(32, end.x, end.y);
+    this.floatText(t.x, t.y - 18, '야마토 포', '#ff9a7a');
+    this.shakeAll(160, .005);
+    this.audio.play('skill');
   }
 
   private findTarget(t: Tower, eligible: (enemy: Enemy) => boolean = () => true): Enemy | null {
