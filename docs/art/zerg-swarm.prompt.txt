@@ -1,0 +1,17 @@
+Generator: built-in image_gen, transparent_background=true
+Output: src/assets/zerg-swarm.png
+
+Use case: stylized-concept. Asset type: production game sprite atlas for a top-down browser RTS tower-defense. Create ONE transparent-background PNG sprite sheet with EXACTLY 4 equal columns and 2 equal rows, 8 cells total, seven isolated Zerg creatures and last cell empty. Landscape aspect ratio 2:1, preferably 1536x768. Each cell is square. Every creature is centered in its own cell with at least 12% empty margin on all sides. No part touches another cell. NO text, labels, dividers, background, ground plane, shadows or scenery. True transparent background.
+Camera and orientation CRITICAL: view FROM DIRECTLY ABOVE, overhead RTS gameplay view, NOT side profile or a cinematic illustration. Every creature faces precisely RIGHT (east), head at right, tail at left, back visible from above, both left and right legs equally visible above and below the body axis. Bilateral symmetry around horizontal body axis. Each creature fills roughly 75% of its cell, all rendered with the same camera and light source upper left. Entire body and appendages visible.
+Style: high quality classic StarCraft Brood War pre-rendered Zerg sprite aesthetic. Organic segmented reddish-brown and dark plum carapace with clear large plates, ivory bone scythes, orange eyes. Broad readable silhouettes for 30-60 pixel display, simplified crisp surface detail, NO black thick cartoon outline, no excessive noise, no fluorescent halos. Highlight edges and anatomical joints with controlled warm amber lighting. The seven silhouettes must be clearly different.
+Row 1 left to right:
+1. ZERGLING: lean compact body, small angular head at right, four powerful limbs and two long ivory hooked scythes curving forward on either side of head; ridged narrow back, short tail at left.
+2. RAPTOR ZERGLING: visibly slimmer elongated body, long powerful swept-back rear jumping legs, twin extended forward bone scythes, swept back dorsal fins, fast predatory silhouette.
+3. ROACH: very broad oval layered shell with three big overlapping brown armor plates, small head at right with short mandibles, six short thick legs, distinctly wider armored low body, no long tusks.
+4. ULTRALISK: huge broad ridged purple-brown armored body, four enormous muscular legs, head at right flanked by TWO MASSIVE ivory curved blade tusks that extend forward to the right on both sides, heavy ridged dorsal crest. Strong boss silhouette.
+Row 2 left to right:
+5. QUEEN: Zerg Queen, narrow raised thorax at right with small crown spines, large abdomen left bearing TWO small pale mint-green fleshy nodes, long articulated spider-like legs radiating to both sides, large angular outline.
+6. BROOD SAC: squat brown low creature, swollen double yellow-green translucent egg sacs at center-left encased in dark ribbed armor, six short claw legs, small pointed head at right. One creature only, no offspring.
+7. DEFILER: very long centipede-like body, clearly segmented narrow reddish-plum plates, eight fine legs on both sides, curved tapering tail to left, hooded broad head right with tiny ivory mandibles, TWO dim violet organic nodes on back. No green sacs, no scorpion pincers.
+8. Leave final cell completely transparent and empty.
+This is a game-ready atlas, not a concept board. Consistent visual mass within each cell (in-game sizes will be set separately). True alpha cutouts only.

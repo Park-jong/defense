@@ -2,10 +2,17 @@ import Phaser from 'phaser';
 import type { MapRuntime } from './game/map';
 import { drawCanyon } from './canyonArt';
 import { drawJunction } from './junctionArt';
-import { ENEMY_DEFS, FONT, MAP_H, RENDER_SCALE, T, TOWER_DEFS, VIEW_H, W } from './config';
+import { FONT, MAP_H, RENDER_SCALE, T, TOWER_DEFS, VIEW_H, W } from './config';
+import { createEnemyArt } from './enemyArt';
+import zergAtlasUrl from './assets/zerg-swarm.png';
 
-/** All art is generated locally: no image downloads or external assets. */
+export function loadEnemyArt(scene: Phaser.Scene): void {
+  if (!scene.textures.exists('zerg:atlas')) scene.load.image('zerg:atlas', zergAtlasUrl);
+}
+
+/** Bundled enemy art and generated combat textures. */
 export function makeTextures(scene: Phaser.Scene): void {
+  createEnemyArt(scene);
   const tex = (key: string, w: number, h: number, fn: (g: Phaser.GameObjects.Graphics) => void) => {
     if (scene.textures.exists(key)) return;
     const g = scene.make.graphics({ x: 0, y: 0 }, false);
@@ -150,27 +157,6 @@ export function makeTextures(scene: Phaser.Scene): void {
         g.fillStyle(color, .65).fillRoundedRect(4, 6, 20, 6, 3);
         g.fillStyle(0xf0ffff).fillRoundedRect(16, 7, 10, 4, 2);
       }
-    });
-  }
-  for (const [k, d] of Object.entries(ENEMY_DEFS)) {
-    const s = d.r * 2 + 12, c = s / 2, r = d.r;
-    tex('enemy_' + k, s, s, g => {
-      g.fillStyle(0x000000, .4).fillEllipse(c + 2, c + 4, r * 2 + 5, r * 1.5);
-      const armor = k === 'boss' ? 0x735280 : k === 'tank' ? 0x88684f : k === 'runner' ? 0x967644 : 0x7d4c4b;
-      for (const sign of [-1, 1]) {
-        for (let j = 0; j < 3; j++) {
-          const yy = c - r * .6 + j * r * .6;
-          g.lineStyle(k === 'boss' ? 3 : 2, 0x312d2b).lineBetween(c - r * .3, yy, c - r * .6, yy + sign * r);
-          g.lineStyle(2, armor).lineBetween(c - r * .6, yy + sign * r, c + r * .5, yy + sign * r * .75);
-        }
-      }
-      g.fillStyle(0x30272b).fillEllipse(c - 2, c, r * 1.8, r * 1.5);
-      g.fillStyle(armor).fillEllipse(c - 3, c - 2, r * 1.5, r * 1.25);
-      g.lineStyle(1, 0xc5a48a, .5).strokeEllipse(c - 3, c - 2, r * 1.5, r * 1.25);
-      g.lineStyle(2, 0x3c3037).lineBetween(c - r, c - 1, c + 3, c - 1);
-      g.fillStyle(0x493240).fillTriangle(c + 1, c - r * .6, c + r + 3, c, c + 1, c + r * .6);
-      g.fillStyle(0xffa36c).fillCircle(c + r * .5, c - 3, 2).fillCircle(c + r * .5, c + 3, 2);
-      if (k === 'boss') g.lineStyle(3, 0xbda8bf).lineBetween(c + 10, c - 9, c + 22, c - 15).lineBetween(c + 10, c + 9, c + 22, c + 15);
     });
   }
   tex('portrait', 100, 116, g => {

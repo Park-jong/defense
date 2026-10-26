@@ -2,7 +2,8 @@ import Phaser from 'phaser';
 import {
   CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE, COLS, SUPPORT_BRANCH_RANGE, CONSOLE_Y, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, FINAL_BOSS_HP_MULT, FONT, GAME_W, H, MAP_H, MAP_Y, MAX_CATCHUP_SEC, MAX_WAVE, MOBILE_LAYOUT, RENDER_SCALE, RIBBON_BAND, ROWS, SIDE_RIBBON_H, SIDE_W, STEP_SEC, T, TEST_GOLD, TOP_BAR_H, TOWER_DEFS, TowerKey, VIEW_H, W,
 } from './config';
-import { drawMap, makeTextures } from './textures';
+import { drawMap, loadEnemyArt, makeTextures } from './textures';
+import { ENEMY_ART, ENEMY_FRAME_COUNT, ENEMY_FRAME_SIZE } from './enemyArt';
 import { attackCount } from './data/units';
 import { Btn, mkBtn } from './ui';
 import { DRAGOON_EMITTER, FIREBAT_MUZZLES, loadBishoujoUnitArt, loadUnitArt, SIEGE_MUZZLE, TURRET_LAUNCH_PORTS, UNIT_WORLD_SCALE } from './unitArt';
@@ -48,6 +49,8 @@ interface Enemy {
   stunT: number; burnT: number; burnDps: number; vulnerableT: number;
   route?: readonly Point[]; shield?: number; pulse?: number; age?: number; hasteT?: number; spawned?: boolean; burnSource?: string;
   observations?: Observation[];
+  /** Distance-driven presentation phase; never used by combat, saves or route selection. */
+  gait?: number;
   /** 젤나가 맙소사의 대가로 나오는 아몬. 보스 패턴을 쓰지만 놓쳐도 기지 내구도만 깎는다. */
   amon?: boolean;
 }
@@ -182,7 +185,7 @@ export class GameScene extends Phaser.Scene {
 
   constructor() { super('game'); }
 
-  preload(): void { loadUnitArt(this); loadCommandIcons(this); if (!MOBILE_LAYOUT) loadConsoleChrome(this); }
+  preload(): void { loadUnitArt(this); loadEnemyArt(this); loadCommandIcons(this); if (!MOBILE_LAYOUT) loadConsoleChrome(this); }
 
   // ---------- 생성 ----------
   create(data: { options?: RunOptions; resume?: RunSave; launched?: boolean } = {}): void {
@@ -1337,13 +1340,16 @@ export class GameScene extends Phaser.Scene {
     const d = ENEMY_DEFS[type];
     const hp = this.enemyHp(type, this.wave);
     const route = parent?.route ?? this.map.routes[(this.waveSpawnIndex++) % this.map.routes.length];
-    const sprite = this.add.image(parent?.x ?? route[0].x, parent?.y ?? route[0].y, 'enemy_' + type).setDepth(8);
-    this.tweens.add({ targets: sprite, scale: { from: 0, to: 1 }, duration: 200 });
+    const scale = ENEMY_ART[type].size / ENEMY_FRAME_SIZE;
+    const gait = this.enemies.length * .381966;
+    const sprite = this.add.image(parent?.x ?? route[0].x, parent?.y ?? route[0].y, 'enemy_' + type, Math.floor(gait * ENEMY_FRAME_COUNT) % ENEMY_FRAME_COUNT).setDepth(8).setScale(scale);
+    if (!parent) sprite.setRotation(Math.atan2(route[1].y - route[0].y, route[1].x - route[0].x));
+    this.tweens.add({ targets: sprite, scale: { from: 0, to: scale }, duration: 200 });
     this.enemies.push({
       type, sprite, x: sprite.x, y: sprite.y, seg: parent?.seg ?? 1, hp, max: hp, speed: d.speed * DIFFICULTIES[this.options.difficulty].speed,
       slow: 1, slowT: 0, reward: child ? 0 : (d.reward + Math.floor(this.wave / 4)) * bountyMultiplier(type), r: d.r,
       route, shield: type === 'boss' ? hp * this.bossShield(this.wave) : 0, pulse: type === 'boss' ? 8 : 2, age: 0, spawned: child,
-      stunT: 0, burnT: 0, burnDps: 0, vulnerableT: 0,
+      stunT: 0, burnT: 0, burnDps: 0, vulnerableT: 0, gait,
     });
   }
 
@@ -1442,12 +1448,15 @@ export class GameScene extends Phaser.Scene {
       const route = e.route ?? this.map.waypoints;
       const accelerated = e.type === 'boss' && ((this.wave === 40 && (e.age ?? 0) % 10 >= 7) || (e.hasteT ?? 0) > 0);
       let mv = stunned ? 0 : e.speed * e.slow * dt * (accelerated ? 1.8 : 1);
+      const travel = mv;
       while (mv > 0 && e.seg < route.length) {
         const tg = route[e.seg], dx = tg.x - e.x, dy = tg.y - e.y, dist = Math.hypot(dx, dy);
         if (dist <= mv) { e.x = tg.x; e.y = tg.y; e.seg++; mv -= dist; }
         else { e.x += dx / dist * mv; e.y += dy / dist * mv; mv = 0; }
       }
       e.sprite.setPosition(e.x, e.y);
+      e.gait = ((e.gait ?? 0) + (travel - mv) / ENEMY_ART[e.type].stride) % 1;
+      e.sprite.setFrame(Math.floor(e.gait * ENEMY_FRAME_COUNT));
       if (e.seg < route.length) e.sprite.setRotation(Math.atan2(route[e.seg].y - e.y, route[e.seg].x - e.x));
       if (stunned) e.sprite.setTint(0xb7f5ff);
       else if (e.burnT > 0) e.sprite.setTint(0xffab69);
@@ -1538,7 +1547,7 @@ export class GameScene extends Phaser.Scene {
         if (heal) ally.hp = Math.min(ally.max, ally.hp + ally.max * .05);
         else ally.shield = Math.max(ally.shield ?? 0, ally.max * .08);
       }
-      this.skillRing(e.x, e.y, heal ? 100 : 95, heal ? 0x76d6a5 : 0x72a9ed);
+      this.skillRing(e.x, e.y, heal ? 100 : 95, heal ? 0x76d6a5 : 0xb596db);
     }
   }
 
@@ -2024,19 +2033,23 @@ export class GameScene extends Phaser.Scene {
     }
     for (const e of this.enemies) {
       if (e.dead) continue;
-      const w = e.r * 2 + 4, x = e.x - w / 2, y = e.y - e.r - 9;
-      g.fillStyle(0x000000, .65).fillRect(x, y, w, 4);
-      g.fillStyle(0x66bb6a).fillRect(x, y, w * Math.max(0, e.hp / e.max), 4);
+      const visualR = ENEMY_ART[e.type].size * .4;
+      const w = e.r * 2 + 4, x = e.x - w / 2, y = e.y - visualR - 7;
+      // Healthy swarms keep their silhouettes; damage reveals a bar, bosses always show one.
+      const healthVisible = e.hp < e.max || e.type === 'boss';
+      if (healthVisible) {
+        g.fillStyle(0x000000, .65).fillRect(x, y, w, 4);
+        g.fillStyle(0x66bb6a).fillRect(x, y, w * Math.max(0, e.hp / e.max), 4);
+      }
       if ((e.shield ?? 0) > 0) {
-        g.fillStyle(0x81b8ff).fillRect(x, y - 4, w * Math.min(1, (e.shield ?? 0) / (e.max * .18)), 2);
-        g.lineStyle(1, 0x81b8ff, .65).strokeCircle(e.x, e.y, e.r + 3);
+        if (healthVisible) g.fillStyle(0xbc9ce1).fillRect(x, y - 4, w * Math.min(1, (e.shield ?? 0) / (e.max * .18)), 2);
+        // A pair of spores conveys protection without covering every creature in an energy dome.
+        g.fillStyle(0xbc9ce1, .8).fillCircle(e.x - 3, e.y + visualR * .6, 1.4).fillCircle(e.x + 3, e.y + visualR * .6, 1.4);
       }
       const observations = Math.min(observationCount(e), OBSERVATION_BONUSES.length);
       for (let i = 0; i < observations; i++) g.fillStyle(0xc4a1ff, .95).fillCircle(e.x + (i - (observations - 1) / 2) * 5, y - 8, 1.6);
-      if (e.type === 'medic') { g.lineStyle(2, 0xc1ffe1).lineBetween(e.x - 4, e.y, e.x + 4, e.y).lineBetween(e.x, e.y - 4, e.x, e.y + 4); }
-      if (e.type === 'splitter') g.lineStyle(1.5, 0xffe4a1).strokeTriangle(e.x - 6, e.y + 5, e.x, e.y - 6, e.x + 6, e.y + 5);
       if (e.stunT > 0) g.lineStyle(1, 0xb4f4ff, .8).strokeCircle(e.x, e.y, e.r + 4);
-      if (e.burnT > 0) g.fillStyle(0xffb456, .8).fillTriangle(e.x - 4, e.y - e.r, e.x, e.y - e.r - 8, e.x + 4, e.y - e.r);
+      if (e.burnT > 0) g.fillStyle(0xffb456, .8).fillTriangle(e.x - 4, e.y - visualR, e.x, e.y - visualR - 8, e.x + 4, e.y - visualR);
     }
     const mini = this.miniGfx;
     mini.clear();

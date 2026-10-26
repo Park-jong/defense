@@ -46,13 +46,13 @@ export const COMMANDERS = {
 };
 export type CommanderKey = keyof typeof COMMANDERS;
 export const ENEMY_INFO: Record<EnemyKey, { name: string; desc: string }> = {
-  grunt: { name: '돌격병', desc: '기본 적. 입구부터 기지까지 이동합니다.' },
-  runner: { name: '질주병', desc: '체력은 낮지만 빠르게 방어선을 돌파합니다.' },
-  tank: { name: '중장갑', desc: '느리고 체력이 높습니다. 집중 화력으로 대응하세요.' },
-  boss: { name: '지휘 개체', desc: '10웨이브마다 출현. 기지에 도달하면 즉시 패배합니다.' },
-  medic: { name: '의무병', desc: '2초마다 주변 100 범위 아군 체력을 최대 체력의 5% 회복합니다.' },
-  splitter: { name: '분열체', desc: '처치하면 같은 위치에서 보상이 없는 질주병 2기가 나타납니다.' },
-  shielder: { name: '보호막 지원병', desc: '3초마다 주변 95 범위 아군에게 최대 체력 8%의 보호막을 부여합니다. 중첩되지 않습니다.' },
+  grunt: { name: '저글링', desc: '낫발톱을 앞세워 몰려오는 군단의 기본 개체. 입구부터 기지까지 이동합니다.' },
+  runner: { name: '랩터 저글링', desc: '긴 뒷다리로 질주하는 변종. 체력은 낮지만 빠르게 방어선을 돌파합니다.' },
+  tank: { name: '바퀴', desc: '두꺼운 겹갑각을 두른 중장갑 개체. 느리고 체력이 높아 집중 화력으로 대응해야 합니다.' },
+  boss: { name: '울트라리스크', desc: '거대한 엄니를 앞세운 군단의 우두머리. 10웨이브마다 출현하며 기지에 도달하면 즉시 패배합니다.' },
+  medic: { name: '여왕', desc: '생체 회복으로 군단을 유지합니다. 2초마다 주변 100 범위 아군 체력을 최대 체력의 5% 회복합니다.' },
+  splitter: { name: '산란낭 변종', desc: '새끼를 품은 산란 개체. 처치하면 같은 위치에서 보상이 없는 랩터 저글링 2기가 나타납니다.' },
+  shielder: { name: '디파일러 변종', desc: '보호 포자를 퍼뜨리는 지원 개체. 3초마다 주변 95 범위 아군에게 최대 체력 8%의 보호막을 부여합니다. 중첩되지 않습니다.' },
 };
 export function bossPattern(wave: number): string {
   return wave >= 50 ? '최종 지휘관 · 보호막/소환/가속 순환' : ['보호막 재생', '부하 소환', '분열 증원', '주기적 가속'][Math.max(0, Math.floor(wave / 10) - 1) % 4];

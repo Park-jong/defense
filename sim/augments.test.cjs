@@ -12,7 +12,7 @@ const rules = load('./campaign'), config = load('./config'), aug = load('./augme
 const { createMapRuntime } = load('./game/map');
 function sprite(x = 0, y = 0) {
   const s = { x, y, visible: true, tint: 0xffffff };
-  for (const k of ['setDepth', 'setOrigin', 'setScale', 'setRotation', 'setStrokeStyle', 'setAlpha', 'setLetterSpacing', 'setInteractive', 'on', 'destroy', 'setText']) s[k] = () => s;
+  for (const k of ['setDepth', 'setOrigin', 'setScale', 'setFrame', 'setRotation', 'setStrokeStyle', 'setAlpha', 'setLetterSpacing', 'setInteractive', 'on', 'destroy', 'setText']) s[k] = () => s;
   s.setPosition = (x, y) => { s.x = x; s.y = y; return s; };
   s.setVisible = v => { s.visible = v; return s; };
   s.setTint = t => { s.tint = t; return s; }; s.clearTint = () => s;

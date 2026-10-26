@@ -26,6 +26,8 @@
 .ops-icon { display:block; flex-shrink:0; object-fit:contain; }
 .ops-enemy { display:inline-flex; align-items:center; gap:3px; color:#b9cba9; }
 .ops-enemy .ops-icon { width:24px; height:24px; }
+.ops-enemy-art { display:block; flex-shrink:0; width:40px; height:40px; object-fit:contain; filter:drop-shadow(0 1px 2px #0008); }
+.ops-enemy .ops-enemy-art { width:28px; height:28px; }
 .ops-enemy b { font:11px monospace; }
 .ops-enemy.is-boss { color:#e9b588; }
 .field-tutorial { display:flex; align-items:center; gap:7px; width:auto; max-width:100%; box-sizing:border-box; flex:1 1 0; min-width:0; margin:0; padding:2px 5px 2px 8px; background:#13221bf2; border:1px solid #3f5a3d; border-radius:8px; font-size:11px; pointer-events:auto; }

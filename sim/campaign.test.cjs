@@ -12,7 +12,7 @@ const rules = load('./campaign'), config = load('./config'), { GameScene } = loa
 const { createMapRuntime } = load('./game/map');
 function sprite(x = 0, y = 0) {
   const s = { x, y, visible: true, tint: 0xffffff };
-  for (const k of ['setDepth', 'setOrigin', 'setScale', 'setRotation', 'setStrokeStyle', 'setAlpha', 'setLetterSpacing', 'setInteractive', 'on', 'destroy', 'setText']) s[k] = () => s;
+  for (const k of ['setDepth', 'setOrigin', 'setScale', 'setFrame', 'setRotation', 'setStrokeStyle', 'setAlpha', 'setLetterSpacing', 'setInteractive', 'on', 'destroy', 'setText']) s[k] = () => s;
   s.setPosition = (x, y) => { s.x = x; s.y = y; return s; };
   s.setVisible = v => { s.visible = v; return s; };
   s.setTint = t => { s.tint = t; return s; }; s.clearTint = () => s;
@@ -170,6 +170,24 @@ test('보스는 10 보호막·20 소환·30 증원·40 가속·50 순환 패턴�
     if (w === 40) { e.age = 7; const x = e.x; s.step(.1); assert.ok(e.x - x > e.speed * .1); }
     if (w === 50) { e.age = 16; e.pulse = 0; s.enemyAct(e, .1); assert.equal(e.hasteT, 4); }
   }
+});
+
+test('저그 보행은 이동 거리를 따르고 기절·감속·보스 가속에도 전투 수치를 바꾸지 않는다', () => {
+  const s = setup(), e = spawn(s);
+  e.route = [{ x: e.x, y: e.y }, { x: e.x + 5000, y: e.y }]; e.gait = 0; e.pulse = 999;
+  const initial = { x: e.x, hp: e.hp, reward: e.reward, r: e.r, speed: e.speed };
+  s.step(.05); const normalGait = e.gait, normalDistance = e.x - initial.x;
+  assert.ok(normalGait > 0);
+  e.stunT = 1; s.step(.05); assert.equal(e.gait, normalGait); assert.equal(e.x, initial.x + normalDistance);
+  e.stunT = 0; e.slow = .5; e.slowT = 1; s.step(.05);
+  assert.ok(Math.abs(e.gait - normalGait * 1.5) < 1e-9);
+  assert.deepEqual({ hp: e.hp, reward: e.reward, r: e.r, speed: e.speed },
+    { hp: initial.hp, reward: initial.reward, r: initial.r, speed: initial.speed });
+  const boss = spawn(s, 'boss'); boss.gait = 0; boss.pulse = 999;
+  boss.route = e.route; boss.hasteT = 1; s.wave = 50;
+  const before = boss.x; s.step(.05);
+  assert.ok(Math.abs(boss.x - before - boss.speed * .05 * 1.8) < 1e-9);
+  const phase = boss.gait; boss.speed = 0; s.step(.05); assert.equal(boss.gait, phase);
 });
 
 test('의무병은 범위 내 체력만 회복하고 보호막 지원은 중첩되지 않는다', () => {

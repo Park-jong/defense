@@ -1,6 +1,7 @@
 import { attackCount, attackDamage, SUPPORT_BRANCH_RANGE, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, GAME_W, MAP_DEFS, MAX_WAVE, MOBILE_LAYOUT, TEST_GOLD, SIDE_W, TOP_BAR_H, TOWER_DEFS, TowerKey, TOWER_KEYS, W } from './config';
 import { SKILL_DEFS, SKILL_KEYS } from './catalog';
 import { unitPortraitUrl } from './unitArt';
+import { enemyPortraitUrl } from './enemyArt';
 import { commandIconUrl } from './commandIcons';
 import { ACHIEVEMENTS, bossPattern, BRANCHES, COMMANDERS, CommanderKey, DIFFICULTIES, ENEMY_INFO, MODES, Profile, REWARDS, RewardKey, RunOptions, RunSave, RunStats, SavedUnit, TARGETS, TargetMode, hasBranch, TEST_SCOPES, TestScope, UnitRecord, wavePlan } from './campaign';
 import { adoptTitles, bindTips, createTip, placeTip, textTip } from './gameTip';
@@ -225,7 +226,7 @@ export class OperationsCenter {
     }
     if (kind === 'enemy') {
       const k = key as EnemyKey;
-      return `<header>${icon(enemyIcons[k])}<b>${ENEMY_INFO[k].name}<small>이번 웨이브 ${extra}기</small></b></header><p>${ENEMY_INFO[k].desc}</p><footer><span>기본 체력 ${ENEMY_DEFS[k].hp}</span><span>속도 ${ENEMY_DEFS[k].speed}</span></footer>`;
+      return `<header>${this.enemyArt(k)}<b>${ENEMY_INFO[k].name}<small>이번 웨이브 ${extra}기</small></b></header><p>${ENEMY_INFO[k].desc}</p><footer><span>기본 체력 ${ENEMY_DEFS[k].hp}</span><span>속도 ${ENEMY_DEFS[k].speed}</span></footer>`;
     }
     if (kind === 'stat') { const [i, label, desc] = compareHead[Number(key)]; return `<header>${icon(i)}<b>${label}</b></header><p>${desc}</p>`; }
     if (kind === 'skill') {
@@ -252,11 +253,15 @@ export class OperationsCenter {
   }
   private hideTip(): void { this.tip.hidden = true; }
   private art(key: TowerKey): string { return `<img class="ops-unit-art" src="${unitPortraitUrl(key)}" width="64" height="64" alt="" aria-hidden="true">`; }
+  private enemyArt(key: EnemyKey): string {
+    const url = enemyPortraitUrl(key);
+    return url ? `<img class="ops-enemy-art" src="${url}" width="40" height="40" alt="" aria-hidden="true">` : icon(enemyIcons[key]);
+  }
   private enemies(wave: number, scope: TestScope = 'all'): string {
     const plan = wavePlan(wave, scope);
     return (Object.keys(ENEMY_DEFS) as EnemyKey[]).filter(k => plan.includes(k)).map(k => {
       const count = plan.filter(x => x === k).length, label = `${ENEMY_INFO[k].name} ${count}기`;
-      return `<span class="ops-enemy ${k === 'boss' ? 'is-boss' : ''}" role="img" data-tip="enemy:${k}:${count}" aria-label="${label}">${icon(enemyIcons[k])}<b aria-hidden="true">${count}</b></span>`;
+      return `<span class="ops-enemy ${k === 'boss' ? 'is-boss' : ''}" role="img" data-tip="enemy:${k}:${count}" aria-label="${label}">${this.enemyArt(k)}<b aria-hidden="true">${count}</b></span>`;
     }).join('');
   }
   private click(e: Event): void {
@@ -359,7 +364,7 @@ export class OperationsCenter {
   private codex(current: Faction): string {
     // 순서: 배우고(플레이 방법) → 내 병력을 알고(현재 종족 먼저, 도감 뒤에 비교표) → 적과 보스를 대비한다. 모든 항목은 접힌 채 연다.
     const order = [current, ...(Object.keys(FACTIONS) as Faction[]).filter(f => f !== current)];
-    const enemies = (Object.keys(ENEMY_INFO) as EnemyKey[]).map(k => `<details class="ops-codex-entry"><summary>${icon(enemyIcons[k])}<b>${ENEMY_INFO[k].name}</b></summary><p>${ENEMY_INFO[k].desc}</p><small>체력 ${ENEMY_DEFS[k].hp} · 속도 ${ENEMY_DEFS[k].speed}</small></details>`).join('');
+    const enemies = (Object.keys(ENEMY_INFO) as EnemyKey[]).map(k => `<details class="ops-codex-entry"><summary>${this.enemyArt(k)}<b>${ENEMY_INFO[k].name}</b></summary><p>${ENEMY_INFO[k].desc}</p><small>체력 ${ENEMY_DEFS[k].hp} · 속도 ${ENEMY_DEFS[k].speed}</small></details>`).join('');
     const compare = (faction: Faction): string => {
       const rows = FACTION_TOWERS[faction].filter(k => k !== 'bunker').map(k => {
         const d = TOWER_DEFS[k], support = k === 'support' || k === 'observer', damage = attackDamage(k), dps = damage / d.rate;

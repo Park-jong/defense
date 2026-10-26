@@ -18,6 +18,7 @@ function sprite(x = 0, y = 0) {
     setDepth() { return this; }, setOrigin() { return this; }, setStrokeStyle() { return this; },
     setPosition(x, y) { this.x = x; this.y = y; return this; },
     setScale(scale) { this.scale = scale; return this; },
+    setFrame(frame) { this.frame = frame; return this; },
     setVisible(visible) { this.visible = visible; return this; },
     setRotation(rotation) { this.rotation = rotation; return this; },
     setTint() { return this; }, clearTint() { return this; },

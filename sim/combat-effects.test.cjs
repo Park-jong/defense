@@ -18,6 +18,7 @@ function fixture() {
       setPosition(x, y) { this.x = x; this.y = y; return this; },
       setRotation(value) { this.rotation = value; return this; },
       setScale(x, y = x) { this.scaleX = x; this.scaleY = y; return this; },
+      setFrame(frame) { this.frame = frame; return this; },
       setTexture(key) { this.texture = { key }; return this; },
       setDisplaySize(w, h) { this.width = w; this.height = h; return this; },
       setAlpha(value) { this.alpha = value; return this; },
