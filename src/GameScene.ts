@@ -98,6 +98,7 @@ export class GameScene extends Phaser.Scene {
   private testMode = false;
   /** power overwhelming 입력 횟수: 입력할 때마다 모든 병력 공격력 2배씩 중첩(상한 10,000). 다시 출격하면 0. */
   private powerStacks = 0;
+  private armyMemo?: Army;
   /** 치트(show me the money·power overwhelming)를 한 번이라도 쓴 작전. 이어하기에도 유지된다. */
   private cheated = false;
   // 테스트 출현 범위는 다시 출격해도 페이지 안에서 유지한다.
@@ -205,7 +206,7 @@ export class GameScene extends Phaser.Scene {
     this.gold = this.testMode ? TEST_GOLD : this.options.mode === 'budget' ? 1500 : DIFFICULTIES[this.options.difficulty].gold;
     this.lives = 20;
     this.wave = this.testMode ? MAX_WAVE : 0;
-    this.towers = []; this.enemies = []; this.projs = [];
+    this.towers = []; this.enemies = []; this.projs = []; this.armyMemo = undefined;
     this.nextUnitId = 0; this.unloading = null;
     this.spawnQ = []; this.spawnT = 0; this.waveActive = false;
     this.building = null; this.selected = null; this.hover = null; this.faction = 'terran';
@@ -540,11 +541,14 @@ export class GameScene extends Phaser.Scene {
     if (key === 'fortress') for (const t of this.towers) if (t.k === 'bunker') while (t.passengers.length < bunkerCapacity()) t.passengers.push(null);
     this.opsNotice = AUGMENTS[key].name + ' 증강을 얻었습니다.'; this.saveCheckpoint(false);
   }
+  /** 병력 구성은 능력치 계산마다 쓰이므로 병력이 바뀌거나(배치·판매) 기지 내구도가 달라질 때만 다시 센다. */
   private army(): Army {
+    if (this.armyMemo?.lives === this.lives) return this.armyMemo;
     const units = this.towers.filter(t => t.k !== 'bunker');
     const kinds: Partial<Record<TowerKey, number>> = {};
     for (const t of units) kinds[t.k] = (kinds[t.k] ?? 0) + 1;
-    return { size: units.length, terran: units.filter(t => TOWER_DEFS[t.k].faction === 'terran').length, protoss: units.filter(t => TOWER_DEFS[t.k].faction === 'protoss').length, kinds, lives: this.lives };
+    this.armyMemo = { size: units.length, terran: units.filter(t => TOWER_DEFS[t.k].faction === 'terran').length, protoss: units.filter(t => TOWER_DEFS[t.k].faction === 'protoss').length, kinds, lives: this.lives };
+    return this.armyMemo;
   }
   private armySize(): number { return this.army().size; }
   /** 약점 분석: 옵저버·사이언스 베슬의 지원 범위 안에 든 적은 병력 피해를 15% 더 받는다. */
@@ -1122,7 +1126,8 @@ export class GameScene extends Phaser.Scene {
     const haste = (t.buffs ?? []).reduce((v, b) => v * b.haste, 1) * aura * (1 + this.bonuses.haste) * (hasBranch(t.branch, 'rapid') ? 1.4 : 1) * eliteBonus(this.armySize()) * this.resonance(t);
     const power = (t.buffs ?? []).reduce((v, b) => v * b.power, 1);
     return {
-      dmg: this.cheatPower(base.dmg * power * (1 + this.bonuses.power) * (hasBranch(t.branch, 'power') ? 1.7 : 1)),
+      // 증강의 병력 피해 배율까지 넣어 정보창·보급 상점의 공격력과 실제 피해가 같은 값이 되게 한다.
+      dmg: this.cheatPower(base.dmg * power * (1 + this.bonuses.power) * (hasBranch(t.branch, 'power') ? 1.7 : 1)) * damageMultiplier(t.k, this.army()),
       range: this.supportRange(t) + (t.host ? BUNKER_RANGE_BONUS + (hasAugment('fortress') ? FORTRESS_RANGE : 0) : 0),
       rate: base.rate * (hasBranch(t.branch, 'power') ? 1.15 : 1) * (t.k === 'cannon' && hasAugment('siegeMode') ? 1.2 : 1) / haste,
       splash: d.splash ? d.splash * (1 + .1 * l) * (hasBranch(t.branch, 'rapid') ? 1.35 : 1) * this.splashAugment(t.k) : 0,
@@ -1174,7 +1179,7 @@ export class GameScene extends Phaser.Scene {
     if (k === 'frost') this.tweens.add({ targets: barrel, alpha: { from: .72, to: 1 }, duration: 1100, yoyo: true, repeat: -1 });
     this.fxPlace.explode(8, x, y);
     const t: Tower = { id: String(++this.nextUnitId), k, c, r, x, y, lvl: 1, cd: 0, shotPort: 0, spent: placeCost(k), base, barrel, skills: [], buffs: [], passengers: Array(bunkerCapacity()).fill(null), target: 'first' };
-    this.towers.push(t);
+    this.towers.push(t); this.armyMemo = undefined;
     this.runStats.units.push({ id: t.id, k, damage: 0, boss: 0, kills: 0 });
     if (!this.usedKinds.includes(k)) this.usedKinds.push(k);
     if (this.profile.skin !== 'standard') this.applySkin();
@@ -1264,7 +1269,7 @@ export class GameScene extends Phaser.Scene {
     t.base.destroy(); t.barrel.destroy();
     if (t.host) t.host.passengers[t.host.passengers.indexOf(t)] = null;
     if (this.unloading === t) this.unloading = null;
-    this.towers = this.towers.filter(x => x !== t);
+    this.towers = this.towers.filter(x => x !== t); this.armyMemo = undefined;
     if (this.selected === t) this.selected = null;
   }
 
@@ -1715,8 +1720,9 @@ export class GameScene extends Phaser.Scene {
   private damageEnemy(e: Enemy, dmg: number, kind: DamageKind = 'normal', source?: string): void {
     if (e.dead || !Number.isFinite(dmg) || dmg <= 0) return;
     // 증강의 피해 배율은 병력이 주는 기본 공격·스킬·지속 피해에 모두 적용한다(사령관 지원 제외).
+    // 병력 쪽 배율(인플레이션·물량 공세 등)은 stats().dmg에 이미 들어 있고, 여기서는 맞는 적에 따른 배율(보스·약점 분석)만 곱한다.
     const unit = source && source !== 'commander' ? this.towers.find(t => t.id === source) : undefined;
-    const amount = dmg * (1 + weaknessBonus(e)) * (unit ? damageMultiplier(unit.k, this.army()) * (e.type === 'boss' ? bossDamageMultiplier() : 1) * this.analysisBonus(e) : 1);
+    const amount = dmg * (1 + weaknessBonus(e)) * (unit ? (e.type === 'boss' ? bossDamageMultiplier() : 1) * this.analysisBonus(e) : 1);
     const absorbed = Math.min(e.shield ?? 0, amount);
     e.shield = Math.max(0, (e.shield ?? 0) - absorbed);
     const dealt = Math.min(e.hp, amount - absorbed);

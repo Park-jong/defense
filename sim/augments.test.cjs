@@ -74,8 +74,10 @@ test('인플레이션은 모든 비용과 판매 환급을 2배로, 병력 피�
   const s = setup(['inflation']), gold = s.gold, t = place(s, 'marine');
   assert.equal(gold - s.gold, config.TOWER_DEFS.marine.cost * 2); assert.equal(t.spent, config.TOWER_DEFS.marine.cost * 2);
   assert.equal(aug.relocateCost('marine'), 40); assert.equal(aug.branchCost('marine'), config.TOWER_DEFS.marine.cost * 2);
-  const e = spawn(s); e.hp = e.max = 1000; s.damageEnemy(e, 10, 'normal', t.id); assert.equal(e.hp, 960);
-  s.damageEnemy(e, 10, 'skill', 'commander'); assert.equal(e.hp, 950);
+  // 병력 피해 4배는 표시 공격력(stats)에 들어가 그대로 적에게 맞고, 사령관 지원 피해에는 붙지 않는다.
+  const st = s.stats(t); assert.equal(st.dmg, config.TOWER_DEFS.marine.dmg * 4);
+  const e = spawn(s); e.hp = e.max = 1000; s.damageEnemy(e, st.dmg, 'normal', t.id); assert.equal(e.hp, 1000 - st.dmg);
+  s.damageEnemy(e, 10, 'skill', 'commander'); assert.equal(e.hp, 990 - st.dmg);
   const before = s.gold; s.selected = t; s.sell(); assert.equal(s.gold - before, Math.round(config.TOWER_DEFS.marine.cost * 2 * .7));
 });
 
@@ -98,7 +100,7 @@ test('내 목숨을 아이어에는 질럿을 일반 환급으로 팔고, 이후
   const other = spawn(s, 'grunt', again.x, again.y + 120); other.hp = other.max = 100000;
   s.fire(again, near, st);
   assert.ok(near.hp < 100000 && other.hp < 100000); assert.equal(far.hp, 100000);
-  assert.equal(100000 - near.hp, st.dmg * 4);
+  assert.equal(st.dmg, config.TOWER_DEFS.zealot.dmg * 4); assert.equal(100000 - near.hp, st.dmg);
 });
 
 test('야마토 프로토콜은 기본 공격을 사거리 끝까지 폭 0.7칸의 관통 포격으로 바꾸고 보스에게 2배, 스킬은 막는다', () => {
@@ -114,7 +116,7 @@ test('야마토 프로토콜은 기본 공격을 사거리 끝까지 폭 0.7칸�
 test('젤나가 맙소사는 프로토스 피해를 2배로 하고, 고른 뒤 5의 배수 웨이브마다 보스의 80% 아몬을 보낸다', () => {
   const s = setup(['xelnaga']), z = place(s, 'zealot'), m = place(s, 'marine', 7, 1);
   const e = spawn(s); e.hp = e.max = 1000;
-  s.damageEnemy(e, 10, 'normal', z.id); s.damageEnemy(e, 10, 'normal', m.id); assert.equal(e.hp, 970);
+  assert.equal(s.stats(z).dmg, config.TOWER_DEFS.zealot.dmg * 2); assert.equal(s.stats(m).dmg, config.TOWER_DEFS.marine.dmg);
   s.amonSince = 10;
   assert.equal(aug.amonDue(10, 10), false); assert.equal(aug.amonDue(15, 10), true); assert.equal(aug.amonDue(20, 10), true); assert.equal(aug.amonDue(15, null), false);
   s.wave = 19; s.startWave(); assert.equal(s.spawnQ.at(-1), 'amon'); assert.ok(s.spawnQ.includes('boss'));
@@ -275,7 +277,18 @@ test('보병 교리·물량 공세·최후의 저항은 조건에 맞는 병력�
   assert.equal(aug.damageMultiplier('marine', { size: 1, terran: 1, protoss: 0, lives: 6 }), 1);
   assert.equal(aug.damageMultiplier('marine', { size: 1, terran: 1, protoss: 0, lives: 5 }), 1.4);
   const s = setup(['lastStand']), t = place(s, 'marine'), e = spawn(s); e.hp = e.max = 1000; s.lives = 4;
-  s.damageEnemy(e, 10, 'normal', t.id); assert.equal(e.hp, 986);
+  assert.ok(Math.abs(s.stats(t).dmg - config.TOWER_DEFS.marine.dmg * 1.4) < 1e-9); s.lives = 6; assert.equal(s.stats(t).dmg, config.TOWER_DEFS.marine.dmg);
+});
+
+test('물량 공세는 같은 유닛이 3기 모일 때마다 표시 공격력과 실제 피해를 함께 10%씩 올린다', () => {
+  const s = setup(['mass']), marines = [];
+  for (let c = 3; c < 10; c++) {
+    marines.push(place(s, 'marine', c, 1));
+    const scale = 1 + Math.floor(marines.length / 3) * .1, st = s.stats(marines[0]);
+    assert.ok(Math.abs(st.dmg - config.TOWER_DEFS.marine.dmg * scale) < 1e-9);
+    const e = spawn(s); e.hp = e.max = 1e6; s.damageEnemy(e, st.dmg, 'normal', marines[0].id); assert.ok(Math.abs(1e6 - e.hp - st.dmg) < 1e-6);
+  }
+  s.selected = marines[6]; s.sell(); assert.ok(Math.abs(s.stats(marines[0]).dmg - config.TOWER_DEFS.marine.dmg * 1.2) < 1e-9);
 });
 
 test('사이오닉 공명은 아칸 주변 150 안의 병력 공격 속도를, 약점 분석은 옵저버·베슬 범위 안 적의 피해를 15% 올린다', () => {
