@@ -300,3 +300,34 @@ test('야마토 프로토콜은 관통 포격 5발째마다 공격력 1200%의 �
     assert.ok(Math.abs(g - st.dmg * power) < 1e-6); assert.ok(Math.abs(b - st.dmg * power * 2) < 1e-6);
   }
 });
+
+test('비밀 명령: show me the money는 미네랄을 10,000(상한 100,000), power overwhelming은 공격력을 2배(상한 10,000)로 올린다', () => {
+  const s = setup(); s.audio = { play() {} };
+  const commands = new Map(); s.registerCheats({ register: c => c.names.forEach(n => commands.set(n, c)) });
+  s.gold = 50; commands.get('show me the money').run([]); assert.equal(s.gold, 10050);
+  s.gold = 95000; commands.get('show me the money').run([]); assert.equal(s.gold, 100000);
+  assert.match(commands.get('show me the money').run([]), /상한/); assert.equal(s.gold, 100000);
+  const t = place(s, 'marine'), base = s.stats(t).dmg;
+  commands.get('power overwhelming').run([]); assert.equal(s.stats(t).dmg, base * 2);
+  t.lvl = 5; s.bonuses.power = 100; const strong = s.stats(t).dmg; assert.equal(strong, 10000);
+  s.powerStacks = 0; const raw = s.stats(t).dmg; s.powerStacks = 1; assert.equal(s.stats(t).dmg, Math.max(raw, 10000));
+  // 입력할 때마다 2배씩 중첩된다: 1회 ×2, 2회 ×4, 3회 ×8 (상한 10,000).
+  t.lvl = 1; s.bonuses.power = 0; s.powerStacks = 0;
+  for (const scale of [2, 4, 8]) { commands.get('power overwhelming').run([]); assert.equal(s.stats(t).dmg, base * scale); }
+  for (let i = 0; i < 30; i++) commands.get('power overwhelming').run([]);
+  assert.equal(s.stats(t).dmg, 10000); assert.equal(s.powerStacks, 20);
+  assert.ok(commands.has('q1w2e3r4'));
+});
+
+test('치트를 쓴 작전은 웨이브 클리어와 작전 종료 때 업적·훈장·최고 기록을 남기지 않고, 이어하기에도 유지된다', () => {
+  const s = setup('', 'standard'); s.audio = { play() {} }; s.testMode = false; s.persistProfile = () => {};
+  s.profile = rules.readProfile({ getItem: () => null, setItem() {}, removeItem() {} });
+  const commands = new Map(); s.registerCheats({ register: c => c.names.forEach(n => commands.set(n, c)) });
+  commands.get('q1w2e3r4') && assert.equal(s.cheated, false);
+  commands.get('show me the money').run([]); assert.equal(s.cheated, true);
+  s.wave = 10; s.waveStart = { kills: 0, lost: 0, seconds: 0 }; s.recordWave();
+  assert.deepEqual(s.profile.achievements, []); assert.equal(s.profile.bestWave, 0);
+  const save = { version: 1, options: { ...rules.DEFAULT_OPTIONS }, wave: 10, gold: 100, lives: 20, units: [], bonuses: { power: 0, haste: 0, range: 0 }, stats: rules.newStats(),
+    commander: { strike: 0, slow: 0, supply: 0 }, pending: [], rewarded: 10, tutorial: 4, usedKinds: [], cheated: true };
+  assert.ok(rules.validateSave(save)); assert.equal(rules.validateSave({ ...save, cheated: 'yes' }), false);
+});

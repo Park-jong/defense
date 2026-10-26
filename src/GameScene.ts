@@ -22,7 +22,9 @@ import { CombatEffects } from './combatEffects';
 import { hasWeaponEffects } from './data/weaponEffects';
 import { OperationsCenter, OperationsView } from './operations';
 import { COMMAND_ACTIVE_CURSOR, COMMAND_CURSOR } from './cursors';
-import { isBishoujo, THEME_CHANGED, themeBrand, themeTexture } from './themes';
+import { CommandConsole } from './commandConsole';
+import { playThemeUnlock } from './themeUnlock';
+import { activeTheme, isBishoujo, selectTheme, THEME_CHANGED, THEMES, themeBrand, themeTexture } from './themes';
 import { createMoePortraits } from './moePortraits';
 import { MoePresentation, type MoeActor } from './moePresentation';
 import { MOE_CHARACTERS } from './moeCharacters';
@@ -64,9 +66,12 @@ const OBSERVER_INFO_BONUSES = OBSERVATION_BONUSES.map(bonus => Math.round(bonus 
 /** 이 depth 이상은 UI로 보고 uiCam만, 미만은 맵으로 보고 mapCam만 그린다. */
 const UI_DEPTH = 25;
 const MAX_MAP_ZOOM = 2.5;
+/** 명령 입력 창의 비밀 명령 수치. */
+const CHEAT_GOLD = 10000, CHEAT_GOLD_CAP = 100000, CHEAT_POWER_CAP = 10000, CHEAT_POWER_STACKS = 20;
 
 export class GameScene extends Phaser.Scene {
   private moe?: MoePresentation;
+  private commandConsole?: CommandConsole;
   private gold = 150;
   private lives = 20;
   private wave = 0;
@@ -91,6 +96,10 @@ export class GameScene extends Phaser.Scene {
   private stepAcc = 0;
   private bossLeaked = false;
   private testMode = false;
+  /** power overwhelming 입력 횟수: 입력할 때마다 모든 병력 공격력 2배씩 중첩(상한 10,000). 다시 출격하면 0. */
+  private powerStacks = 0;
+  /** 치트(show me the money·power overwhelming)를 한 번이라도 쓴 작전. 이어하기에도 유지된다. */
+  private cheated = false;
   // 테스트 출현 범위는 다시 출격해도 페이지 안에서 유지한다.
   private testScope: TestScope = 'all';
   // 테스트 페이지에서 증강 작전을 고르면 출격 전에 켜 둔 증강으로 시작한다(페이지 안에서 유지).
@@ -191,6 +200,7 @@ export class GameScene extends Phaser.Scene {
 
     // scene.restart() 시 인스턴스가 재사용되므로 상태를 초기화한다.
     this.testMode = new URLSearchParams(location.search).has('test');
+    this.powerStacks = 0; this.cheated = false;
     this.repeat = 0;
     this.gold = this.testMode ? TEST_GOLD : this.options.mode === 'budget' ? 1500 : DIFFICULTIES[this.options.difficulty].gold;
     this.lives = 20;
@@ -261,6 +271,9 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard?.addCapture('SPACE');
     this.input.keyboard?.on('keydown', (e: KeyboardEvent) => this.onKey(e));
     this.setupOperations();
+    this.commandConsole = new CommandConsole();
+    this.registerCheats(this.commandConsole);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.commandConsole?.destroy(); this.commandConsole = undefined; });
     if (data.resume) this.restoreCheckpoint(data.resume);
     this.applySkin();
     this.setupTheme();
@@ -300,6 +313,7 @@ export class GameScene extends Phaser.Scene {
       faction: key => this.selectFaction(key),
       commander: key => this.useCommander(key),
       autoCommander: key => this.toggleAutoCommander(key),
+      console: () => this.commandConsole?.toggle(),
       testScope: key => { if (!this.waveActive) this.testScope = key; },
       testAugment: key => { if (!this.testAugments.delete(key)) this.testAugments.add(key); },
       pickAugment: key => this.pickAugment(key),
@@ -324,7 +338,7 @@ export class GameScene extends Phaser.Scene {
     const save: RunSave = { version: 1, options: { ...this.options }, wave: this.wave, gold: this.gold, lives: this.lives,
       units: this.savedUnits(), bonuses: { ...this.bonuses }, stats: this.runStats, commander: { ...this.commander },
       pending: [...this.pending], rewarded: this.rewarded, tutorial: this.tutorial, usedKinds: [...this.usedKinds],
-      augments: [...this.augments], augmentSeen: [...this.augmentSeen], augmentOffer: this.augmentOffer && structuredClone(this.augmentOffer), amonSince: this.amonSince };
+      augments: [...this.augments], augmentSeen: [...this.augmentSeen], augmentOffer: this.augmentOffer && structuredClone(this.augmentOffer), amonSince: this.amonSince, cheated: this.cheated };
     if (!validateSave(save)) { if (notify) this.opsNotice = '현재 상태를 저장할 수 없습니다.'; return; }
     if (writeStored(SAVE_KEY, save)) {
       this.checkpoint = structuredClone(save);
@@ -336,7 +350,7 @@ export class GameScene extends Phaser.Scene {
     if (!validateSave(save)) return;
     // 증강 가격이 배치·강화 비용에 쓰이므로 병력을 되살리기 전에 먼저 적용한다.
     this.augments = [...save.augments ?? []]; this.augmentSeen = [...save.augmentSeen ?? []];
-    this.augmentOffer = save.augmentOffer ? structuredClone(save.augmentOffer) : null; this.amonSince = save.amonSince ?? null;
+    this.augmentOffer = save.augmentOffer ? structuredClone(save.augmentOffer) : null; this.amonSince = save.amonSince ?? null; this.cheated = save.cheated ?? false;
     setActiveAugments(this.augments);
     this.wave = save.wave; this.gold = save.gold; this.lives = save.lives;
     const units = new Map<string, Tower>();
@@ -356,6 +370,38 @@ export class GameScene extends Phaser.Scene {
   private applySkin(): void {
     const tint = this.profile.skin === 'gold' ? 0xffdb85 : this.profile.skin === 'ion' ? 0x9bcfff : 0xffffff;
     for (const t of this.towers) { t.base.setTint(tint); t.barrel.setTint(tint); }
+  }
+
+  /** 치트를 쓰면 이번 작전은 업적·훈장·최고 기록에서 빠진다. 테마 전환(q1w2e3r4)은 치트가 아니다. */
+  private markCheated(): void {
+    if (!this.cheated) this.opsNotice = '치트를 사용한 작전은 업적·훈장이 기록되지 않습니다.';
+    this.cheated = true;
+  }
+
+  /** 명령 입력 창의 비밀 명령. */
+  private registerCheats(console: CommandConsole): void {
+    console.register({ names: ['show me the money'], desc: '미네랄 +10,000 (최대 100,000)', run: () => {
+      this.markCheated();
+      const gain = Math.max(0, Math.min(CHEAT_GOLD, CHEAT_GOLD_CAP - this.gold));
+      if (!gain) return `미네랄이 이미 상한(${CHEAT_GOLD_CAP.toLocaleString()})입니다.`;
+      this.gold += gain; this.banner(`미네랄 +${gain.toLocaleString()}`); this.audio.play('build');
+      return `미네랄 +${gain.toLocaleString()} · 보유 ${this.gold.toLocaleString()}`;
+    } });
+    console.register({ names: ['power overwhelming'], desc: '모든 병력 공격력 2배, 입력할 때마다 중첩 (공격력 상한 10,000)', run: () => {
+      this.markCheated();
+      // 2배씩 거듭 곱해도 상한(10,000)에서 멈추므로, 배율 숫자가 무한히 커지지 않도록 횟수만 묶어 둔다.
+      this.powerStacks = Math.min(CHEAT_POWER_STACKS, this.powerStacks + 1);
+      const scale = 2 ** this.powerStacks;
+      this.banner(`POWER OVERWHELMING ×${scale.toLocaleString()}`); this.audio.play('skill');
+      return `모든 병력 공격력 ×${scale.toLocaleString()} · 공격력 상한 10,000`;
+    } });
+    console.register({ names: ['q1w2e3r4'], desc: '모에크래프트 테마 전환 (다시 입력하면 원래 테마)', run: () => {
+      if (isBishoujo()) { selectTheme('frontier'); return `테마: ${THEMES.frontier.name}`; }
+      // 프런티어 → 모에크래프트: 창을 닫고 잠금 해제 연출 한가운데(빛이 터지는 순간)에 테마를 바꾼다.
+      console.close();
+      playThemeUnlock(() => selectTheme('bishoujo'));
+      return `테마: ${THEMES.bishoujo.name}`;
+    } });
   }
 
   /** Swap artwork in place: battle state, saves, achievements and aiming remain intact. */
@@ -529,7 +575,7 @@ export class GameScene extends Phaser.Scene {
   private recordWave(cleared = true): void {
     this.runStats.waves.push({ wave: this.wave, kills: this.runStats.kills - this.waveStart.kills,
       lost: this.runStats.lost - this.waveStart.lost, seconds: this.runStats.seconds - this.waveStart.seconds });
-    if (!this.testMode && cleared) { awardAchievements(this.profile, this.wave, false, this.runStats, this.options, this.usedKinds); this.persistProfile(); }
+    if (!this.testMode && !this.cheated && cleared) { awardAchievements(this.profile, this.wave, false, this.runStats, this.options, this.usedKinds); this.persistProfile(); }
   }
 
   private cellAt(p: Phaser.Input.Pointer): Cell | null {
@@ -964,6 +1010,8 @@ export class GameScene extends Phaser.Scene {
     if (e.key.toLowerCase() === 'o' && !this.shopOpen) { if (this.operations?.open) this.operations.close(); else this.operations?.show(); return; }
     if (this.operationsOpen) return;
     if (this.shopOpen) { if (e.key === 'Escape' || e.key.toLowerCase() === 'b') this.shop.close(); return; }
+    // Enter: 명령 입력 창. 작전실·보급 상점이 열려 있을 때는 열지 않는다.
+    if (e.key === 'Enter') { this.commandConsole?.open(); return; }
     if (e.key.toLowerCase() === 'b') { this.openShop(this.selected?.k === 'bunker' ? 'garrison' : this.selected ? 'army' : 'manage'); return; }
     if ((e.key.toLowerCase() === 'z' || e.key.toLowerCase() === 'x') && this.selected && this.selected.k !== 'bunker') {
       const skills = SKILL_KEYS.filter(key => SKILL_DEFS[key].unit === this.selected!.k);
@@ -1074,7 +1122,7 @@ export class GameScene extends Phaser.Scene {
     const haste = (t.buffs ?? []).reduce((v, b) => v * b.haste, 1) * aura * (1 + this.bonuses.haste) * (hasBranch(t.branch, 'rapid') ? 1.4 : 1) * eliteBonus(this.armySize()) * this.resonance(t);
     const power = (t.buffs ?? []).reduce((v, b) => v * b.power, 1);
     return {
-      dmg: base.dmg * power * (1 + this.bonuses.power) * (hasBranch(t.branch, 'power') ? 1.7 : 1),
+      dmg: this.cheatPower(base.dmg * power * (1 + this.bonuses.power) * (hasBranch(t.branch, 'power') ? 1.7 : 1)),
       range: this.supportRange(t) + (t.host ? BUNKER_RANGE_BONUS + (hasAugment('fortress') ? FORTRESS_RANGE : 0) : 0),
       rate: base.rate * (hasBranch(t.branch, 'power') ? 1.15 : 1) * (t.k === 'cannon' && hasAugment('siegeMode') ? 1.2 : 1) / haste,
       splash: d.splash ? d.splash * (1 + .1 * l) * (hasBranch(t.branch, 'rapid') ? 1.35 : 1) * this.splashAugment(t.k) : 0,
@@ -1084,6 +1132,10 @@ export class GameScene extends Phaser.Scene {
   /** 시즈 모드 확장(시즈 탱크 +30%)과 확장 격납고(리버 스캐럽 +40%)의 폭발 범위 배율. */
   private splashAugment(k: TowerKey): number {
     return k === 'cannon' && hasAugment('siegeMode') ? 1.3 : k === 'reaver' && hasAugment('hangar') ? 1.4 : 1;
+  }
+  /** power overwhelming: 입력 횟수만큼 공격력 2배씩, 단 올린 값은 10,000을 넘지 않는다(원래 더 높으면 그대로). */
+  private cheatPower(dmg: number): number {
+    return this.powerStacks ? Math.max(dmg, Math.min(dmg * 2 ** this.powerStacks, CHEAT_POWER_CAP)) : dmg;
   }
   private supportRange(t: StatsUnit): number {
     return levelStats(t.k, t.lvl).range + this.bonuses.range + highGroundRangeBonus(this.map, t.c ?? -1, t.r ?? -1) + (['support', 'observer'].includes(t.k) && t.branch ? SUPPORT_BRANCH_RANGE : 0)
@@ -1985,9 +2037,9 @@ export class GameScene extends Phaser.Scene {
     this.moe?.reset();
     if (!win && this.waveActive) this.recordWave(false);
     if (!this.testMode) {
-      const earned = awardAchievements(this.profile, win ? this.wave : Math.max(0, this.wave - 1), win, this.runStats, this.options, this.usedKinds);
+      const earned = this.cheated ? [] : awardAchievements(this.profile, win ? this.wave : Math.max(0, this.wave - 1), win, this.runStats, this.options, this.usedKinds);
       this.persistProfile(); clearSave(); this.checkpoint = null;
-      this.opsNotice = earned.length ? '업적 달성: ' + earned.map(k => ACHIEVEMENTS[k as keyof typeof ACHIEVEMENTS].name).join(' · ') : '작전이 종료되었습니다. 전투 통계에서 병력별 전과를 확인하세요.';
+      this.opsNotice = this.cheated ? '치트를 사용한 작전이라 업적·훈장이 기록되지 않았습니다.' : earned.length ? '업적 달성: ' + earned.map(k => ACHIEVEMENTS[k as keyof typeof ACHIEVEMENTS].name).join(' · ') : '작전이 종료되었습니다. 전투 통계에서 병력별 전과를 확인하세요.';
     }
     this.operations?.update();
     this.pauseTxt.setVisible(false);

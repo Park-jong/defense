@@ -110,6 +110,8 @@ export interface RunSave {
   pending: RewardKey[]; rewarded: number; tutorial: number; usedKinds: TowerKey[];
   /** 증강 모드: 고른 증강, 한 번이라도 출현한 증강, 고르는 중인 선택지, 젤나가 맙소사를 고른 웨이브. */
   augments?: AugmentKey[]; augmentSeen?: AugmentKey[]; augmentOffer?: AugmentOffer | null; amonSince?: number | null;
+  /** 비밀 명령(치트)을 쓴 작전: 업적·훈장·최고 기록을 남기지 않는다. */
+  cheated?: boolean;
 }
 export interface Profile { version: 1; achievements: string[]; skin: 'standard' | 'gold' | 'ion'; bestWave: number; wins: number; tutorialDone: boolean; volume: number }
 export const ACHIEVEMENTS = {
@@ -167,7 +169,7 @@ export function validateSave(v: unknown): v is RunSave {
   const offer = v.augmentOffer;
   if (v.augments !== undefined && !keys(v.augments) || v.augmentSeen !== undefined && !keys(v.augmentSeen)
     || offer != null && (!obj(offer) || !keys(offer.cards) || offer.cards.length > 3 || !Array.isArray(offer.rerolled) || offer.rerolled.length !== offer.cards.length || !offer.rerolled.every((r: unknown) => typeof r === 'boolean'))
-    || v.amonSince != null && !integer(v.amonSince, 0, v.wave)) return false;
+    || v.amonSince != null && !integer(v.amonSince, 0, v.wave) || v.cheated !== undefined && typeof v.cheated !== 'boolean') return false;
   const s = v.stats;
   return obj(s) && ['damage', 'kills', 'lost', 'seconds', 'commanderDamage'].every(k => num(s[k]))
     && Array.isArray(s.units) && s.units.every((u: unknown) => obj(u) && typeof u.id === 'string' && /^[1-9]\d*$/.test(u.id) && has(TOWER_DEFS, u.k) && num(u.damage) && (u.boss === undefined || num(u.boss)) && num(u.kills))

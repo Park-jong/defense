@@ -431,4 +431,11 @@
 .mission-ribbon.side .mission-augments span { width:24px; height:24px; }
 .mission-ribbon.side .mission-augments .ops-icon { width:18px; height:18px; }
 .ops-tip .ops-tip-tier { color:var(--tier); }
-
+/* 터치 화면의 명령 입력 아이콘: 데스크톱 배치는 띠 끝의 작은 버튼, 모바일 사이드 패널은 둘째 줄 오른쪽 끝에 숨긴다. */
+.mission-console { display:flex; flex:none; align-items:center; }
+.mission-ribbon .mission-console button { flex:0 0 32px; width:32px; height:32px; padding:3px; }
+.mission-ribbon.side .mission-console { position:absolute; top:52px; right:0; z-index:2; height:30px; box-sizing:border-box; padding:0 3px; background:#1b2320; border:1px solid #596150; border-left-color:#3d4b3f; }
+.mission-ribbon.side .mission-console button { flex-basis:24px; width:24px; height:24px; padding:2px; border-radius:5px; }
+.mission-ribbon.side .mission-augments { right:31px; }
+.mission-ribbon .mission-console .ops-icon { width:24px; height:24px; }
+.mission-ribbon.side .mission-console .ops-icon { width:18px; height:18px; }

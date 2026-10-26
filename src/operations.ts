@@ -7,7 +7,7 @@ import { adoptTitles, bindTips, createTip, placeTip, textTip } from './gameTip';
 import { supportTraits } from './support';
 import { AUGMENTS, AUGMENT_KEYS, AUGMENT_TIERS, AugmentKey, AugmentOffer, amonDue, branchCost, commanderCooldownScale, hasAugment, relocateCost } from './augments';
 import './operations.css';
-import { activeTheme, isBishoujo, selectTheme, THEMES, type ThemeKey } from './themes';
+import { isBishoujo } from './themes';
 
 export interface OperationsView {
   options: RunOptions; wave: number; gold: number; lives: number; active: boolean; over: boolean; paused: boolean;
@@ -29,6 +29,7 @@ export interface OperationsActions {
   faction(key: Faction): void;
   commander(key: CommanderKey): void;
   autoCommander(key: CommanderKey): void;
+  console(): void;
   testScope(key: TestScope): void;
   testAugment(key: AugmentKey): void;
   pickAugment(key: AugmentKey): void;
@@ -60,6 +61,9 @@ const DAMAGE_VIEWS: Record<TestScope, { name: string; icon: string; unit: (u: Un
 /** 보유 증강 아이콘. 마우스를 올리면 증강 설명 창(data-tip="augment:키")이 뜬다. */
 const augmentChips = (keys: AugmentKey[], className: string): string => keys.length
   ? `<div class="${className}" role="list" aria-label="보유 증강">${keys.map(k => `<span role="listitem" class="ops-tier-${AUGMENTS[k].tier}" data-tip="augment:${k}" aria-label="${AUGMENTS[k].name}">${icon(AUGMENTS[k].icon)}</span>`).join('')}</div>` : '';
+/** Enter 키가 없는 모바일·터치 화면은 상단 패널의 명령 아이콘으로 명령 입력 창을 연다. */
+// 모바일 배치는 부팅 중에 정해지므로 그릴 때마다 확인한다.
+const touchConsole = (): boolean => MOBILE_LAYOUT || typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
 const enemyIcons: Record<EnemyKey, string> = { grunt: 'first', runner: 'overdrive', tank: 'shield', boss: 'boss', medic: 'repair', splitter: 'shrapnel', shielder: 'plasma' };
 const rewardIcons: Record<RewardKey, string> = { power: 'siege', haste: 'overdrive', range: 'range', repair: 'repair', supply: 'supply' };
 const rewardValues: Record<RewardKey, string> = { power: '+12%', haste: '+10%', range: '+12', repair: '+4', supply: '+150' };
@@ -178,7 +182,7 @@ export class OperationsCenter {
       const cooldown = Math.ceil(v.commander[k]);
       const auto = v.autoCommander.includes(k), autoText = auto ? ' · 자동 사용 중' : '';
       return button('commander', k, `${icon(k)}${cooldown > 0 ? `<span class="mission-cooldown" aria-hidden="true">${cooldown}</span>` : ''}`, COMMANDERS[k].name + (cooldown > 0 ? ` ${cooldown}초` : '') + autoText, { disabled: v.over || v.paused || !v.active || cooldown > 0 || v.options.mode === 'budget' && k === 'supply', className: auto ? 'is-auto' : '', tip: `commander:${k}`, hint: `${COMMANDERS[k].name} · ${COMMANDERS[k].desc} · 재사용 ${COMMANDERS[k].cooldown}초${cooldown > 0 ? ` · 남은 ${cooldown}초` : ''}${autoText} · 우클릭(길게 누르기)으로 자동 사용 ${auto ? '끄기' : '켜기'}` });
-    }).join('')}</div></div>${augmentChips(v.augments, 'mission-augments')}${forecast}${tutorial}</div>`;
+    }).join('')}</div></div>${augmentChips(v.augments, 'mission-augments')}${touchConsole() ? `<div class="mission-console">${button('console', '', icon('console'), '명령 입력', { hint: '명령 입력 · 명령어를 입력해 실행' })}</div>` : ''}${forecast}${tutorial}</div>`;
     if (html !== this.cache) {
       this.ribbon.innerHTML = html; this.cache = html;
       // 쿨타임 숫자가 바뀔 때마다 버튼을 새로 그리므로, 자동 사용 빛의 회전 위상을 시계에 맞춰 끊김 없이 잇는다.
@@ -258,6 +262,7 @@ export class OperationsCenter {
     const el = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-action]'); if (!el || el.disabled) return;
     const a = el.dataset.action!, key = el.dataset.key!;
     if (a === 'open') { this.show(key); return; }
+    if (a === 'console') { this.actions.console(); return; }
     if (a === 'faction') { this.actions.faction(key as Faction); this.update(); return; }
     if (a === 'close') { this.close(); return; }
     if (a === 'tab') this.section = key;
@@ -277,7 +282,6 @@ export class OperationsCenter {
     if (a === 'reroll') this.actions.rerollAugment(Number(key));
     if (a === 'test-augment') this.actions.testAugment(key as AugmentKey);
     if (a === 'skin') this.actions.skin(key as Profile['skin']);
-    if (a === 'theme') selectTheme(key);
     if (a === 'tutorial') { this.actions.tutorial(false); this.update(); }
     if (a === 'skip') { this.actions.tutorial(true); this.update(); if (!this.open) return; }
     const scroll = a === 'tab' ? 0 : this.dialog.querySelector('.ops-content')?.scrollTop ?? 0;
@@ -307,19 +311,13 @@ export class OperationsCenter {
   }
   private setup(v: OperationsView): string {
     const draft = this.draft ?? v.options;
-    return `<section class="ops-setup">${this.themePicker()}<div class="ops-section-heading"><h2>${v.test ? '최종 웨이브 테스트' : '전장 선택'}</h2><span>${MAP_DEFS[draft.map].desc}</span></div><div class="ops-map-picker" role="group" aria-label="전장">${(Object.keys(MAP_DEFS) as RunOptions['map'][]).map(k => button('map', k, `${mapPreview(k)}<span>${MAP_DEFS[k].name}</span>`, MAP_DEFS[k].name, { selected: draft.map === k, hint: `${MAP_DEFS[k].name} · ${MAP_DEFS[k].desc}` })).join('')}</div>
+    return `<section class="ops-setup"><div class="ops-section-heading"><h2>${v.test ? '최종 웨이브 테스트' : '전장 선택'}</h2><span>${MAP_DEFS[draft.map].desc}</span></div><div class="ops-map-picker" role="group" aria-label="전장">${(Object.keys(MAP_DEFS) as RunOptions['map'][]).map(k => button('map', k, `${mapPreview(k)}<span>${MAP_DEFS[k].name}</span>`, MAP_DEFS[k].name, { selected: draft.map === k, hint: `${MAP_DEFS[k].name} · ${MAP_DEFS[k].desc}` })).join('')}</div>
       <div class="ops-rules"><div><h2>난이도</h2><div class="ops-difficulties" role="group" aria-label="난이도">${(Object.keys(DIFFICULTIES) as RunOptions['difficulty'][]).map((k, i) => button('difficulty', k, `${icon('shield')}<span>${DIFFICULTIES[k].name}</span><span class="ops-pips" aria-hidden="true">${'•'.repeat(i + 1)}</span>`, DIFFICULTIES[k].name, { selected: draft.difficulty === k })).join('')}</div></div><div><h2>모드</h2><div class="ops-modes" role="group" aria-label="작전 모드">${(Object.keys(MODES) as RunOptions['mode'][]).map(k => button('mode', k, k === 'bunker' ? this.art('bunker') : icon(modeIcons[k]), MODES[k].name, { selected: draft.mode === k, hint: `${MODES[k].name} · ${MODES[k].desc}` })).join('')}</div><p class="ops-mode-hint">${MODES[draft.mode].desc}</p></div></div>
       ${v.test ? `<div class="ops-section-heading"><h2>테스트 범위</h2><span>${TEST_SCOPES[v.testScope].desc}</span></div>${this.scopes(v)}` : ''}
       ${v.test && draft.mode === 'augment' ? `<div class="ops-section-heading"><h2>테스트 증강 <small>${v.testAugments.length}</small></h2><span>켜 둔 증강으로 출격</span></div><div class="ops-test-augments" role="group" aria-label="테스트 증강">${AUGMENT_KEYS.map(k => button('test-augment', k, `${icon(AUGMENTS[k].icon)}<span>${AUGMENTS[k].name}</span>`, AUGMENTS[k].name, { selected: v.testAugments.includes(k), className: `ops-tier-${AUGMENTS[k].tier}`, tip: `augment:${k}`, hint: `${AUGMENTS[k].name} · ${AUGMENT_TIERS[AUGMENTS[k].tier]} · ${AUGMENTS[k].desc}` })).join('')}</div>` : ''}
       <div class="ops-launch">${v.checkpoint && !v.test ? `<div class="ops-checkpoint">${button('resume', '', `${icon('resume')}<span>이어하기</span><b>W ${String(v.checkpoint.wave).padStart(2, '0')}</b>`, '저장된 작전 이어하기', { className: 'ops-resume', hint: `${MAP_DEFS[v.checkpoint.options.map].name} · ${DIFFICULTIES[v.checkpoint.options.difficulty].name} · ${MODES[v.checkpoint.options.mode].name} · ${v.checkpoint.wave}웨이브 완료 · 기지 ${v.checkpoint.lives}/20 · 병력 ${v.checkpoint.units.length}기` })}<small>새 출격 시 기존 저장 교체</small></div>` : ''}${v.test
         ? button('start', '', `${icon(scopeIcons[v.testScope])}<span>${TEST_SCOPES[v.testScope].name} 테스트</span>`, `${TEST_SCOPES[v.testScope].name} 테스트 시작`, { className: 'ops-deploy', hint: `${MAP_DEFS[draft.map].name}에서 ${MAX_WAVE}웨이브 반복 · ${TEST_SCOPES[v.testScope].name}: ${TEST_SCOPES[v.testScope].desc} · ◆ ${TEST_GOLD.toLocaleString()} · 저장 및 업적 제외` })
         : button('start', '', `${icon('deploy')}<span>출격</span>`, '새 작전 시작', { className: 'ops-deploy', hint: v.checkpoint ? '새 작전 시작 · 기존 체크포인트를 교체합니다' : '새 작전 시작' })}</div></section>`;
-  }
-  private themePicker(): string {
-    return `<div class="ops-theme-picker" role="group" aria-label="게임 테마">${(Object.keys(THEMES) as ThemeKey[]).map(key => {
-      const theme = THEMES[key];
-      return button('theme', key, `<span class="theme-preview" aria-hidden="true"><img src="${unitPortraitUrl('marine', key)}" alt=""><img src="${unitPortraitUrl(key === 'bishoujo' ? 'zealot' : 'sniper', key)}" alt=""></span><span class="theme-copy"><small>${theme.caption}</small><b>${theme.name}</b></span><span class="theme-selected" aria-hidden="true">${activeTheme() === key ? '✦' : '◇'}</span>`, theme.name + ' 테마', { selected: activeTheme() === key, className: `theme-card theme-card-${key}`, hint: `${theme.description} · 즉시 적용 · 선택 자동 저장` });
-    }).join('')}</div>`;
   }
   private tactics(v: OperationsView): string {
     const u = v.selected, next = v.test ? MAX_WAVE : v.wave + 1;

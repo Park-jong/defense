@@ -1,0 +1,30 @@
+/* 비밀 테마 해금 연출: 어두워짐 → 자물쇠 흔들림 → 걸쇠 열림·빛 폭발(이때 테마 전환) → 문구 → 사라짐. 총 2.6초. */
+.theme-unlock { position:fixed; inset:0; z-index:60; display:grid; place-items:center; align-content:center; gap:18px; pointer-events:none;
+  background:radial-gradient(circle at 50% 46%,#0c1714d9,#030806f2 70%); animation:unlock-veil 2.6s ease forwards; }
+.theme-unlock-stage { position:relative; display:grid; place-items:center; width:220px; height:220px; }
+.theme-unlock-lock { position:relative; z-index:2; overflow:visible; filter:drop-shadow(0 0 10px #b8e07a55); animation:unlock-pop .35s cubic-bezier(.3,1.6,.6,1) both, unlock-shake .5s .4s ease-in-out both, unlock-lift .9s 1s ease-in forwards; }
+.theme-unlock-body { fill:#2c4433; stroke:#b8e07a; stroke-width:2; animation:unlock-body .4s .95s ease forwards; }
+.theme-unlock-keyhole { fill:#0d1a14; animation:unlock-keyhole .4s .95s ease forwards; }
+.theme-unlock-shackle { stroke:#b8e07a; transform-box:fill-box; transform-origin:100% 100%; animation:unlock-shackle .35s .9s cubic-bezier(.2,1.4,.5,1) forwards, unlock-shackle-color .4s .95s ease forwards; }
+.theme-unlock-ring { position:absolute; z-index:1; width:60px; height:60px; border-radius:50%; border:3px solid #ffc6ec; box-shadow:0 0 30px #ff9ad5, inset 0 0 20px #ffd6f0; opacity:0; animation:unlock-ring .8s 1s ease-out forwards; }
+.theme-unlock-sparks { position:absolute; inset:0; z-index:1; }
+.theme-unlock-sparks i { position:absolute; left:50%; top:50%; width:8px; height:8px; margin:-4px; border-radius:50%; background:#fff2fb; box-shadow:0 0 10px #ff9ad5, 0 0 4px #fff; opacity:0;
+  animation:unlock-spark .9s 1s cubic-bezier(.15,.7,.3,1) forwards; }
+.theme-unlock-sparks i:nth-child(3n) { width:5px; height:5px; background:#c9e9ff; box-shadow:0 0 8px #8ad8ff; }
+.theme-unlock-sparks i:nth-child(4n) { background:#ffe7a8; box-shadow:0 0 8px #ffd58a; }
+.theme-unlock-text { display:grid; justify-items:center; gap:6px; margin:0; text-align:center; opacity:0; transform:translateY(10px); animation:unlock-text .5s 1.15s ease forwards; }
+.theme-unlock-text small { font:11px monospace; letter-spacing:4px; color:#ffc6ec; }
+.theme-unlock-text b { font-size:30px; color:#fff1fa; text-shadow:0 0 18px #ff9ad5, 0 2px 0 #4a2a52; }
+.theme-unlock-text span { font-size:12px; color:#e6c9ef; letter-spacing:1px; }
+
+@keyframes unlock-veil { 0% { opacity:0; } 10%,78% { opacity:1; } 100% { opacity:0; } }
+@keyframes unlock-pop { from { transform:scale(.4); opacity:0; } to { transform:scale(1); opacity:1; } }
+@keyframes unlock-shake { 0%,100% { rotate:0deg; } 20% { rotate:-9deg; } 40% { rotate:8deg; } 60% { rotate:-6deg; } 80% { rotate:4deg; } }
+@keyframes unlock-lift { 0% { transform:scale(1); opacity:1; } 30% { transform:scale(1.12); } 100% { transform:scale(.9) translateY(-16px); opacity:0; } }
+@keyframes unlock-shackle { to { transform:translateY(-9px) rotate(-38deg); } }
+@keyframes unlock-shackle-color { to { stroke:#ffc6ec; } }
+@keyframes unlock-body { to { fill:#5a3266; stroke:#ffc6ec; } }
+@keyframes unlock-keyhole { to { fill:#ffd6f0; } }
+@keyframes unlock-ring { 0% { opacity:1; transform:scale(.4); } 100% { opacity:0; transform:scale(4.2); } }
+@keyframes unlock-spark { 0% { opacity:1; transform:rotate(var(--a)) translateY(0) scale(1); } 100% { opacity:0; transform:rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(.3); } }
+@keyframes unlock-text { to { opacity:1; transform:none; } }

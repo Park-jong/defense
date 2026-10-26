@@ -1,0 +1,10 @@
+/* 명령 입력 창: 작전실 설명 창과 같은 장갑판 톤. 위치(top·left·width)는 commandConsole.ts가 하단 인터페이스 위에 맞춘다. */
+.command-console { position:fixed; z-index:30; top:auto; left:50%; display:grid; grid-template-columns:auto auto 1fr; align-items:center; gap:4px 8px; box-sizing:border-box; width:min(520px,calc(100vw - 32px)); padding:10px 12px; transform:translateX(-50%); color:#d2e4b3; background:linear-gradient(#18291e,#0f1b15); border:1px solid #6f8b52; border-radius:9px; box-shadow:0 10px 30px #000a, inset 0 0 0 1px #c6ea8c1f; font-family:inherit; }
+.command-console[hidden] { display:none; }
+.command-console img { width:28px; height:28px; border-radius:6px; }
+.command-console-prompt { font:700 16px monospace; color:#b8e07a; }
+.command-console input { min-width:0; height:34px; padding:0 4px; font:15px monospace; color:#eef7dc; background:transparent; border:0; border-bottom:1px solid #4a6338; outline:none; caret-color:#b8e07a; }
+.command-console input:focus { border-bottom-color:#b8e07a; }
+.command-console input::placeholder { color:#7d9170; }
+.command-console-output { grid-column:1 / -1; margin:0; min-height:0; white-space:pre-line; font:12px/1.6 monospace; color:#b9cda3; }
+.command-console-output:empty { display:none; }

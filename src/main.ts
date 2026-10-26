@@ -9,6 +9,8 @@ import { registerBishoujoPortraits } from './bishoujoPortraitAssets';
 import { registerMoeAtlas } from './moePortraits';
 import moeAtlasUrl from './assets/bishoujo-roster-v2.png';
 import './moePresentation.css';
+import './commandConsole.css';
+import './themeUnlock.css';
 
 applyThemeDocument();
 registerBishoujoPortraits(import.meta.glob<string>('./assets/bishoujo/*.webp', { eager: true, query: '?url', import: 'default' }));
