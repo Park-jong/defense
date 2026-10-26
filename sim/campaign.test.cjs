@@ -506,6 +506,22 @@ test('전투 통계는 과잉 피해와 보호막을 제외하고 유닛·스킬
   const second = spawn(s); second.hp = 10; s.damageEnemy(second, 50, 'skill', 'commander'); assert.equal(s.runStats.commanderDamage, 10); assert.equal(s.runStats.kills, 2);
 });
 
+test('테스트 범위는 기본·보스만·라인만으로 최종 웨이브 편성을 나눈다', () => {
+  const all = rules.wavePlan(50), line = rules.wavePlan(50, 'line');
+  assert.deepEqual(rules.wavePlan(50, 'boss'), ['boss']); assert.ok(!line.includes('boss')); assert.deepEqual([...line, 'boss'], all);
+  const s = setup(); s.testMode = true; s.wave = 50; s.testScope = 'line'; s.startWave(); assert.deepEqual(s.spawnQ, line);
+  s.testScope = 'boss'; assert.equal(s.testScope, 'boss');
+});
+
+test('전투 통계는 보스 피해를 종합 피해 안에서 따로 센다', () => {
+  const s = setup(), t = place(s, 'marine'), boss = spawn(s, 'boss'), grunt = spawn(s); boss.shield = 0;
+  s.damageEnemy(boss, 40, 'normal', t.id); s.damageEnemy(grunt, 7, 'normal', t.id);
+  const u = s.runStats.units[0]; assert.equal(u.boss, 40); assert.equal(u.damage, 40 + Math.min(7, grunt.max));
+  assert.equal(s.runStats.bossDamage, 40); assert.equal(s.runStats.damage, u.damage);
+  const old = rules.newStats(); delete old.bossDamage; old.units.push({ id: '1', k: 'marine', damage: 3, kills: 0 });
+  assert.equal(rules.normalizeStats(old).bossDamage, 0); assert.equal(old.units[0].boss, 0);
+});
+
 test('자동 스킬·지속 영역·화상 피해는 발사한 병력의 전과에 귀속된다', () => {
   const s = setup(), f = place(s, 'firebat'), e = spawn(s, 'tank', f.x, f.y + 30);
   s.autoSkill(f, 'inferno', e); assert.equal(e.burnSource, f.id); assert.ok(s.runStats.units[0].damage > 0);

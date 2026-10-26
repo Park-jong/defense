@@ -15,7 +15,7 @@ import { ShopState, SupplyShop } from './shop';
 import { levelStats, MAX_UNIT_LEVEL, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
 import { BUNKER_BARREL_LENGTH, BUNKER_CAPACITY, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
 import { createMapRuntime, highGroundRangeBonus, type MapRuntime, type Point } from './game/map';
-import { ACHIEVEMENTS, allowedUnit, awardAchievements, Bonuses, bossPattern, Branch, COMMANDERS, CommanderKey, DEFAULT_OPTIONS, DIFFICULTIES, newStats, Profile, PROFILE_KEY, readProfile, readSave, REWARDS, RewardKey, rewardChoices, RunOptions, RunSave, RunStats, SavedUnit, SAVE_KEY, clearSave, TargetMode, validateSave, wavePlan, writeStored } from './campaign';
+import { ACHIEVEMENTS, allowedUnit, awardAchievements, Bonuses, bossPattern, Branch, COMMANDERS, CommanderKey, DEFAULT_OPTIONS, DIFFICULTIES, newStats, normalizeStats, Profile, PROFILE_KEY, readProfile, readSave, REWARDS, RewardKey, rewardChoices, RunOptions, RunSave, RunStats, SavedUnit, SAVE_KEY, clearSave, TargetMode, TestScope, validateSave, wavePlan, writeStored } from './campaign';
 import { BattleAudio } from './audio';
 import { CombatEffects } from './combatEffects';
 import { hasWeaponEffects } from './data/weaponEffects';
@@ -83,6 +83,8 @@ export class GameScene extends Phaser.Scene {
   private stepAcc = 0;
   private bossLeaked = false;
   private testMode = false;
+  // 테스트 출현 범위는 다시 출격해도 페이지 안에서 유지한다.
+  private testScope: TestScope = 'all';
   private repeat = 0;
   private options: RunOptions = { ...DEFAULT_OPTIONS };
   private map: MapRuntime = createMapRuntime(this.options.map, MAP_Y);
@@ -257,7 +259,7 @@ export class GameScene extends Phaser.Scene {
     const units = this.savedUnits();
     return { options: this.options, wave: this.wave, gold: this.gold, lives: this.lives, active: this.waveActive, over: this.over,
       selected: units.find(u => u.id === this.selected?.id), units, stats: this.runStats, profile: this.profile,
-      commander: this.commander, autoCommander: [...this.autoCommander], pending: this.pending, checkpoint: this.checkpoint, tutorial: this.tutorial, notice: this.opsNotice, test: this.testMode, paused: this.paused, faction: this.faction };
+      commander: this.commander, autoCommander: [...this.autoCommander], pending: this.pending, checkpoint: this.checkpoint, tutorial: this.tutorial, notice: this.opsNotice, test: this.testMode, testScope: this.testScope, paused: this.paused, faction: this.faction };
   }
 
   private setupOperations(): void {
@@ -273,6 +275,7 @@ export class GameScene extends Phaser.Scene {
       faction: key => this.selectFaction(key),
       commander: key => this.useCommander(key),
       autoCommander: key => this.toggleAutoCommander(key),
+      testScope: key => { if (!this.waveActive) this.testScope = key; },
       reward: key => this.takeReward(key),
       skin: key => { this.profile.skin = key; this.applySkin(); this.persistProfile(); },
       volume: value => { this.profile.volume = value; this.audio.volume = value; this.audio.unlock(); this.audio.play('build'); this.persistProfile(); },
@@ -312,7 +315,7 @@ export class GameScene extends Phaser.Scene {
     }
     for (const u of save.units) if (u.hostId) this.garrison(units.get(u.hostId)!, u.slot!, units.get(u.id)!);
     this.nextUnitId = Math.max(0, ...save.units.map(u => Number(u.id)));
-    this.bonuses = { ...save.bonuses }; this.runStats = structuredClone(save.stats); this.commander = { ...save.commander };
+    this.bonuses = { ...save.bonuses }; this.runStats = normalizeStats(structuredClone(save.stats)); this.commander = { ...save.commander };
     this.pending = [...save.pending]; this.rewarded = save.rewarded; this.tutorial = save.tutorial; this.usedKinds = [...save.usedKinds];
     this.opsNotice = `${save.wave}웨이브 준비 시점에서 복귀했습니다.`;
   }
@@ -965,7 +968,7 @@ export class GameScene extends Phaser.Scene {
     this.fxPlace.explode(8, x, y);
     const t: Tower = { id: String(++this.nextUnitId), k, c, r, x, y, lvl: 1, cd: 0, shotPort: 0, spent: TOWER_DEFS[k].cost, base, barrel, skills: [], buffs: [], passengers: Array(BUNKER_CAPACITY).fill(null), target: 'first' };
     this.towers.push(t);
-    this.runStats.units.push({ id: t.id, k, damage: 0, kills: 0 });
+    this.runStats.units.push({ id: t.id, k, damage: 0, boss: 0, kills: 0 });
     if (!this.usedKinds.includes(k)) this.usedKinds.push(k);
     if (this.profile.skin !== 'standard') this.applySkin();
     this.audio.play('build');
@@ -1059,11 +1062,12 @@ export class GameScene extends Phaser.Scene {
     if (this.over || this.paused || this.shopOpen || this.operationsOpen || this.pending.length || this.waveActive || (!this.testMode && this.options.mode !== 'endless' && this.wave >= MAX_WAVE)) return;
     this.runLaunched = true; this.saveCheckpoint(false); this.cancelCommand();
     if (this.testMode) this.repeat++; else this.wave++;
-    const w = this.wave, q = wavePlan(w);
+    const w = this.wave, q = wavePlan(w, this.testMode ? this.testScope : 'all');
     this.waveStart = { kills: this.runStats.kills, lost: this.runStats.lost, seconds: this.runStats.seconds };
     this.spawnQ = q; this.spawnT = 0; this.waveActive = true;
-    this.banner(w % 10 === 0 ? `웨이브 ${w} — ${bossPattern(w)}` : `웨이브 ${w}`);
-    if (w % 10 === 0) this.audio.play('boss');
+    const boss = q.includes('boss');
+    this.banner(boss ? `웨이브 ${w} — ${bossPattern(w)}` : this.testMode && this.testScope === 'line' ? `웨이브 ${w} — 라인 테스트` : `웨이브 ${w}`);
+    if (boss) this.audio.play('boss');
   }
 
   private spawn(type: EnemyKey, parent?: Enemy, child = false): void {
@@ -1418,6 +1422,7 @@ export class GameScene extends Phaser.Scene {
     e.hp -= dealt;
     this.runStats.damage += dealt;
     const record = this.runStats.units.find(u => u.id === source); if (record) record.damage += dealt;
+    if (e.type === 'boss') { this.runStats.bossDamage += dealt; if (record) record.boss += dealt; }
     if (source === 'commander') this.runStats.commanderDamage += dealt;
     this.damageNumbers?.hit(e, amount - absorbed, kind);
     if (e.hp <= 0) this.killEnemy(e, source);

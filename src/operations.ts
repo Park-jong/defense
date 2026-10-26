@@ -2,7 +2,7 @@ import { attackCount, attackDamage, SUPPORT_BRANCH_RANGE, ENEMY_DEFS, EnemyKey, 
 import { SKILL_DEFS, SKILL_KEYS } from './catalog';
 import { unitImageUrl } from './unitArt';
 import { commandIconUrl } from './commandIcons';
-import { ACHIEVEMENTS, bossPattern, BRANCHES, COMMANDERS, CommanderKey, DIFFICULTIES, ENEMY_INFO, MODES, Profile, REWARDS, RewardKey, RunOptions, RunSave, RunStats, SavedUnit, TARGETS, TargetMode, wavePlan } from './campaign';
+import { ACHIEVEMENTS, bossPattern, BRANCHES, COMMANDERS, CommanderKey, DIFFICULTIES, ENEMY_INFO, MODES, Profile, REWARDS, RewardKey, RunOptions, RunSave, RunStats, SavedUnit, TARGETS, TargetMode, TEST_SCOPES, TestScope, UnitRecord, wavePlan } from './campaign';
 import { adoptTitles, bindTips, createTip, placeTip, textTip } from './gameTip';
 import { supportTraits } from './support';
 import './operations.css';
@@ -11,7 +11,7 @@ export interface OperationsView {
   options: RunOptions; wave: number; gold: number; lives: number; active: boolean; over: boolean; paused: boolean;
   selected?: SavedUnit; units: SavedUnit[]; stats: RunStats; profile: Profile;
   commander: Record<CommanderKey, number>; autoCommander: CommanderKey[]; pending: RewardKey[]; checkpoint: RunSave | null;
-  tutorial: number; notice: string; test: boolean;
+  tutorial: number; notice: string; test: boolean; testScope: TestScope;
   faction: Faction;
 }
 export interface OperationsActions {
@@ -26,6 +26,7 @@ export interface OperationsActions {
   faction(key: Faction): void;
   commander(key: CommanderKey): void;
   autoCommander(key: CommanderKey): void;
+  testScope(key: TestScope): void;
   reward(key: RewardKey): void;
   skin(key: Profile['skin']): void;
   volume(value: number): void;
@@ -43,6 +44,13 @@ const tutorialSteps = [
 ];
 const tutorialHints = ['병력을 골라 길 옆에 배치', '병력을 선택하고 강화', '전용 스킬 하나 장착', '벙커에 보병 보급'];
 const tutorialIcons = ['terran', 'upgrade', 'storm', 'empty'];
+const scopeIcons: Record<TestScope, string> = { all: 'flag', boss: 'boss', line: 'first' };
+// 전적의 피해 구분: 종합, 보스에게 준 피해, 보스를 뺀 라인 병력에게 준 피해.
+const DAMAGE_VIEWS: Record<TestScope, { name: string; icon: string; unit: (u: UnitRecord) => number; total: (s: RunStats) => number }> = {
+  all: { name: '종합', icon: 'siege', unit: u => u.damage, total: s => s.damage },
+  boss: { name: '보스', icon: 'boss', unit: u => u.boss, total: s => s.bossDamage },
+  line: { name: '라인', icon: 'first', unit: u => u.damage - u.boss, total: s => s.damage - s.bossDamage },
+};
 const enemyIcons: Record<EnemyKey, string> = { grunt: 'first', runner: 'overdrive', tank: 'shield', boss: 'boss', medic: 'repair', splitter: 'shrapnel', shielder: 'plasma' };
 const rewardIcons: Record<RewardKey, string> = { power: 'siege', haste: 'overdrive', range: 'range', repair: 'repair', supply: 'supply' };
 const rewardValues: Record<RewardKey, string> = { power: '+12%', haste: '+10%', range: '+12', repair: '+4', supply: '+150' };
@@ -63,7 +71,7 @@ function unitTraits(k: TowerKey): string[] {
 const OPS_SILENT = [
   '.ops-nav button', '.ops-volume', '.ops-save-status', '[data-action="map"]', '[data-action="difficulty"]', '[data-action="mode"]',
   '[data-action="start"]', '[data-action="resume"]', '[data-action="target"]', '.ops-empty [data-action="close"]', '.ops-metrics > div',
-  '[data-action="tutorial"]', '[data-action="skin"]', '[data-action="reward"]',
+  '[data-action="tutorial"]', '[data-action="skin"]', '[data-action="reward"]', '[data-action="scope"]', '[data-action="damage"]',
 ].join(',');
 const tabs = {
   setup: { icon: 'flag', name: '출격', label: '작전 설정' },
@@ -95,6 +103,7 @@ export class OperationsCenter {
   private ribbonTipSpec = '';
   private section = 'setup';
   private draft?: RunOptions;
+  private damageView: TestScope = 'all';
   private cache = '';
   private images = new Map(TOWER_KEYS.map(k => [k, unitImageUrl(k)]));
   private onResize = () => this.position();
@@ -155,7 +164,7 @@ export class OperationsCenter {
       ? `<div class="field-tutorial">${icon(tutorialIcons[v.tutorial])}<span title="${escape(tutorialSteps[v.tutorial])}">${tutorialHints[v.tutorial]}</span><span class="training-progress" role="img" aria-label="훈련 ${v.tutorial + 1}/4">${tutorialSteps.map((_, i) => `<i class="${i <= v.tutorial ? 'done' : ''}"></i>`).join('')}</span>${button('open', 'codex', icon('help'), '도움말')}${button('skip', '', icon('skip'), '훈련 건너뛰기')}</div>` : '';
     const factions = `<div class="mission-actions mission-factions" role="group" aria-label="종족 선택">${(Object.keys(FACTIONS) as Faction[]).map(k => button('faction', k, icon(k), `${FACTIONS[k].name} 병력 9종${k === 'terran' ? ' [T]' : ' [R]'}`, { disabled: v.over || v.options.mode === 'bunker' && k === 'protoss', selected: v.faction === k, tip: `faction:${k}` })).join('')}</div>`;
     // 모바일 사이드 패널은 한 줄(32px)뿐이라 훈련 안내가 있으면 예보 대신 보여준다.
-    const forecast = !v.active && !v.over && !(tutorial && MOBILE_LAYOUT) ? `<div class="mission-forecast" role="group" aria-label="다음 웨이브 ${next}"><b>W ${String(next).padStart(2, '0')}</b>${this.enemies(next)}</div>` : '';
+    const forecast = !v.active && !v.over && !(tutorial && MOBILE_LAYOUT) ? `<div class="mission-forecast" role="group" aria-label="다음 웨이브 ${next}"><b>W ${String(next).padStart(2, '0')}</b>${this.enemies(next, v.test ? v.testScope : 'all')}</div>` : '';
     const html = `<div class="mission-strip"><div class="mission-toolbar">${factions}<div class="mission-actions" role="group" aria-label="사령관 패널">${button('open', 'tactics', icon('manage'), '작전실 [O]', { tip: 'ops' })}${(['strike', 'slow', 'supply'] as CommanderKey[]).map(k => {
       const cooldown = Math.ceil(v.commander[k]);
       const auto = v.autoCommander.includes(k), autoText = auto ? ' · 자동 사용 중' : '';
@@ -225,8 +234,8 @@ export class OperationsCenter {
   }
   private hideTip(): void { this.tip.hidden = true; }
   private art(key: TowerKey): string { return `<img class="ops-unit-art" src="${this.images.get(key)}" width="64" height="64" alt="" aria-hidden="true">`; }
-  private enemies(wave: number): string {
-    const plan = wavePlan(wave);
+  private enemies(wave: number, scope: TestScope = 'all'): string {
+    const plan = wavePlan(wave, scope);
     return (Object.keys(ENEMY_DEFS) as EnemyKey[]).filter(k => plan.includes(k)).map(k => {
       const count = plan.filter(x => x === k).length, label = `${ENEMY_INFO[k].name} ${count}기`;
       return `<span class="ops-enemy ${k === 'boss' ? 'is-boss' : ''}" role="img" data-tip="enemy:${k}:${count}" aria-label="${label}">${icon(enemyIcons[k])}<b aria-hidden="true">${count}</b></span>`;
@@ -244,6 +253,8 @@ export class OperationsCenter {
     if (a === 'start') { this.actions.start({ ...(this.draft ?? this.actions.view().options) }); return; }
     if (a === 'resume') { this.actions.resume(); return; }
     if (a === 'target') this.actions.target(key as TargetMode);
+    if (a === 'scope') this.actions.testScope(key as TestScope);
+    if (a === 'damage') this.damageView = key as TestScope;
     if (a === 'branch') this.actions.branch(key as keyof typeof BRANCHES);
     if (a === 'select') this.actions.select(key);
     if (a === 'move' && this.actions.move()) { this.close(); return; }
@@ -277,17 +288,19 @@ export class OperationsCenter {
   }
   private setup(v: OperationsView): string {
     const draft = this.draft ?? v.options;
-    return `<section class="ops-setup"><div class="ops-section-heading"><h2>${v.test ? '보스 테스트 전장' : '전장 선택'}</h2><span>${MAP_DEFS[draft.map].desc}</span></div><div class="ops-map-picker" role="group" aria-label="전장">${(Object.keys(MAP_DEFS) as RunOptions['map'][]).map(k => button('map', k, `${mapPreview(k)}<span>${MAP_DEFS[k].name}</span>`, MAP_DEFS[k].name, { selected: draft.map === k, hint: `${MAP_DEFS[k].name} · ${MAP_DEFS[k].desc}` })).join('')}</div>
+    return `<section class="ops-setup"><div class="ops-section-heading"><h2>${v.test ? '최종 웨이브 테스트' : '전장 선택'}</h2><span>${MAP_DEFS[draft.map].desc}</span></div><div class="ops-map-picker" role="group" aria-label="전장">${(Object.keys(MAP_DEFS) as RunOptions['map'][]).map(k => button('map', k, `${mapPreview(k)}<span>${MAP_DEFS[k].name}</span>`, MAP_DEFS[k].name, { selected: draft.map === k, hint: `${MAP_DEFS[k].name} · ${MAP_DEFS[k].desc}` })).join('')}</div>
       <div class="ops-rules"><div><h2>난이도</h2><div class="ops-difficulties" role="group" aria-label="난이도">${(Object.keys(DIFFICULTIES) as RunOptions['difficulty'][]).map((k, i) => button('difficulty', k, `${icon('shield')}<span>${DIFFICULTIES[k].name}</span><span class="ops-pips" aria-hidden="true">${'•'.repeat(i + 1)}</span>`, DIFFICULTIES[k].name, { selected: draft.difficulty === k })).join('')}</div></div><div><h2>모드</h2><div class="ops-modes" role="group" aria-label="작전 모드">${(Object.keys(MODES) as RunOptions['mode'][]).map(k => button('mode', k, k === 'bunker' ? this.art('bunker') : icon(modeIcons[k]), MODES[k].name, { selected: draft.mode === k, hint: `${MODES[k].name} · ${MODES[k].desc}` })).join('')}</div><p class="ops-mode-hint">${MODES[draft.mode].desc}</p></div></div>
+      ${v.test ? `<div class="ops-section-heading"><h2>테스트 범위</h2><span>${TEST_SCOPES[v.testScope].desc}</span></div>${this.scopes(v)}` : ''}
       <div class="ops-launch">${v.checkpoint && !v.test ? `<div class="ops-checkpoint">${button('resume', '', `${icon('resume')}<span>이어하기</span><b>W ${String(v.checkpoint.wave).padStart(2, '0')}</b>`, '저장된 작전 이어하기', { className: 'ops-resume', hint: `${MAP_DEFS[v.checkpoint.options.map].name} · ${DIFFICULTIES[v.checkpoint.options.difficulty].name} · ${MODES[v.checkpoint.options.mode].name} · ${v.checkpoint.wave}웨이브 완료 · 기지 ${v.checkpoint.lives}/20 · 병력 ${v.checkpoint.units.length}기` })}<small>새 출격 시 기존 저장 교체</small></div>` : ''}${v.test
-        ? button('start', '', `${icon('boss')}<span>보스 테스트</span>`, '보스 테스트 시작', { className: 'ops-deploy', hint: `${MAP_DEFS[draft.map].name}에서 ${MAX_WAVE}웨이브 ${bossPattern(MAX_WAVE)} 반복 · ◆ ${TEST_GOLD.toLocaleString()} · 저장 및 업적 제외` })
+        ? button('start', '', `${icon(scopeIcons[v.testScope])}<span>${TEST_SCOPES[v.testScope].name} 테스트</span>`, `${TEST_SCOPES[v.testScope].name} 테스트 시작`, { className: 'ops-deploy', hint: `${MAP_DEFS[draft.map].name}에서 ${MAX_WAVE}웨이브 반복 · ${TEST_SCOPES[v.testScope].name}: ${TEST_SCOPES[v.testScope].desc} · ◆ ${TEST_GOLD.toLocaleString()} · 저장 및 업적 제외` })
         : button('start', '', `${icon('deploy')}<span>출격</span>`, '새 작전 시작', { className: 'ops-deploy', hint: v.checkpoint ? '새 작전 시작 · 기존 체크포인트를 교체합니다' : '새 작전 시작' })}</div></section>`;
   }
   private tactics(v: OperationsView): string {
     const u = v.selected, next = v.test ? MAX_WAVE : v.wave + 1;
     const targetIcons: Record<TargetMode, string> = { first: 'first', strong: 'shield', weak: 'weak', boss: 'boss' };
     const targetNames: Record<TargetMode, string> = { first: '선두', strong: '강적', weak: '약적', boss: '보스' };
-    const forecast = !v.over ? `<section class="ops-forecast"><div><small>${v.active ? '다음 교전' : '다음 웨이브'}</small><b>${String(next).padStart(2, '0')}</b></div><div class="ops-enemies">${this.enemies(next)}</div>${next % 10 === 0 ? `<p class="ops-danger">${icon('boss')}${bossPattern(next)} · 놓치면 패배</p>` : ''}</section>` : '';
+    const scope = v.test ? v.testScope : 'all';
+    const forecast = !v.over ? `<section class="ops-forecast"><div><small>${v.active ? '다음 교전' : '다음 웨이브'}</small><b>${String(next).padStart(2, '0')}</b></div><div class="ops-enemies">${this.enemies(next, scope)}</div>${wavePlan(next, scope).includes('boss') ? `<p class="ops-danger">${icon('boss')}${bossPattern(next)} · 놓치면 패배</p>` : ''}</section>${v.test ? this.scopes(v) : ''}` : '';
     if (!v.units.length) return `${forecast}<div class="ops-empty">${this.art(v.faction === 'terran' ? 'marine' : 'zealot')}<h2>방어선을 세워볼까요?</h2><p>병력을 골라 길 옆에 배치하세요.</p>${button('close', '', `${icon('deploy')}<span>병력 배치</span>`, '병력 배치', { className: 'ops-primary' })}</div>`;
     return `${forecast}<div class="ops-section-heading"><h2>내 병력 <small>${v.units.length}</small></h2></div><div class="ops-roster" role="group" aria-label="배치된 병력">${v.units.map(t => button('select', t.id, `${this.art(t.k)}<span class="ops-level" aria-hidden="true">${t.hostId ? '↳ ' : ''}${'•'.repeat(t.lvl)}</span>`, `${TOWER_DEFS[t.k].name} #${t.id} · Lv.${t.lvl}${t.hostId ? ' · 주둔' : ''}`, { selected: t.id === u?.id })).join('')}</div>
       ${u ? `<section class="ops-unit"><div class="ops-unit-heading">${this.art(u.k)}<div><h2>${TOWER_DEFS[u.k].name}<small>Lv.${u.lvl}</small></h2><p>${TOWER_DEFS[u.k].role}</p></div>${button('move', '', `${icon('move')}<small>◆ 20</small>`, '선택 병력 재배치 · ◆ 20', { disabled: v.over || v.active || !!u.hostId || v.gold < 20, className: 'ops-move', hint: '준비 시간에 빈 칸으로 재배치 · ◆ 20 · 빈 칸 선택 시 비용 차감' })}</div>${u.k !== 'bunker' ? `<div class="ops-targets" role="group" aria-label="공격 대상 우선순위">${(Object.keys(TARGETS) as TargetMode[]).map(k => button('target', k, `${icon(targetIcons[k])}<span>${targetNames[k]}</span>`, TARGETS[k] + ' 우선', { disabled: v.over, selected: u.target === k })).join('')}</div><div class="ops-section-heading ops-branch-heading"><h3>특화</h3><span>${u.branch ? '선택 완료' : `Lv.3 · ◆ ${TOWER_DEFS[u.k].cost} · 선택 후 변경 불가`}</span></div><div class="ops-branches">${(Object.keys(BRANCHES) as (keyof typeof BRANCHES)[]).map(k => {
@@ -297,13 +310,19 @@ export class OperationsCenter {
         return button('branch', k, `${icon(k === 'power' ? 'siege' : 'overdrive')}<span><b>${BRANCHES[k].name}</b><small>${detail}</small></span><strong>${value}</strong>`, u.branch === k ? '선택 완료' : BRANCHES[k].name + ' 선택', { disabled: v.over || u.lvl < 3 || !!u.branch || v.gold < TOWER_DEFS[u.k].cost, selected: u.branch === k, hint: `${BRANCHES[k].name} · ${BRANCHES[k].desc} · ◆ ${TOWER_DEFS[u.k].cost} · 선택 후 변경 불가` });
       }).join('')}</div>` : `<p class="ops-muted">보병 보급과 강화는 벙커 명령 아이콘에서.</p>`}</section>` : '<p class="ops-muted">병력을 선택해 전술을 바꾸세요.</p>'}`;
   }
+  /** 테스트 출현 범위 선택. 교전 중에는 다음 교전부터 바꿀 수 있도록 잠근다. */
+  private scopes(v: OperationsView): string {
+    return `<div class="ops-targets ops-scopes" role="group" aria-label="테스트 범위">${(Object.keys(TEST_SCOPES) as TestScope[]).map(k => button('scope', k, `${icon(scopeIcons[k])}<span>${TEST_SCOPES[k].name}</span>`, `${TEST_SCOPES[k].name} 테스트`, { disabled: v.active || v.over, selected: v.testScope === k })).join('')}</div>`;
+  }
   private rewards(v: OperationsView): string {
     return `<p class="ops-reward-hint">하나를 골라 더 강해지세요.</p><div class="ops-rewards">${v.pending.map(k => button('reward', k, `${icon(rewardIcons[k])}<strong>${rewardValues[k]}</strong><b>${REWARDS[k].name}</b><span>${REWARDS[k].desc}</span>`, REWARDS[k].name + ' 획득', { hint: `${REWARDS[k].name} · ${REWARDS[k].desc}`, className: `ops-reward ops-reward-${k}` })).join('')}</div>`;
   }
   private stats(v: OperationsView): string {
-    const units = [...v.stats.units].filter(u => u.damage > 0).sort((a, b) => b.damage - a.damage), top = units[0];
+    const view = DAMAGE_VIEWS[this.damageView], value = (u: UnitRecord) => view.unit(u);
+    const units = [...v.stats.units].filter(u => value(u) > 0).sort((a, b) => value(b) - value(a)), top = units[0];
+    const views = `<div class="ops-targets ops-damage-views" role="group" aria-label="피해 구분">${(Object.keys(DAMAGE_VIEWS) as TestScope[]).map(k => button('damage', k, `${icon(DAMAGE_VIEWS[k].icon)}<span>${DAMAGE_VIEWS[k].name}<b>${Math.round(DAMAGE_VIEWS[k].total(v.stats)).toLocaleString()}</b></span>`, `${DAMAGE_VIEWS[k].name} 피해 ${Math.round(DAMAGE_VIEWS[k].total(v.stats))}`, { selected: this.damageView === k })).join('')}</div>`;
     const metrics = [{ icon: 'siege', label: '누적 피해', value: Math.round(v.stats.damage).toLocaleString() }, { icon: 'tactics', label: '처치', value: v.stats.kills }, { icon: 'weak', label: '기지 피해', value: v.stats.lost }, { icon: 'clock', label: '교전 시간', value: `${Math.floor(v.stats.seconds / 60)}:${String(Math.floor(v.stats.seconds % 60)).padStart(2, '0')}` }];
-    return `<div class="ops-metrics">${metrics.map(m => `<div title="${m.label}" aria-label="${m.label} ${m.value}">${icon(m.icon)}<b>${m.value}</b><small>${m.label}</small></div>`).join('')}</div>${top ? `<section class="ops-mvp">${this.art(top.k)}<div><small>MVP</small><h2>${TOWER_DEFS[top.k].name}</h2><p>${Math.round(top.damage).toLocaleString()} 피해 · ${top.kills} 처치</p></div>${icon('medal')}</section><div class="ops-damage-list">${units.slice(0, 5).map(u => `<div title="${TOWER_DEFS[u.k].name} #${u.id} · ${u.kills} 처치" aria-label="${TOWER_DEFS[u.k].name} #${u.id} · ${Math.round(u.damage)} 피해 · ${u.kills} 처치">${this.art(u.k)}<span><span>${TOWER_DEFS[u.k].name}</span><i style="--damage:${u.damage / top.damage * 100}%"></i></span><b>${Math.round(u.damage).toLocaleString()}</b></div>`).join('')}</div>` : `<div class="ops-empty">${icon('stats')}<p>첫 전투를 기다리고 있어요.</p></div>`}${v.stats.waves.length ? `<div class="ops-section-heading"><h2>최근 웨이브</h2><span>처치 / 기지 피해</span></div><div class="ops-wave-history">${v.stats.waves.slice(-10).map(w => `<span class="${w.lost ? 'has-loss' : ''}" title="${w.wave}웨이브 · ${w.kills} 처치 · 기지 피해 ${w.lost} · ${w.seconds.toFixed(1)}초"><b>${String(w.wave).padStart(2, '0')}</b><small>${w.kills} / ${w.lost}</small></span>`).join('')}</div>` : ''}`;
+    return `<div class="ops-metrics">${metrics.map(m => `<div title="${m.label}" aria-label="${m.label} ${m.value}">${icon(m.icon)}<b>${m.value}</b><small>${m.label}</small></div>`).join('')}</div>${v.stats.damage > 0 ? views : ''}${top ? `<section class="ops-mvp">${this.art(top.k)}<div><small>${this.damageView === 'all' ? 'MVP' : `${view.name} MVP`}</small><h2>${TOWER_DEFS[top.k].name}</h2><p>${Math.round(value(top)).toLocaleString()} ${view.name} 피해 · ${top.kills} 처치</p></div>${icon('medal')}</section><div class="ops-damage-list">${units.slice(0, 5).map(u => `<div title="${TOWER_DEFS[u.k].name} #${u.id} · ${u.kills} 처치" aria-label="${TOWER_DEFS[u.k].name} #${u.id} · ${Math.round(value(u))} ${view.name} 피해 · ${u.kills} 처치">${this.art(u.k)}<span><span>${TOWER_DEFS[u.k].name}</span><i style="--damage:${value(u) / value(top) * 100}%"></i></span><b>${Math.round(value(u)).toLocaleString()}</b></div>`).join('')}</div>` : `<div class="ops-empty">${icon(v.stats.damage > 0 ? view.icon : 'stats')}<p>${v.stats.damage > 0 ? `${view.name} 병력에게 준 피해가 아직 없어요.` : '첫 전투를 기다리고 있어요.'}</p></div>`}${v.stats.waves.length ? `<div class="ops-section-heading"><h2>최근 웨이브</h2><span>처치 / 기지 피해</span></div><div class="ops-wave-history">${v.stats.waves.slice(-10).map(w => `<span class="${w.lost ? 'has-loss' : ''}" title="${w.wave}웨이브 · ${w.kills} 처치 · 기지 피해 ${w.lost} · ${w.seconds.toFixed(1)}초"><b>${String(w.wave).padStart(2, '0')}</b><small>${w.kills} / ${w.lost}</small></span>`).join('')}</div>` : ''}`;
   }
   private codex(current: Faction): string {
     // 순서: 배우고(플레이 방법) → 내 병력을 알고(현재 종족 먼저, 도감 뒤에 비교표) → 적과 보스를 대비한다. 모든 항목은 접힌 채 연다.

@@ -398,4 +398,8 @@
 .ops-tip-wait { color:#f2c48a; }
 .ops-tip-roster { display:grid; grid-template-columns:repeat(9,24px); gap:3px; }
 .ops-tip-roster .ops-unit-art { width:24px; height:24px; }
-
+/* 전적의 피해 구분(종합·보스·라인): 이름 아래에 누적 피해를 함께 보여준다. */
+.ops-damage-views { margin-bottom:14px; }
+.ops-damage-views button>span { display:flex; flex-direction:column; align-items:flex-start; gap:2px; min-width:0; }
+.ops-damage-views b { font:12px monospace; color:#e4efd2; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+.ops-rules + .ops-section-heading { margin-top:18px; }

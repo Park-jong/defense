@@ -52,8 +52,16 @@ export const ENEMY_INFO: Record<EnemyKey, { name: string; desc: string }> = {
 export function bossPattern(wave: number): string {
   return wave >= 50 ? '최종 지휘관 · 보호막/소환/가속 순환' : ['보호막 재생', '부하 소환', '분열 증원', '주기적 가속'][Math.max(0, Math.floor(wave / 10) - 1) % 4];
 }
+/** 테스트 모드의 출현 범위: 기본(라인 + 보스), 보스만, 라인(보스 제외)만. */
+export const TEST_SCOPES = {
+  all: { name: '기본', desc: '라인 병력과 보스가 함께 출현' },
+  boss: { name: '보스만', desc: '보스만 단독 출현 · 보스가 부르는 증원은 그대로' },
+  line: { name: '라인만', desc: '보스를 뺀 라인 병력만 출현' },
+};
+export type TestScope = keyof typeof TEST_SCOPES;
 /** Both the preview and the actual spawn queue use this exact function. */
-export function wavePlan(wave: number): EnemyKey[] {
+export function wavePlan(wave: number, scope: TestScope = 'all'): EnemyKey[] {
+  if (scope === 'boss') return wave % 10 === 0 ? ['boss'] : [];
   const q: EnemyKey[] = [];
   for (let i = 0, n = Math.min(160, 6 + Math.floor(wave * 1.6)); i < n; i++) {
     let k: EnemyKey = 'grunt';
@@ -64,7 +72,7 @@ export function wavePlan(wave: number): EnemyKey[] {
     if (wave >= 12 && i % 15 === 9) k = 'shielder';
     q.push(k);
   }
-  if (wave % 10 === 0) q.push('boss');
+  if (wave % 10 === 0 && scope === 'all') q.push('boss');
   return q;
 }
 export function rewardChoices(mode: RunOptions['mode'], random: () => number = Math.random): RewardKey[] {
@@ -77,10 +85,16 @@ export function rewardChoices(mode: RunOptions['mode'], random: () => number = M
 export function allowedUnit(key: TowerKey, mode: RunOptions['mode']): boolean {
   return mode !== 'bunker' || ['bunker', 'marine', 'firebat'].includes(key);
 }
-export interface UnitRecord { id: string; k: TowerKey; damage: number; kills: number }
+/** damage는 종합 피해, boss는 그중 보스에게 준 피해다. 라인 피해는 damage - boss. */
+export interface UnitRecord { id: string; k: TowerKey; damage: number; boss: number; kills: number }
 export interface WaveRecord { wave: number; lost: number; kills: number; seconds: number }
-export interface RunStats { damage: number; kills: number; lost: number; seconds: number; units: UnitRecord[]; waves: WaveRecord[]; commanderDamage: number }
-export const newStats = (): RunStats => ({ damage: 0, kills: 0, lost: 0, seconds: 0, units: [], waves: [], commanderDamage: 0 });
+export interface RunStats { damage: number; kills: number; lost: number; seconds: number; units: UnitRecord[]; waves: WaveRecord[]; commanderDamage: number; bossDamage: number }
+export const newStats = (): RunStats => ({ damage: 0, kills: 0, lost: 0, seconds: 0, units: [], waves: [], commanderDamage: 0, bossDamage: 0 });
+/** 보스 피해를 따로 세기 전의 저장도 이어할 수 있게 빈 값을 0으로 채운다. */
+export function normalizeStats(stats: RunStats): RunStats {
+  stats.bossDamage ??= 0; for (const u of stats.units) u.boss ??= 0;
+  return stats;
+}
 export interface SavedUnit {
   id: string; k: TowerKey; c: number; r: number; lvl: number; spent: number;
   skills: EquippedSkill[]; cd: number; buffs: UnitBuff[]; hostId?: string; slot?: number; target: TargetMode; branch?: Branch;
@@ -144,7 +158,8 @@ export function validateSave(v: unknown): v is RunSave {
     || !integer(v.tutorial, 0, 4) || !Array.isArray(v.usedKinds) || !v.usedKinds.every((k: unknown) => has(TOWER_DEFS, k))) return false;
   const s = v.stats;
   return obj(s) && ['damage', 'kills', 'lost', 'seconds', 'commanderDamage'].every(k => num(s[k]))
-    && Array.isArray(s.units) && s.units.every((u: unknown) => obj(u) && typeof u.id === 'string' && /^[1-9]\d*$/.test(u.id) && has(TOWER_DEFS, u.k) && num(u.damage) && num(u.kills))
+    && Array.isArray(s.units) && s.units.every((u: unknown) => obj(u) && typeof u.id === 'string' && /^[1-9]\d*$/.test(u.id) && has(TOWER_DEFS, u.k) && num(u.damage) && (u.boss === undefined || num(u.boss)) && num(u.kills))
+    && (s.bossDamage === undefined || num(s.bossDamage))
     && Array.isArray(s.waves) && s.waves.every((w: unknown) => obj(w) && integer(w.wave, 1, v.wave) && num(w.lost) && num(w.kills) && num(w.seconds));
 }
 export function readSave(store = storage()): RunSave | null { const v = readStored(SAVE_KEY, store); return validateSave(v) ? v : null; }
