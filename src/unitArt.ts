@@ -595,14 +595,25 @@ export function unitPortraitUrl(key: TowerKey, theme: ThemeKey = activeTheme()):
   return moePortraitUrl(key) ?? bishoujoPortraitAsset(key)?.portrait ?? unitImageUrl(key, theme);
 }
 
+/** 프런티어 그림은 항상, 모에크래프트 그림은 그 테마로 시작할 때만 불러온다(나머지는 loadBishoujoUnitArt로 필요할 때). */
 export function loadUnitArt(scene: Phaser.Scene): void {
+  queueUnitArt(scene, 'frontier');
+  if (activeTheme() === 'bishoujo') loadBishoujoUnitArt(scene);
+}
+
+/** 모에크래프트 아틀라스·초상화·유닛 그림을 로더에 올린다. 이미 있는 텍스처는 건너뛴다. */
+export function loadBishoujoUnitArt(scene: Phaser.Scene): void {
   loadMoeAtlas(scene);
   if (!hasMoeAtlas() && !scene.textures.exists('bishoujo:portrait')) {
     const portrait = bishoujoPortraitAsset('marine');
     if (portrait) scene.load.image('bishoujo:portrait', portrait.portrait);
     else scene.load.svg('bishoujo:portrait', unitImageUrl('marine', 'bishoujo'));
   }
-  for (const theme of ['frontier', 'bishoujo'] as const) for (const key of Object.keys(layers) as TowerKey[]) {
+  queueUnitArt(scene, 'bishoujo');
+}
+
+function queueUnitArt(scene: Phaser.Scene, theme: ThemeKey): void {
+  for (const key of Object.keys(layers) as TowerKey[]) {
     const art = theme === 'bishoujo' ? bishoujoLayers(key) : layers[key];
     for (const [part, content] of [['base', art.base], ['barrel', art.head], ['unit', art.base + art.head]]) {
       if (theme === 'bishoujo' && part === 'unit' && hasMoeAtlas()) continue;

@@ -58,11 +58,13 @@ test('18종의 캐릭터가 기존 유닛 키와 일치하고 두 테마의 그�
   const load = createSourceLoader();
   const { TOWER_KEYS } = load('./data/units');
   const { HEROINES, bishoujoLayers } = load('./bishoujoArt');
-  const { unitImageUrl, loadUnitArt } = load('./unitArt');
+  const { unitImageUrl, loadUnitArt, loadBishoujoUnitArt } = load('./unitArt');
   assert.deepEqual(Object.keys(HEROINES).sort(), [...TOWER_KEYS].sort());
   const loaded = new Map();
-  loadUnitArt({ textures: { exists: () => false }, load: { svg(key, url) { assert.ok(!loaded.has(key)); loaded.set(key, url); } } });
-  assert.equal(loaded.size, 18 * 3 * 2 + 1);
+  const scene = { textures: { exists: () => false }, load: { svg(key, url) { assert.ok(!loaded.has(key)); loaded.set(key, url); } } };
+  // 프런티어로 시작하면 모에크래프트 그림은 불러오지 않고, 테마를 처음 켤 때 따로 불러온다.
+  loadUnitArt(scene); assert.equal(loaded.size, 18 * 3); assert.ok(![...loaded.keys()].some(k => k.startsWith('bishoujo:')));
+  loadBishoujoUnitArt(scene); assert.equal(loaded.size, 18 * 3 * 2 + 1);
   for (const key of TOWER_KEYS) {
     assert.ok(bishoujoLayers(key).base.includes('<ellipse'));
     assert.notEqual(unitImageUrl(key, 'frontier'), unitImageUrl(key, 'bishoujo'));
@@ -74,7 +76,7 @@ test('초상화 파일을 모두 등록한 뒤에는 본문과 아이콘을 구�
   const load = createSourceLoader();
   const { TOWER_KEYS } = load('./data/units');
   const { registerBishoujoPortraits } = load('./bishoujoPortraitAssets');
-  const { unitPortraitUrl, loadUnitArt } = load('./unitArt');
+  const { unitPortraitUrl, loadBishoujoUnitArt } = load('./unitArt');
   const files = Object.fromEntries(TOWER_KEYS.flatMap(key => [
     [`./assets/bishoujo/${key}.webp`, `/assets/${key}.webp`],
     [`./assets/bishoujo/${key}-icon.webp`, `/assets/${key}-icon.webp`],
@@ -82,7 +84,7 @@ test('초상화 파일을 모두 등록한 뒤에는 본문과 아이콘을 구�
   assert.throws(() => registerBishoujoPortraits({}), /Missing bishoujo portrait assets/);
   registerBishoujoPortraits(files);
   const loaded = new Map();
-  loadUnitArt({ textures: { exists: () => false }, load: { svg() {}, image(key, url) { loaded.set(key, url); } } });
+  loadBishoujoUnitArt({ textures: { exists: () => false }, load: { svg() {}, image(key, url) { loaded.set(key, url); } } });
   assert.equal(loaded.size, 19);
   assert.equal(loaded.get('bishoujo:portrait'), '/assets/marine.webp');
   for (const key of TOWER_KEYS) {

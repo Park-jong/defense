@@ -5,11 +5,11 @@ import {
 import { drawMap, makeTextures } from './textures';
 import { attackCount } from './data/units';
 import { Btn, mkBtn } from './ui';
-import { DRAGOON_EMITTER, FIREBAT_MUZZLES, loadUnitArt, SIEGE_MUZZLE, TURRET_LAUNCH_PORTS, UNIT_WORLD_SCALE } from './unitArt';
+import { DRAGOON_EMITTER, FIREBAT_MUZZLES, loadBishoujoUnitArt, loadUnitArt, SIEGE_MUZZLE, TURRET_LAUNCH_PORTS, UNIT_WORLD_SCALE } from './unitArt';
 import { EquippedSkill, SKILL_DEFS, SKILL_KEYS, SKILL_SLOTS, SkillKey, UnitBuff } from './catalog';
 import { CommandCard, UnitCommand } from './commandCard';
 import { loadCommandIcons } from './commandIcons';
-import { addConsoleChrome, CONSOLE_RISE, consoleContains, loadConsoleChrome } from './consoleChrome';
+import { addConsoleChrome, CONSOLE_RISE, consoleContains, loadBishoujoConsoleChrome, loadConsoleChrome } from './consoleChrome';
 import { DamageKind, DamageNumbers } from './damageNumbers';
 import { ShopState, SupplyShop } from './shop';
 import { levelStats, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
@@ -66,6 +66,8 @@ const OBSERVER_INFO_BONUSES = OBSERVATION_BONUSES.map(bonus => Math.round(bonus 
 /** 이 depth 이상은 UI로 보고 uiCam만, 미만은 맵으로 보고 mapCam만 그린다. */
 const UI_DEPTH = 25;
 const MAX_MAP_ZOOM = 2.5;
+/** 작전 종료 화면에서 입력이 없을 때 게임 루프를 재우기까지의 시간. */
+const IDLE_SLEEP_MS = 2500;
 /** 명령 입력 창의 비밀 명령 수치. */
 const CHEAT_GOLD = 10000, CHEAT_GOLD_CAP = 100000, CHEAT_POWER_CAP = 10000, CHEAT_POWER_STACKS = 20;
 
@@ -268,7 +270,8 @@ export class GameScene extends Phaser.Scene {
     this.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
       if (this.inMapView(p)) this.zoomMap(this.mapZoom * (dy < 0 ? 1.15 : 1 / 1.15), p.x, p.y);
     });
-    this.input.mouse?.disableContextMenu();
+    // 우클릭 메뉴 차단은 캔버스에 리스너를 더하므로, 다시 출격할 때마다 쌓이지 않게 게임당 한 번만 건다.
+    if (!this.game.registry.get('contextMenuDisabled')) { this.input.mouse?.disableContextMenu(); this.game.registry.set('contextMenuDisabled', true); }
     this.input.keyboard?.addCapture('SPACE');
     this.input.keyboard?.on('keydown', (e: KeyboardEvent) => this.onKey(e));
     this.setupOperations();
@@ -400,9 +403,21 @@ export class GameScene extends Phaser.Scene {
       if (isBishoujo()) { selectTheme('frontier'); return `테마: ${THEMES.frontier.name}`; }
       // 프런티어 → 모에크래프트: 창을 닫고 잠금 해제 연출 한가운데(빛이 터지는 순간)에 테마를 바꾼다.
       console.close();
-      playThemeUnlock(() => selectTheme('bishoujo'));
+      // 모에크래프트 그림은 처음 켤 때 불러온다. 연출의 빛이 터지는 순간과 불러오기가 모두 끝난 뒤에 바꾼다.
+      let loaded = false, revealed = false;
+      this.loadBishoujoArt(() => { loaded = true; if (revealed) selectTheme('bishoujo'); });
+      playThemeUnlock(() => { revealed = true; if (loaded) selectTheme('bishoujo'); });
       return `테마: ${THEMES.bishoujo.name}`;
     } });
+  }
+
+  /** 모에크래프트 그림을 처음 켤 때만 불러와, 프런티어만 쓰는 동안에는 메모리를 차지하지 않게 한다. */
+  private loadBishoujoArt(done: () => void): void {
+    if (this.textures.exists('bishoujo:portrait')) { done(); return; }
+    loadBishoujoUnitArt(this);
+    if (!MOBILE_LAYOUT) loadBishoujoConsoleChrome(this);
+    this.load.once(Phaser.Loader.Events.COMPLETE, () => { createMoePortraits(this); done(); });
+    this.load.start();
   }
 
   /** Swap artwork in place: battle state, saves, achievements and aiming remain intact. */
@@ -2037,9 +2052,30 @@ export class GameScene extends Phaser.Scene {
     mini.fillStyle(this.lives <= 5 ? 0xcf8067 : isBishoujo() ? 0xe8acd4 : 0x9dc278).fillRect(m.x + 2, m.y + 2, (m.w - 4) * Math.max(0, this.lives) / maxLives(), 5);
   }
 
+  /**
+   * 작전이 끝나면 화면이 멈춰 있으므로, 잠시 뒤 게임 루프를 재워 CPU·그래픽 자원을 놓아준다.
+   * 누르거나 키를 치면 깨어나 그 입력을 처리하고, 다시 조용해지면 잠든다. 다음 출격에서는 늘 깨어 있다.
+   */
+  private sleepWhenIdle(): void {
+    const loop = this.game?.loop;
+    if (!loop?.sleep) return;
+    let timer = 0;
+    const nap = () => { window.clearTimeout(timer); timer = window.setTimeout(() => { if (this.over && loop.running) loop.sleep(); }, IDLE_SLEEP_MS); };
+    const wake = () => { if (!loop.running) loop.wake(); nap(); };
+    const types = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'resize'];
+    for (const type of types) window.addEventListener(type, wake, true);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      window.clearTimeout(timer);
+      for (const type of types) window.removeEventListener(type, wake, true);
+      if (!loop.running) loop.wake();
+    });
+    nap();
+  }
+
   private endGame(win: boolean): void {
     if (this.over) return;
     this.over = true;
+    this.sleepWhenIdle();
     this.moe?.reset();
     if (!win && this.waveActive) this.recordWave(false);
     if (!this.testMode) {
