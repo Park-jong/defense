@@ -1,0 +1,84 @@
+/* Both themes share layout and hit areas. Theme choice only changes presentation. */
+.ops-theme-picker { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:22px; }
+.operations-center .theme-card { display:flex; align-items:center; gap:12px; min-width:0; min-height:90px; padding:10px 14px 10px 6px; text-align:left; overflow:hidden; position:relative; border-radius:12px; }
+.operations-center .theme-card-frontier { background:linear-gradient(120deg,#26372d,#17251d); border-color:#647d59; }
+.operations-center .theme-card-bishoujo { background:radial-gradient(ellipse at 20% 20%,#79518b88,transparent 75%),linear-gradient(120deg,#3b2c50,#241e36); border-color:#856a9e; color:#f4def4; }
+.operations-center .theme-card[aria-pressed="true"] { border-color:#dbb0dc; box-shadow:inset 0 0 0 1px #e4b4d940,0 0 20px #c893d015; }
+.theme-preview { display:flex; align-items:center; flex:none; width:112px; height:64px; }
+.theme-preview img { width:64px; height:64px; object-fit:contain; filter:drop-shadow(0 4px 3px #100b2477); }
+.theme-preview img+img { margin-left:-16px; transform:translateY(5px); }
+.theme-copy { display:flex; flex-direction:column; gap:7px; min-width:0; }
+.theme-copy small { color:#bda9cd; font:8px monospace; letter-spacing:1px; white-space:nowrap; }
+.theme-copy b { font-size:14px; font-weight:600; word-break:keep-all; }
+.theme-selected { margin-left:auto; font-size:20px; color:#edbde4; flex:none; }
+.theme-card-bishoujo .theme-preview { position:relative; height:76px; }
+.theme-card-bishoujo .theme-preview img { height:76px; width:62px; border-radius:7px; border:1px solid #d9afcc55; object-fit:cover; object-position:50% 15%; }
+.theme-card-bishoujo .theme-preview img+img { transform:translateY(5px) rotate(5deg); }
+.theme-card-bishoujo .theme-copy small { color:#e4b6cd; letter-spacing:.4px; }
+
+:root[data-theme="bishoujo"] { color-scheme:dark; }
+:root[data-theme="bishoujo"] body { background:radial-gradient(ellipse at 50% 25%,#4c345c 0%,#21192e 50%,#0e101e 100%); }
+:root[data-theme="bishoujo"] canvas { box-shadow:0 0 0 1px #a37cae,0 0 0 5px #201a31,0 20px 90px #130d23cc; }
+:root[data-theme="bishoujo"] :is(.operations-center,.supply-shop) { color:#f1e4f6; background:#211c30; border-color:#a182b4; box-shadow:0 0 0 4px #78558b33,0 24px 100px #0c091dcc; }
+:root[data-theme="bishoujo"] :is(.operations-center,.supply-shop)::backdrop { background:#100c20bf; }
+:root[data-theme="bishoujo"] :is(.ops-header,.shop-header) { background:radial-gradient(ellipse at 10% 0,#a96d9f33,transparent 70%),linear-gradient(115deg,#403050,#262139); border-bottom:1px solid #b08bbb26; }
+:root[data-theme="bishoujo"] :is(.ops-heading,.shop-heading) h1 { color:#ffe5f6; }
+:root[data-theme="bishoujo"] :is(.ops-heading,.shop-heading) p { color:#cfb2dc; letter-spacing:.7px; }
+:root[data-theme="bishoujo"] :is(.ops-nav,.shop-tabs) { background:#292139; border-color:#534263; }
+:root[data-theme="bishoujo"] :is(.ops-footer,.shop-footer) { background:#251d34; border-color:#534263; }
+:root[data-theme="bishoujo"] :is(.ops-content,.shop-content) { scrollbar-color:#9c7baa transparent; }
+:root[data-theme="bishoujo"] :is(.operations-center,.supply-shop,.mission-ribbon) button { color:#e9daf1; background:#342b46; border-color:#6c557f; }
+:root[data-theme="bishoujo"] :is(.operations-center,.supply-shop,.mission-ribbon) button:hover:enabled { background:#4c375d; border-color:#ddb0d9; }
+:root[data-theme="bishoujo"] :is(.operations-center,.supply-shop,.mission-ribbon) button[aria-pressed="true"] { color:#ffe3f5; background:#553d66; border-color:#eab4da; box-shadow:inset 0 0 0 1px #e7b6e333; }
+:root[data-theme="bishoujo"] :is(.operations-center,.supply-shop,.mission-ribbon) :focus-visible { outline-color:#f8c4e7; }
+:root[data-theme="bishoujo"] :is(.ops-nav,.shop-tabs) button { background:transparent; border-color:transparent; }
+:root[data-theme="bishoujo"] :is(.operations-center,.supply-shop) :is(p,small,.shop-hint,.ops-section-heading>span,.ops-mode-hint,.ops-save-status,.shop-heading p,.ops-volume) { color:#bdaacc; }
+:root[data-theme="bishoujo"] :is(.operations-center,.supply-shop) :is(h2,h3,h4,strong) { color:#efddf4; }
+:root[data-theme="bishoujo"] :is(.ops-wallet,.shop-wallet) { color:#b2e3f7; }
+:root[data-theme="bishoujo"] :is(.ops-volume,.shop-volume) input { accent-color:#dfa7d4; }
+:root[data-theme="bishoujo"] :is(.ops-icon,.shop-icon):not(.shop-unit-icon) { filter:hue-rotate(130deg) saturate(.6) brightness(1.2); }
+:root[data-theme="bishoujo"] :is(.ops-notice,.shop-notice,.shop-notice.is-success) { background:#3c2e4c; color:#efd4ee; border-color:#88679b; }
+:root[data-theme="bishoujo"] .mission-strip { color:#e7d8ef; background:#241e35e8; border-color:#846593; box-shadow:0 4px 18px #150d2722; }
+:root[data-theme="bishoujo"] .mission-factions { border-color:#725c85; }
+:root[data-theme="bishoujo"] .mission-ribbon button:disabled { background:#282237; border-color:#544363; }
+:root[data-theme="bishoujo"] :is(.mission-go,.ops-deploy,.shop-purchase) { background:linear-gradient(#715078,#483653); color:#ffe6f6; border-color:#d29cc8; }
+:root[data-theme="bishoujo"] :is(.ops-map-picker,.ops-roster,.ops-branches,.ops-skins,.ops-difficulties,.ops-modes) button { background:#2d253d; }
+:root[data-theme="bishoujo"] .ops-map-grid { stroke:#bb9dcf; }
+:root[data-theme="bishoujo"] .ops-map-picker button[aria-pressed="true"]::after { background:#f4b9dc; box-shadow:0 0 9px #e1a0ce77; }
+:root[data-theme="bishoujo"] .ops-map-picker button .ops-map-road { stroke:#655578; }
+:root[data-theme="bishoujo"] .ops-map-picker button .ops-map-route { stroke:#e5c0ed; }
+:root[data-theme="bishoujo"] .ops-map-picker button[aria-pressed="true"] .ops-map-road { stroke:#8c6e9c; }
+:root[data-theme="bishoujo"] .ops-map-picker button[aria-pressed="true"] .ops-map-route { stroke:#ffe0f4; }
+:root[data-theme="bishoujo"] :is(.ops-disclosure,.ops-codex-entry,.ops-unit-card,.ops-medal,.ops-metrics>div,.ops-wave-history>span,.bunker-slot,.shop-batch,.shop-batch-group,.army-detail,.army-stat,.skill-card) { color:#e9dcf1; background:linear-gradient(135deg,#30263f,#251f34); border-color:#655079; }
+:root[data-theme="bishoujo"] :is(.ops-unit-art,.army-head>img,.bunker-crew-art,.army-unit>img:first-child) { border-radius:6px; object-fit:cover; object-position:50% 15%; box-shadow:0 0 0 1px #e5aec644,0 4px 12px #120b2440; }
+:root[data-theme="bishoujo"] :is(.ops-unit-traits li,.ops-hotkeys,.ops-unit-cost,.ops-tip kbd) { color:#e1c6ec; background:#352842; border-color:#735680; }
+:root[data-theme="bishoujo"] .ops-tip { color:#f0e1f6; background:linear-gradient(#372b47,#211a31); border-color:#c49bd1; box-shadow:0 0 0 3px #8e6ba333,0 12px 32px #000b; }
+:root[data-theme="bishoujo"] .ops-tip :is(p,li,small,footer) { color:#cdb8dc; }
+:root[data-theme="bishoujo"] .ops-tip header b { color:#ffe1f5; }
+:root[data-theme="bishoujo"] .ops-tip li::before { color:#ebacda; }
+:root[data-theme="bishoujo"] .ops-damage-list i::after { background:linear-gradient(90deg,#b09fe8,#edafd5); }
+:root[data-theme="bishoujo"] .ops-compare tbody tr:hover { background:#40304e; }
+:root[data-theme="bishoujo"] .ops-theme-picker .theme-card-bishoujo { background:radial-gradient(ellipse at 20% 20%,#a56aaf55,transparent 75%),linear-gradient(120deg,#493358,#30243e); }
+:root[data-theme="bishoujo"] .ops-theme-picker .theme-card-frontier { background:linear-gradient(120deg,#26372d,#17251d); }
+:root[data-theme="bishoujo"] #rotate-hint { background:#191222f2; color:#efd7ef; }
+:root[data-theme="bishoujo"] #rotate-hint p { color:#cdb0dc; }
+:root[data-theme="bishoujo"] #rotate-hint button { color:#ffe1f5; background:linear-gradient(#674772,#3d2c4d); border-color:#c397ce; }
+
+@media (max-width:700px),(max-height:600px) {
+  .ops-theme-picker { gap:8px; margin-bottom:14px; }
+  .operations-center .theme-card { gap:6px; min-height:62px; padding:6px; }
+  .theme-preview { width:74px; height:44px; }
+  .theme-preview img { width:44px; height:44px; }
+  .theme-preview img+img { margin-left:-14px; }
+  .theme-card-bishoujo .theme-preview { height:50px; }
+  .theme-card-bishoujo .theme-preview img { width:42px; height:50px; }
+  .theme-copy { gap:4px; }
+  .theme-copy b { font-size:11px; }
+  .theme-copy small { font-size:6px; letter-spacing:0; }
+  .theme-selected { font-size:15px; }
+}
+@media (max-width:420px) {
+  .theme-preview { width:44px; }
+  .theme-preview img+img { display:none; }
+  .theme-copy small { white-space:normal; }
+}

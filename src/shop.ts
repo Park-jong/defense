@@ -1,6 +1,6 @@
 import { attackDamage, TOWER_DEFS, TOWER_KEYS, TowerKey } from './config';
 import { EquippedSkill, SKILL_DEFS, SKILL_KEYS, SKILL_SLOTS, SkillKey } from './catalog';
-import { unitImageUrl } from './unitArt';
+import { unitPortraitUrl } from './unitArt';
 import { commandIconUrl } from './commandIcons';
 import { BUNKER_INFANTRY, InfantryKey, isInfantry } from './bunker';
 import { OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
@@ -39,7 +39,6 @@ export class SupplyShop {
   private tab: 'army' | 'garrison' | 'manage' = 'army';
   private notice = '';
   private boarding: { bunkerId: string; slot: number } | null = null;
-  private images = new Map(TOWER_KEYS.map(k => [k, unitImageUrl(k)]));
   private tip = createTip();
 
   constructor(private actions: ShopActions) {
@@ -132,7 +131,7 @@ export class SupplyShop {
     const selected = state.units.find(u => u.id === state.selectedId);
     const tabs = [
       { key: 'army', name: '부대', label: '부대 · 강화와 스킬', art: icon('tactics') },
-      { key: 'garrison', name: '벙커', label: '벙커 주둔 · 4칸', art: `<img class="shop-icon shop-unit-icon" src="${this.images.get('bunker')}" alt="" aria-hidden="true">` },
+      { key: 'garrison', name: '벙커', label: '벙커 주둔 · 4칸', art: `<img class="shop-icon shop-unit-icon" src="${unitPortraitUrl('bunker')}" alt="" aria-hidden="true">` },
       { key: 'manage', name: '일괄', label: '일괄 관리', art: icon('manage') },
     ];
     this.dialog.innerHTML = `
@@ -154,7 +153,7 @@ export class SupplyShop {
     const roster = units.map(u => {
       const name = `${TOWER_DEFS[u.k].name} #${u.id} · Lv.${u.lvl} · 스킬 ${u.skills.length}/${SKILL_SLOTS}${u.hostId ? ' · 탑승' : ''}`;
       return `<button type="button" class="army-unit" data-action="select" data-key="${u.id}" aria-pressed="${u.id === selected?.id}" aria-label="${name}" title="${name}">
-        <img src="${this.images.get(u.k)}" alt="" width="44" height="44"><b>Lv.${u.lvl}</b><span class="army-dots" aria-hidden="true">${Array.from({ length: SKILL_SLOTS }, (_, i) => `<i class="${i < u.skills.length ? 'on' : ''}"></i>`).join('')}</span>${u.hostId ? `<img class="army-host" src="${this.images.get('bunker')}" alt="" width="16" height="16">` : ''}</button>`;
+        <img src="${unitPortraitUrl(u.k)}" alt="" width="44" height="44"><b>Lv.${u.lvl}</b><span class="army-dots" aria-hidden="true">${Array.from({ length: SKILL_SLOTS }, (_, i) => `<i class="${i < u.skills.length ? 'on' : ''}"></i>`).join('')}</span>${u.hostId ? `<img class="army-host" src="${unitPortraitUrl('bunker')}" alt="" width="16" height="16">` : ''}</button>`;
     }).join('');
     return `${notice}<div class="army-console"><nav class="army-roster" aria-label="배치된 병력">${roster}</nav>${this.armyDetail(state, selected)}</div>`;
   }
@@ -162,8 +161,8 @@ export class SupplyShop {
   private armyDetail(state: ShopState, u?: ShopUnit): string {
     if (!u) return `<section class="army-detail army-pointer">${icon('tactics')}<p>왼쪽에서 병력을 선택하세요</p></section>`;
     const d = TOWER_DEFS[u.k];
-    const toGarrison = `<button type="button" class="garrison-unload" data-action="tab" data-key="garrison" aria-label="벙커 탭으로 이동" title="벙커 탭으로 이동"><img src="${this.images.get('bunker')}" alt="" width="22" height="22"></button>`;
-    if (u.k === 'bunker') return `<section class="army-detail army-pointer"><img src="${this.images.get('bunker')}" alt="" width="64" height="64"><p>벙커는 벙커 탭에서 주둔 병력을 관리합니다</p>${toGarrison}</section>`;
+    const toGarrison = `<button type="button" class="garrison-unload" data-action="tab" data-key="garrison" aria-label="벙커 탭으로 이동" title="벙커 탭으로 이동"><img src="${unitPortraitUrl('bunker')}" alt="" width="22" height="22"></button>`;
+    if (u.k === 'bunker') return `<section class="army-detail army-pointer"><img src="${unitPortraitUrl('bunker')}" alt="" width="64" height="64"><p>벙커는 벙커 탭에서 주둔 병력을 관리합니다</p>${toGarrison}</section>`;
     const max = u.lvl >= maxUnitLevel(), cost = unitUpgradeCost(u), cur = u.stats, next = u.nextStats;
     const support = u.k === 'support' || u.k === 'observer';
     const stat = (art: string, label: string, now: number, then: number, digits = 0): string => {
@@ -175,7 +174,7 @@ export class SupplyShop {
       : stat('siege', '공격력', attackDamage(u.k, cur.dmg), attackDamage(u.k, next.dmg)) + stat('range', '사거리', cur.range, next.range) + stat('overdrive', '초당 공격', 1 / cur.rate, 1 / next.rate, 2) + stat('barrage', 'DPS', attackDamage(u.k, cur.dmg) / cur.rate, attackDamage(u.k, next.dmg) / next.rate, 1);
     const skills = SKILL_KEYS.filter(key => SKILL_DEFS[key].unit === u.k);
     return `<section class="army-detail" aria-label="${d.name} 상세">
-      <header class="army-head"><img src="${this.images.get(u.k)}" alt="" width="72" height="72"><div><h3>${d.name} <small>${max ? 'MAX' : `Lv.${u.lvl}`}</small></h3>
+      <header class="army-head"><img src="${unitPortraitUrl(u.k)}" alt="" width="72" height="72"><div><h3>${d.name} <small>${max ? 'MAX' : `Lv.${u.lvl}`}</small></h3>
         <p>${u.hostId ? `벙커 #${u.hostId} 탑승` : `구역 ${u.c + 1}-${u.r + 1}`} · ${d.role}</p></div>${u.hostId ? toGarrison : ''}</header>
       <div class="army-stats">${stats}</div>
       <div class="army-actions">${this.garrisonButton('upgrade', u.id, '강화', commandIconUrl('upgrade'), {
@@ -200,7 +199,7 @@ export class SupplyShop {
       <div class="shop-batch-header"><div><h3>${title}</h3><p>강화는 각 1단계씩 · 최대 강화·이미 장착한 스킬은 제외 · 미네랄 부족 시 전체 보류</p></div>${this.orderButton(state, { type: 'upgrade' }, scope, '전체 강화')}</div>
       ${units.length ? `<div class="shop-batch-groups">${TOWER_KEYS.filter(k => units.some(u => u.k === k)).map(k => {
         const group = units.filter(u => u.k === k), kindScope = { ...scope, kind: k };
-        return `<section class="shop-batch-group" aria-label="${TOWER_DEFS[k].name} 일괄 관리"><header><img src="${this.images.get(k)}" alt="" width="44" height="44"><div><h4>${TOWER_DEFS[k].name} · ${group.length}기</h4><p>벙커 탑승 ${group.filter(u => u.hostId).length} · 전장 ${group.filter(u => !u.hostId).length}</p></div></header>
+        return `<section class="shop-batch-group" aria-label="${TOWER_DEFS[k].name} 일괄 관리"><header><img src="${unitPortraitUrl(k)}" alt="" width="44" height="44"><div><h4>${TOWER_DEFS[k].name} · ${group.length}기</h4><p>벙커 탑승 ${group.filter(u => u.hostId).length} · 전장 ${group.filter(u => !u.hostId).length}</p></div></header>
           ${this.orderButton(state, { type: 'upgrade' }, kindScope, '동종 병력 강화')}
           ${SKILL_KEYS.filter(key => SKILL_DEFS[key].unit === k).map(key => this.orderButton(state, { type: 'skill', key }, kindScope, SKILL_DEFS[key].name)).join('')}</section>`;
       }).join('')}</div>` : '<p class="shop-batch-empty">병력을 배치하거나 벙커에 구매하면 일괄 관리할 수 있습니다.</p>'}</section>`;
@@ -237,14 +236,14 @@ export class SupplyShop {
     const selected = state.units.find(u => u.id === state.selectedId);
     const bunkers = state.units.filter(u => u.k === 'bunker');
     const bunker = bunkers.find(u => u.id === selected?.id || u.id === selected?.hostId) ?? bunkers[0];
-    if (!bunker) return `<section class="bunker-empty"><img src="${this.images.get('bunker')}" alt="벙커" width="128" height="128"><h3>먼저 빈 벙커를 건설하세요.</h3><p>마린·파이어뱃 4기를 조합해 나만의 방어 거점을 만드세요.</p><button type="button" class="shop-purchase" data-action="choose" data-key="bunker" ${state.gold < placeCost('bunker') ? 'disabled' : ''}>벙커 건설 · ◆ ${placeCost('bunker')}</button></section>`;
+    if (!bunker) return `<section class="bunker-empty"><img src="${unitPortraitUrl('bunker')}" alt="벙커" width="128" height="128"><h3>먼저 빈 벙커를 건설하세요.</h3><p>마린·파이어뱃 4기를 조합해 나만의 방어 거점을 만드세요.</p><button type="button" class="shop-purchase" data-action="choose" data-key="bunker" ${state.gold < placeCost('bunker') ? 'disabled' : ''}>벙커 건설 · ◆ ${placeCost('bunker')}</button></section>`;
     const available = state.units.filter(u => !u.hostId && isInfantry(u.k));
     const preferred = this.boarding?.bunkerId === bunker.id ? this.boarding.slot : -1;
     const targetSlot = preferred >= 0 && preferred < bunkerCapacity() && !bunker.passengers[preferred]
       ? preferred : bunker.passengers.findIndex(id => !id);
     return `<div class="garrison-console">
       <nav class="garrison-bunkers" aria-label="관리할 벙커">${bunkers.map(b => `<button type="button" data-action="select" data-key="${b.id}" class="${b.id === bunker.id ? 'is-active' : ''}" aria-pressed="${b.id === bunker.id}">
-        <img src="${this.images.get('bunker')}" alt="" width="44" height="44"><span>벙커 #${b.id}<small>${b.passengers.filter(Boolean).length}/${bunkerCapacity()} 주둔 · 구역 ${b.c + 1}-${b.r + 1}</small></span></button>`).join('')}</nav>
+        <img src="${unitPortraitUrl('bunker')}" alt="" width="44" height="44"><span>벙커 #${b.id}<small>${b.passengers.filter(Boolean).length}/${bunkerCapacity()} 주둔 · 구역 ${b.c + 1}-${b.r + 1}</small></span></button>`).join('')}</nav>
       <p class="garrison-notice" role="status">${this.notice || '초상화로 병력 선택 · 아래 아이콘으로 바로 강화·스킬 장착 · 빈 사격구에 보병 구매'}</p>
       <div class="bunker-slots garrison-slots">${bunker.passengers.map((id, slot) => {
         const unit = state.units.find(u => u.id === id);
@@ -252,7 +251,7 @@ export class SupplyShop {
         return `<section class="bunker-slot garrison-slot ${unit ? 'is-occupied' : ''} ${focused ? 'is-selected' : ''}" aria-label="${slot + 1}번 주둔 슬롯">
           <div class="bunker-slot-header"><span>사격구 ${String(slot + 1).padStart(2, '0')}</span><b>${unit ? '● 주둔 중' : focused ? '▼ 탑승 대상' : '비어 있음'}</b></div>
           <button type="button" class="garrison-portrait ${focused ? 'is-active' : ''}" data-action="${unit ? 'select' : 'select-slot'}" data-key="${unit?.id ?? bunker.id}" data-slot="${slot}" aria-pressed="${focused}" aria-label="${slot + 1}번 사격구 · ${unit ? `${TOWER_DEFS[unit.k].name} Lv.${unit.lvl} 선택` : '탑승 위치로 선택'}">
-            <img src="${unit ? this.images.get(unit.k) : commandIconUrl('empty')}" alt="" width="68" height="68"><strong>${unit ? TOWER_DEFS[unit.k].name : '빈 사격구'}</strong>
+            <img src="${unit ? unitPortraitUrl(unit.k) : commandIconUrl('empty')}" alt="" width="68" height="68"><strong>${unit ? TOWER_DEFS[unit.k].name : '빈 사격구'}</strong>
             <small>${unit ? `Lv.${unit.lvl} · 스킬 ${unit.skills.length}/${SKILL_SLOTS}` : '마린 · 파이어뱃 탑승'}</small></button>
           ${unit ? `<div class="garrison-commands" aria-label="${slot + 1}번 병력 명령">${this.garrisonButton('upgrade', unit.id, '강화', commandIconUrl('upgrade'), {
             disabled: unit.lvl >= maxUnitLevel() || state.gold < unitUpgradeCost(unit), active: unit.lvl >= maxUnitLevel(),
@@ -263,7 +262,7 @@ export class SupplyShop {
               disabled: owned || unit.skills.length >= SKILL_SLOTS || state.gold < skillCost(key),
               meta: owned ? '자동 사용' : `◆ ${skillCost(key)}`, detail: `${d.desc}${owned ? ' · 장착 완료' : unit.skills.length >= SKILL_SLOTS ? ' · 슬롯 가득 참' : state.gold < skillCost(key) ? ' · 미네랄 부족' : ''}` });
           }).join('')}</div><button type="button" class="garrison-unload" data-action="unload" data-key="${unit.id}" title="빈 구역을 지정하면 하차합니다. 강화와 스킬은 유지됩니다."><img src="${commandIconUrl('unload')}" alt="" width="22" height="22">하차 <small>전장에 배치</small></button>`
-          : `<div class="garrison-recruits">${BUNKER_INFANTRY.map(k => this.garrisonButton('recruit', bunker.id, TOWER_DEFS[k].name, this.images.get(k)!, {
+          : `<div class="garrison-recruits">${BUNKER_INFANTRY.map(k => this.garrisonButton('recruit', bunker.id, TOWER_DEFS[k].name, unitPortraitUrl(k)!, {
             unit: k, slot, disabled: state.gold < placeCost(k), meta: `◆ ${placeCost(k)}`, detail: `구매 즉시 ${slot + 1}번 사격구 탑승${state.gold < placeCost(k) ? ' · 미네랄 부족' : ''}`,
           })).join('')}</div><p class="garrison-vacancy-hint">기존 보병은 아래 아이콘으로 무료 탑승</p>`}</section>`;
       }).join('')}</div>
@@ -271,7 +270,7 @@ export class SupplyShop {
         ${this.garrisonOrder(state, bunker.id, { type: 'upgrade' })}${SKILL_KEYS.filter(key => isInfantry(SKILL_DEFS[key].unit)).map(key => this.garrisonOrder(state, bunker.id, { type: 'skill', key })).join('')}
       </div></section>
       <section class="garrison-transfer" aria-label="전장 보병 탑승"><header><h3>전장 보병 ${targetSlot >= 0 ? `→ ${targetSlot + 1}번 사격구` : ''}</h3><span>${targetSlot < 0 ? '사격구가 모두 찼습니다' : '초상화를 누르면 무료 탑승'}</span></header>
-        ${targetSlot >= 0 && available.length ? `<div class="garrison-available">${available.map(u => this.garrisonButton('board', bunker.id, TOWER_DEFS[u.k].name, this.images.get(u.k)!, {
+        ${targetSlot >= 0 && available.length ? `<div class="garrison-available">${available.map(u => this.garrisonButton('board', bunker.id, TOWER_DEFS[u.k].name, unitPortraitUrl(u.k)!, {
           unit: u.id, slot: targetSlot, meta: `Lv.${u.lvl} · 구역 ${u.c + 1}-${u.r + 1}`, detail: `${targetSlot + 1}번 사격구 무료 탑승 · 강화·스킬 유지`,
         })).join('')}</div>` : `<p>${targetSlot < 0 ? '병력을 하차시키면 다른 보병을 탑승시킬 수 있습니다.' : '탑승 가능한 보병이 없습니다. 빈 사격구의 유닛 아이콘으로 새 병력을 구매하세요.'}</p>`}
       </section></div>`;

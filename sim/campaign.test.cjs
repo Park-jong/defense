@@ -445,8 +445,8 @@ test('건설 대기 정보는 전장 보상·고지·지원 오라를 반영해 
 });
 
 test('보급 상점의 현재·강화 예상 수치는 보상·특화·주둔·고지·버프·오라를 포함한 전투 계산과 같다', () => {
-  const { SupplyShop } = createSourceLoader({ './unitArt': { unitImageUrl: () => '' }, './commandIcons': { commandIconUrl: () => '' }, './shop.css': {} })('./shop');
-  const shop = Object.create(SupplyShop.prototype); shop.images = new Map();
+  const { SupplyShop } = createSourceLoader({ './unitArt': { unitPortraitUrl: () => '' }, './commandIcons': { commandIconUrl: () => '' }, './shop.css': {} })('./shop');
+  const shop = Object.create(SupplyShop.prototype);
   const s = setup('standard', 'canyon'), bunker = place(s, 'bunker', 6, 2), support = place(s, 'support', 7, 2);
   s.recruit(bunker.id, 0, 'marine'); const marine = bunker.passengers[0];
   s.bonuses = { power: .24, haste: .2, range: 24 };

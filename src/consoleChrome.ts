@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { RENDER_SCALE, W } from './config';
+import { themeTexture } from './themes';
 
 export const CONSOLE_RISE = 32;
 const HEIGHT = 256;
@@ -91,11 +92,19 @@ function artwork(): string {
 
 export function loadConsoleChrome(scene: Phaser.Scene): void {
   scene.load.svg(KEY, 'data:image/svg+xml;base64,' + btoa(artwork()), { width: W * RENDER_SCALE, height: HEIGHT * RENDER_SCALE });
+  const colors: Record<string, string> = {
+    '#59606a': '#8b719f', '#303844': '#4c3b65', '#252b34': '#352a4b', '#11171c': '#211b31',
+    '#a0a4a2': '#ead2ef', '#5d6571': '#ab88bc', '#282e39': '#514064', '#141a20': '#2a203c',
+    '#04090a': '#141323', '#0c1613': '#221c33', '#a59553': '#d3a7ce', '#343d46': '#5d456c',
+    '#899298': '#efc4e9', '#92bb72': '#f2abd7', '#42625c': '#b292cf',
+  };
+  const themed = artwork().replace(/#[\da-f]{6}/gi, c => colors[c] ?? c);
+  scene.load.svg('bishoujo:' + KEY, 'data:image/svg+xml;base64,' + btoa(themed), { width: W * RENDER_SCALE, height: HEIGHT * RENDER_SCALE });
 }
 
 export function addConsoleChrome(scene: Phaser.Scene, y: number): void {
   // 골짜기 바닥의 땅은 맵 카메라(GameScene)가 맵 아래로 이어 그린다. 여기서는 장갑만 얹는다.
-  const armor = scene.add.image(0, y - CONSOLE_RISE, KEY).setOrigin(0).setDisplaySize(W, HEIGHT).setDepth(26);
+  const armor = scene.add.image(0, y - CONSOLE_RISE, themeTexture(KEY)).setOrigin(0).setDisplaySize(W, HEIGHT).setDepth(26);
   const shape = new Phaser.Geom.Polygon([...ridge, [W, HEIGHT], [0, HEIGHT]].map(([x, yy]) => ({ x: x * RENDER_SCALE, y: yy * RENDER_SCALE })));
   armor.setInteractive(shape, Phaser.Geom.Polygon.Contains);
 }

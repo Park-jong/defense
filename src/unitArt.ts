@@ -2,6 +2,10 @@ import type { TowerKey } from './config';
 import type Phaser from 'phaser';
 import { classicUnitLayers } from './classicUnitArt';
 import { supportUnitLayers } from './supportUnitArt';
+import { bishoujoLayers } from './bishoujoArt';
+import { bishoujoPortraitAsset } from './bishoujoPortraitAssets';
+import { activeTheme, type ThemeKey } from './themes';
+import { hasMoeAtlas, loadMoeAtlas, moePortraitUrl } from './moePortraits';
 
 // Layered, hand-drawn unit art. Each unit has a fixed chassis and a rotating weapon.
 const defs = `<defs>
@@ -576,17 +580,38 @@ const layers: Record<TowerKey, { base: string; head: string }> = {
 
 export const UNIT_WORLD_SCALE: Partial<Record<TowerKey, number>> = { cannon: 1.15, cruiser: 1.3, carrier: 1.2 };
 
-export function unitImageUrl(key: TowerKey): string {
-  const art = layers[key];
-  return 'data:image/svg+xml;base64,' + btoa(svg(art.base + art.head));
+const imageUrls = new Map<string, string>();
+export function unitImageUrl(key: TowerKey, theme: ThemeKey = activeTheme()): string {
+  const id = theme + ':' + key;
+  if (!imageUrls.has(id)) {
+    const art = theme === 'bishoujo' ? bishoujoLayers(key) : layers[key];
+    imageUrls.set(id, 'data:image/svg+xml;base64,' + btoa(svg(art.base + art.head)));
+  }
+  return imageUrls.get(id)!;
+}
+
+export function unitPortraitUrl(key: TowerKey, theme: ThemeKey = activeTheme()): string {
+  if (theme === 'frontier') return unitImageUrl(key, theme);
+  return moePortraitUrl(key) ?? bishoujoPortraitAsset(key)?.portrait ?? unitImageUrl(key, theme);
 }
 
 export function loadUnitArt(scene: Phaser.Scene): void {
-  for (const [key, art] of Object.entries(layers)) {
+  loadMoeAtlas(scene);
+  if (!hasMoeAtlas() && !scene.textures.exists('bishoujo:portrait')) {
+    const portrait = bishoujoPortraitAsset('marine');
+    if (portrait) scene.load.image('bishoujo:portrait', portrait.portrait);
+    else scene.load.svg('bishoujo:portrait', unitImageUrl('marine', 'bishoujo'));
+  }
+  for (const theme of ['frontier', 'bishoujo'] as const) for (const key of Object.keys(layers) as TowerKey[]) {
+    const art = theme === 'bishoujo' ? bishoujoLayers(key) : layers[key];
     for (const [part, content] of [['base', art.base], ['barrel', art.head], ['unit', art.base + art.head]]) {
-      if (!scene.textures.exists(part + '_' + key)) {
+      if (theme === 'bishoujo' && part === 'unit' && hasMoeAtlas()) continue;
+      const texture = (theme === 'bishoujo' ? 'bishoujo:' : '') + part + '_' + key;
+      if (!scene.textures.exists(texture)) {
         // Phaser 3.80 decodes every data URI as Base64, including SVG sources.
-        scene.load.svg(part + '_' + key, 'data:image/svg+xml;base64,' + btoa(svg(content)), { width: 64, height: 64 });
+        const portrait = theme === 'bishoujo' && part === 'unit' ? bishoujoPortraitAsset(key) : undefined;
+        if (portrait) scene.load.image(texture, portrait.icon);
+        else scene.load.svg(texture, 'data:image/svg+xml;base64,' + btoa(svg(content)), { width: 64, height: 64 });
       }
     }
   }

@@ -22,6 +22,10 @@ import { CombatEffects } from './combatEffects';
 import { hasWeaponEffects } from './data/weaponEffects';
 import { OperationsCenter, OperationsView } from './operations';
 import { COMMAND_ACTIVE_CURSOR, COMMAND_CURSOR } from './cursors';
+import { isBishoujo, THEME_CHANGED, themeBrand, themeTexture } from './themes';
+import { createMoePortraits } from './moePortraits';
+import { MoePresentation, type MoeActor } from './moePresentation';
+import { MOE_CHARACTERS } from './moeCharacters';
 import { OBSERVATION_BONUSES, OBSERVATION_DURATION, Observation, observationCount, supportTraits, VESSEL_AURA, vesselAuraBonus, vesselAuraMultiplier, VESSEL_EMP, weaknessBonus } from './support';
 
 interface Tower {
@@ -62,6 +66,7 @@ const UI_DEPTH = 25;
 const MAX_MAP_ZOOM = 2.5;
 
 export class GameScene extends Phaser.Scene {
+  private moe?: MoePresentation;
   private gold = 150;
   private lives = 20;
   private wave = 0;
@@ -173,6 +178,7 @@ export class GameScene extends Phaser.Scene {
     this.options = { ...(data.resume?.options ?? data.options ?? DEFAULT_OPTIONS) };
     this.map = createMapRuntime(this.options.map, MAP_Y);
     makeTextures(this);
+    createMoePortraits(this);
     // 캔버스는 RENDER_SCALE배 픽셀이므로 카메라를 같은 배율로 확대해 게임 좌표(GAME_W×H)를 화면에 꽉 채운다.
     // 기본 카메라는 맵 영역만 담당(mapCam)하고, 그 위에 전체 화면 uiCam을 얹어 UI를 그린다.
     const rs = RENDER_SCALE;
@@ -257,6 +263,9 @@ export class GameScene extends Phaser.Scene {
     this.setupOperations();
     if (data.resume) this.restoreCheckpoint(data.resume);
     this.applySkin();
+    this.setupTheme();
+    this.moe = new MoePresentation();
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.moe?.destroy(); this.moe = undefined; });
     // 테스트 모드도 처음에는 출격 화면을 열어 보스를 시험할 전장·난이도를 고르게 한다.
     if (!data.launched) this.operations!.show('setup');
     else if (this.pending.length) this.operations!.show('reward');
@@ -347,6 +356,60 @@ export class GameScene extends Phaser.Scene {
   private applySkin(): void {
     const tint = this.profile.skin === 'gold' ? 0xffdb85 : this.profile.skin === 'ion' ? 0x9bcfff : 0xffffff;
     for (const t of this.towers) { t.base.setTint(tint); t.barrel.setTint(tint); }
+  }
+
+  /** Swap artwork in place: battle state, saves, achievements and aiming remain intact. */
+  private setupTheme(): void {
+    const originals = new WeakMap<Phaser.GameObjects.Text, string>();
+    const originalColors = new WeakMap<Phaser.GameObjects.Text, string>();
+    const colors: Record<string, string> = { '#d2d7be': '#ffe0f4', '#8a967b': '#bfa7d2', '#77876d': '#ad93c1', '#80978d': '#b6a0cd', '#87977a': '#bda4cc', '#cbd5b8': '#ead9f4', '#a5b897': '#cbb8de', '#c9d7b2': '#f2d8f3', '#cedfb1': '#e7caef' };
+    const chrome = this.add.graphics().setDepth(25.5);
+    if (MOBILE_LAYOUT) {
+      chrome.fillStyle(0x241e34).fillRect(W, 0, SIDE_W, H);
+      chrome.lineStyle(1, 0x9070a3).strokeRect(W + 2, 2, SIDE_W - 4, H - 4);
+    } else {
+      chrome.fillStyle(0x2d243d).fillRect(0, 0, W, TOP_BAR_H);
+      chrome.fillStyle(0x241e34).fillRect(0, TOP_BAR_H, W, RIBBON_BAND);
+      chrome.lineStyle(1, 0x86659a).strokeRect(2, 2, W - 4, TOP_BAR_H - 4).lineBetween(0, MAP_Y - 2, W, MAP_Y - 2);
+      chrome.fillStyle(0x9fd5ee).fillTriangle(587, 27, 580, 36, 587, 44).fillTriangle(589, 27, 596, 36, 589, 44);
+    }
+    const sky = this.add.graphics().setDepth(.5);
+    sky.fillStyle(0x9e6ad2, .09).fillRect(0, MAP_Y, W, MAP_H);
+    for (let i = 0; i < 34; i++) {
+      const c = (i * 7 + 2) % COLS, r = (i * 3 + 1) % ROWS;
+      if (this.map.pathCells.has(c + ',' + r)) continue;
+      const x = (c + .5) * T, y = MAP_Y + (r + .5) * T;
+      sky.lineStyle(1, 0xf4c8ed, .28).lineBetween(x - 3, y, x + 3, y).lineBetween(x, y - 3, x, y + 3);
+      sky.fillStyle(0xe9bcf5, .12).fillCircle(x, y, 8);
+    }
+    const refresh = () => {
+      sky.setVisible(isBishoujo());
+      chrome.setVisible(isBishoujo());
+      for (const child of this.children.list) {
+        if (child instanceof Phaser.GameObjects.Image) {
+          const texture = themeTexture(child.texture.key);
+          if (texture !== child.texture.key && this.textures.exists(texture)) {
+            const width = child.displayWidth, height = child.displayHeight;
+            child.setTexture(texture).setDisplaySize(width, height);
+          }
+        } else if (child instanceof Phaser.GameObjects.Text) {
+          if (child.text.includes('FRONTIER') || originals.has(child)) {
+            if (!originals.has(child)) originals.set(child, child.text);
+            child.setText(originals.get(child)!.replace(/FRONTIER/g, themeBrand()));
+          }
+          const color = originalColors.get(child) ?? child.style.color;
+          if (typeof color === 'string' && colors[color]) {
+            originalColors.set(child, color);
+            child.setColor(isBishoujo() ? colors[color] : color);
+          }
+        }
+      }
+      this.uiCache.info = '';
+      this.uiCache.hud = '';
+    };
+    refresh();
+    window.addEventListener(THEME_CHANGED, refresh);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => window.removeEventListener(THEME_CHANGED, refresh));
   }
 
   private advanceTutorial(): void {
@@ -745,7 +808,7 @@ export class GameScene extends Phaser.Scene {
       this.hud.setText(`WAVE  ${String(this.wave).padStart(2, '0')} / ${this.options.mode === 'endless' ? '∞' : MAX_WAVE}`);
       this.mineralTxt.setText(this.gold.toLocaleString());
       this.lifeTxt.setText(`${Math.max(0, this.lives)} / ${maxLives()}`);
-      this.lifeTxt.setColor(this.lives <= 5 ? '#e29a7f' : '#b7dc8e');
+      this.lifeTxt.setColor(this.lives <= 5 ? '#e29a7f' : isBishoujo() ? '#efb9dd' : '#b7dc8e');
       this.goBtn.set(this.over ? '작전 종료' : this.waveActive ? `${MOBILE_LAYOUT ? '교전' : '교전 중'} · 남은 적 ${remaining}` : `▶  웨이브 시작${this.kb('  [SPACE]')}`);
     }
     this.goBtn.en(!this.waveActive && !this.over && !this.paused && !this.shopOpen && !this.operationsOpen && !this.pending.length && !this.augmentOffer && (this.testMode || this.options.mode === 'endless' || this.wave < MAX_WAVE));
@@ -776,16 +839,16 @@ export class GameScene extends Phaser.Scene {
       title = '기지 사령부';
       msg = this.unloading
         ? `${TOWER_DEFS[this.unloading.k].name} 하차 대기\n${this.touchUI ? '빈 구역을 두 번 탭하세요.\n✕ 취소' : '빈 구역을 클릭하세요.\nESC 취소'} · 병력은 탑승 유지`
-        : `FRONTIER COMMAND\n아이콘 선택 → 유닛 배치\n유닛 선택 → 강화·스킬\n빈 땅 → 유닛 보급`;
+        : `${themeBrand()} COMMAND\n아이콘 선택 → 유닛 배치\n유닛 선택 → 강화·스킬\n빈 땅 → 유닛 보급`;
     }
     const cache = title + msg;
     if (this.uiCache.info !== cache) {
       this.uiCache.info = cache;
       this.unitTitle.setText(title); this.info.setText(msg);
-      this.unitImage.setTexture(k ? 'unit_' + k : 'portrait');
+      this.unitImage.setTexture(themeTexture(k ? 'unit_' + k : 'portrait'));
       if (this.statusImage) {
         this.statusImage.setVisible(!!k);
-        if (k) this.statusImage.setTexture('unit_' + k);
+        if (k) this.statusImage.setTexture(themeTexture('unit_' + k));
         this.info.setX(k ? 302 : 224).setWordWrapWidth(k ? 238 : 316);
       }
       const ps = this.portraitSize;
@@ -875,10 +938,12 @@ export class GameScene extends Phaser.Scene {
 
   private describeCommand(command?: UnitCommand): void {
     const t = this.selected;
+    const portraitKey = command?.texture.match(/^unit_(.+)$/)?.[1] as TowerKey | undefined;
+    const character = isBishoujo() && portraitKey ? MOE_CHARACTERS[portraitKey] : undefined;
     this.commandTitle.setText(this.relocating ? '재배치 위치 지정' : this.unloading ? '하차 위치 지정' : t ? TOWER_DEFS[t.k].name + ' 명령' : FACTIONS[this.faction].name + ' / 9종 보급');
     this.commandHint.setVisible(!MOBILE_LAYOUT && !!command);
     this.commandTip?.setVisible(!!command);
-    const detail = command ? `${command.title}${command.price !== undefined ? ' · ◆ ' + command.price : ''}${!command.enabled && !command.active ? ' · 사용 불가' : ''}\n${MOBILE_LAYOUT ? command.detail.replace(/\n/g, ' ').slice(0, 48) : command.detail}`
+    const detail = command ? `${character ? character.mark + ' ' + character.name + ' · ' : ''}${command.title}${command.price !== undefined ? ' · ◆ ' + command.price : ''}${!command.enabled && !command.active ? ' · 사용 불가' : ''}\n${MOBILE_LAYOUT ? command.detail.replace(/\n/g, ' ').slice(0, 48) : command.detail}`
       : this.unloading ? '빈 구역을 지정해 병력을 하차시키세요.\n취소하면 벙커에 그대로 남습니다.'
       : t ? t.k === 'bunker' ? '병력 초상화를 누르면 해당 병력의 강화·스킬 명령으로 전환됩니다.'
         : '강화·스킬 아이콘을 누르면 바로 적용됩니다.\n장착한 스킬은 자동으로 사용합니다.'
@@ -1041,6 +1106,7 @@ export class GameScene extends Phaser.Scene {
     this.runLaunched = true;
     this.gold -= placeCost(k);
     const t = this.createTower(k, c, r);
+    this.moe?.say(t, 'deploy');
     this.floatText(t.x, t.y, d.name, '#c7dfaa');
     if (k === 'bunker') { this.building = null; this.selected = t; }
     else if (this.gold < placeCost(k) || this.buildLimited(k)) this.building = null;
@@ -1048,8 +1114,8 @@ export class GameScene extends Phaser.Scene {
 
   private createTower(k: TowerKey, c: number, r: number): Tower {
     const x = (c + .5) * T, y = MAP_Y + (r + .5) * T;
-    const base = this.add.image(x, y, 'base_' + k).setDepth(5);
-    const barrel = this.add.image(x, y, 'barrel_' + k).setOrigin(.5).setDepth(6);
+    const base = this.add.image(x, y, themeTexture('base_' + k)).setDepth(5);
+    const barrel = this.add.image(x, y, themeTexture('barrel_' + k)).setOrigin(.5).setDepth(6);
     const scale = UNIT_WORLD_SCALE[k] ?? 1;
     this.tweens.add({ targets: [base, barrel], scale: { from: 0, to: scale }, duration: 220, ease: 'Back.Out' });
     if (k === 'cruiser') this.tweens.add({ targets: barrel, y: y - 2, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
@@ -1151,6 +1217,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ---------- 웨이브 / 적 ----------
+  private moeLead(): MoeActor {
+    return this.selected ?? this.towers[(Math.max(1, this.wave) - 1) % Math.max(1, this.towers.length)]
+      ?? { id: 'commander', k: 'marine', x: W / 2, y: MAP_Y + MAP_H / 2 };
+  }
+
   private startWave(): void {
     if (this.over || this.paused || this.shopOpen || this.operationsOpen || this.pending.length || this.augmentOffer || this.waveActive || (!this.testMode && this.options.mode !== 'endless' && this.wave >= MAX_WAVE)) return;
     this.runLaunched = true; this.saveCheckpoint(false); this.cancelCommand();
@@ -1168,6 +1239,7 @@ export class GameScene extends Phaser.Scene {
     const interest = bondInterest(this.gold);
     if (interest > 0) { this.gold += interest; this.opsNotice = `전시 채권 이자 +${interest} 미네랄`; }
     const boss = q.includes('boss') || q.includes('amon');
+    this.moe?.start(w, boss, this.moeLead());
     this.banner(boss ? `웨이브 ${w} — ${bossPattern(w)}` : this.testMode && this.testScope === 'line' ? `웨이브 ${w} — 라인 테스트` : `웨이브 ${w}`);
     if (boss) this.audio.play('boss');
   }
@@ -1210,6 +1282,7 @@ export class GameScene extends Phaser.Scene {
     if (this.options.mode !== 'budget') this.gold += e.reward;
     this.runStats.kills++;
     const record = this.runStats.units.find(u => u.id === source); if (record) record.kills++;
+    this.moe?.kill(this.runStats.seconds, this.towers.find(t => t.id === source) ?? this.moeLead(), e.type === 'boss');
     if (e.type === 'splitter' && !e.spawned) { this.spawn('runner', e, true); this.spawn('runner', e, true); }
     this.fxDie.explode(e.type === 'boss' ? 40 : 10, e.x, e.y);
     if (this.options.mode !== 'budget' && e.reward > 0) this.floatText(e.x + 8, e.y + 10, '+' + e.reward, '#ffd54f');
@@ -1245,6 +1318,10 @@ export class GameScene extends Phaser.Scene {
     if (this.over && !this.paused && !this.shopOpen && !this.operationsOpen) this.combatEffects?.update(Math.min(.05, elapsed));
     this.combatEffects?.render();
     this.damageNumbers?.update(this.paused || this.shopOpen || this.operationsOpen ? 0 : Math.min(.05, elapsed));
+    this.moe?.update(Math.min(.1, elapsed), this.paused || this.shopOpen || this.operationsOpen || this.over,
+      this.runStats.seconds, this.waveActive, this.towers.map(t => ({ id: t.id, k: t.k,
+        x: ((t.host ?? t).x - this.mapCx) * this.mapZoom + W / 2,
+        y: ((t.host ?? t).y - this.mapCy) * this.mapZoom + VIEW_H / 2 })));
     this.advanceTutorial();
     this.opsRefresh += elapsed;
     if (this.opsRefresh >= .3) { this.operations?.update(); this.opsRefresh = 0; }
@@ -1310,6 +1387,7 @@ export class GameScene extends Phaser.Scene {
         this.runStats.lost += loss; this.lives -= loss;
         if (e.type === 'boss' && !e.amon) this.bossLeaked = true;
         this.audio.play('warning');
+        this.moe?.say(this.moeLead(), 'danger');
         this.shakeAll(150, .006);
         this.uiCam.flash(120, 255, 60, 60);
       }
@@ -1356,6 +1434,7 @@ export class GameScene extends Phaser.Scene {
         this.gold += bonus;
         this.banner(`구역 확보 · +${bonus} 미네랄`);
         this.audio.play('clear');
+        this.moe?.clear(this.moeLead());
         if (!this.testMode && this.wave % 5 === 0 && this.rewarded < this.wave) {
           this.pending = rewardChoices(this.options.mode); this.opsNotice = '';
         }
@@ -1630,6 +1709,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private autoSkill(t: Tower, key: SkillKey, target: Enemy): void {
+    this.moe?.say(t, 'skill');
     this.audio.play('skill');
     const d = SKILL_DEFS[key], st = this.stats(t);
     const nearby = this.enemies.filter(e => !e.dead && Math.hypot(e.x - t.x, e.y - t.y) <= st.range)
@@ -1888,7 +1968,7 @@ export class GameScene extends Phaser.Scene {
     const mini = this.miniGfx;
     mini.clear();
     // 모바일 배치는 전장이 이미 크게 보이므로 전술 지도를 그리지 않는다.
-    if (!MOBILE_LAYOUT) for (const t of this.towers) if (!t.host) mini.fillStyle(t === this.selected || t === this.selected?.host ? 0xe0f7ad : 0x9bd76f).fillRect(25 + t.c * 8 + 2, CONSOLE_Y + 53 + t.r * 8 + 2, 4, 4);
+    if (!MOBILE_LAYOUT) for (const t of this.towers) if (!t.host) mini.fillStyle(isBishoujo() ? t === this.selected || t === this.selected?.host ? 0xffe6f5 : 0xe6a8d3 : t === this.selected || t === this.selected?.host ? 0xe0f7ad : 0x9bd76f).fillRect(25 + t.c * 8 + 2, CONSOLE_Y + 53 + t.r * 8 + 2, 4, 4);
     if (!MOBILE_LAYOUT) for (const e of this.enemies) {
       if (!e.dead && e.x >= 0 && e.x < W) mini.fillStyle(e.type === 'boss' ? 0xea85d8 : 0xe49674)
         .fillCircle(25 + e.x / W * 160, CONSOLE_Y + 53 + (e.y - MAP_Y) / MAP_H * 96, e.type === 'boss' ? 3 : 1.8);
@@ -1896,12 +1976,13 @@ export class GameScene extends Phaser.Scene {
     // A small base-integrity meter beneath the top resource readout.
     const m = this.lifeMeter;
     mini.fillStyle(0x0b120e).fillRect(m.x, m.y, m.w, 9);
-    mini.fillStyle(this.lives <= 5 ? 0xcf8067 : 0x9dc278).fillRect(m.x + 2, m.y + 2, (m.w - 4) * Math.max(0, this.lives) / maxLives(), 5);
+    mini.fillStyle(this.lives <= 5 ? 0xcf8067 : isBishoujo() ? 0xe8acd4 : 0x9dc278).fillRect(m.x + 2, m.y + 2, (m.w - 4) * Math.max(0, this.lives) / maxLives(), 5);
   }
 
   private endGame(win: boolean): void {
     if (this.over) return;
     this.over = true;
+    this.moe?.reset();
     if (!win && this.waveActive) this.recordWave(false);
     if (!this.testMode) {
       const earned = awardAchievements(this.profile, win ? this.wave : Math.max(0, this.wave - 1), win, this.runStats, this.options, this.usedKinds);

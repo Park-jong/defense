@@ -1,12 +1,13 @@
 import { attackCount, attackDamage, SUPPORT_BRANCH_RANGE, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, GAME_W, MAP_DEFS, MAX_WAVE, MOBILE_LAYOUT, TEST_GOLD, SIDE_W, TOP_BAR_H, TOWER_DEFS, TowerKey, TOWER_KEYS, W } from './config';
 import { SKILL_DEFS, SKILL_KEYS } from './catalog';
-import { unitImageUrl } from './unitArt';
+import { unitPortraitUrl } from './unitArt';
 import { commandIconUrl } from './commandIcons';
 import { ACHIEVEMENTS, bossPattern, BRANCHES, COMMANDERS, CommanderKey, DIFFICULTIES, ENEMY_INFO, MODES, Profile, REWARDS, RewardKey, RunOptions, RunSave, RunStats, SavedUnit, TARGETS, TargetMode, hasBranch, TEST_SCOPES, TestScope, UnitRecord, wavePlan } from './campaign';
 import { adoptTitles, bindTips, createTip, placeTip, textTip } from './gameTip';
 import { supportTraits } from './support';
 import { AUGMENTS, AUGMENT_KEYS, AUGMENT_TIERS, AugmentKey, AugmentOffer, amonDue, branchCost, commanderCooldownScale, hasAugment, relocateCost } from './augments';
 import './operations.css';
+import { activeTheme, isBishoujo, selectTheme, THEMES, type ThemeKey } from './themes';
 
 export interface OperationsView {
   options: RunOptions; wave: number; gold: number; lives: number; active: boolean; over: boolean; paused: boolean;
@@ -79,7 +80,7 @@ function unitTraits(k: TowerKey): string[] {
 const OPS_SILENT = [
   '.ops-nav button', '.ops-volume', '.ops-save-status', '[data-action="map"]', '[data-action="difficulty"]', '[data-action="mode"]',
   '[data-action="start"]', '[data-action="resume"]', '[data-action="target"]', '.ops-empty [data-action="close"]', '.ops-metrics > div',
-  '[data-action="tutorial"]', '[data-action="skin"]', '[data-action="reward"]', '[data-action="scope"]', '[data-action="damage"]', '[data-action="augment"]', '[data-action="test-augment"]',
+  '[data-action="tutorial"]', '[data-action="skin"]', '[data-action="theme"]', '[data-action="reward"]', '[data-action="scope"]', '[data-action="damage"]', '[data-action="augment"]', '[data-action="test-augment"]',
 ].join(',');
 const tabs = {
   setup: { icon: 'flag', name: '출격', label: '작전 설정' },
@@ -113,7 +114,6 @@ export class OperationsCenter {
   private draft?: RunOptions;
   private damageView: TestScope = 'all';
   private cache = '';
-  private images = new Map(TOWER_KEYS.map(k => [k, unitImageUrl(k)]));
   private onResize = () => this.position();
   constructor(private actions: OperationsActions) {
     this.ribbon.className = 'mission-ribbon'; this.ribbon.setAttribute('aria-label', '전술 상황판');
@@ -246,7 +246,7 @@ export class OperationsCenter {
     placeTip(tip, el);
   }
   private hideTip(): void { this.tip.hidden = true; }
-  private art(key: TowerKey): string { return `<img class="ops-unit-art" src="${this.images.get(key)}" width="64" height="64" alt="" aria-hidden="true">`; }
+  private art(key: TowerKey): string { return `<img class="ops-unit-art" src="${unitPortraitUrl(key)}" width="64" height="64" alt="" aria-hidden="true">`; }
   private enemies(wave: number, scope: TestScope = 'all'): string {
     const plan = wavePlan(wave, scope);
     return (Object.keys(ENEMY_DEFS) as EnemyKey[]).filter(k => plan.includes(k)).map(k => {
@@ -277,6 +277,7 @@ export class OperationsCenter {
     if (a === 'reroll') this.actions.rerollAugment(Number(key));
     if (a === 'test-augment') this.actions.testAugment(key as AugmentKey);
     if (a === 'skin') this.actions.skin(key as Profile['skin']);
+    if (a === 'theme') selectTheme(key);
     if (a === 'tutorial') { this.actions.tutorial(false); this.update(); }
     if (a === 'skip') { this.actions.tutorial(true); this.update(); if (!this.open) return; }
     const scroll = a === 'tab' ? 0 : this.dialog.querySelector('.ops-content')?.scrollTop ?? 0;
@@ -294,7 +295,7 @@ export class OperationsCenter {
     });
     const choosing = this.section === 'reward' || this.section === 'augment', locked = v.pending.length > 0 || !!v.augmentOffer;
     this.dialog.classList.toggle('is-reward', choosing);
-    this.dialog.innerHTML = `<header class="ops-header"><div class="ops-heading">${icon(this.section === 'reward' ? 'supply' : this.section === 'augment' ? 'augment' : 'manage')}<div><h1>${this.section === 'reward' ? '전장 보상 선택' : this.section === 'augment' ? '증강 선택' : '작전실'}</h1><p>${choosing ? `WAVE ${v.wave} CLEAR` : MAP_DEFS[v.options.map].name}</p></div></div><span class="ops-wallet" aria-label="미네랄 ${v.gold}">${icon('mineral')}${v.gold.toLocaleString()}</span>${locked ? '' : button('close', '', icon('close'), '전장 복귀', { className: 'ops-close', hint: '전장 복귀 [Esc / O]' })}</header>
+    this.dialog.innerHTML = `<header class="ops-header"><div class="ops-heading">${icon(this.section === 'reward' ? 'supply' : this.section === 'augment' ? 'augment' : 'manage')}<div><h1>${this.section === 'reward' ? '전장 보상 선택' : this.section === 'augment' ? '증강 선택' : '작전실'}</h1><p>${choosing ? `WAVE ${v.wave} CLEAR` : isBishoujo() ? '모에크래프트 · STARLIGHT COMMAND' : MAP_DEFS[v.options.map].name}</p></div></div><span class="ops-wallet" aria-label="미네랄 ${v.gold}">${icon('mineral')}${v.gold.toLocaleString()}</span>${locked ? '' : button('close', '', icon('close'), '전장 복귀', { className: 'ops-close', hint: '전장 복귀 [Esc / O]' })}</header>
       ${locked ? '' : `<nav class="ops-nav" aria-label="작전실 메뉴">${Object.entries(tabs).map(([key, tab]) => button('tab', key, `${icon(tab.icon)}<span>${tab.name}</span>`, tab.label, { selected: this.section === key })).join('')}</nav>`}
       <main class="ops-content">${v.notice ? `<p class="ops-notice" role="status">${icon('saved')}${v.notice}</p>` : ''}${this.section === 'reward' ? this.rewards(v) : this.section === 'augment' ? this.augmentChoice(v) : this.section === 'setup' ? this.setup(v) : this.section === 'tactics' ? this.tactics(v) : this.section === 'stats' ? this.stats(v) : this.section === 'codex' ? this.codex(v.faction) : this.medals(v)}</main>
       ${locked ? '' : `<footer class="ops-footer"><label class="ops-volume" title="효과음 음량">${icon('volume')}<input id="battle-volume" aria-label="효과음 음량" type="range" min="0" max="100" value="${Math.round(v.profile.volume * 100)}"><output for="battle-volume">${Math.round(v.profile.volume * 100)}%</output></label><span class="ops-save-status" title="${v.test ? '테스트 모드 · 저장 및 업적 제외' : '웨이브 종료 시 자동 저장 · 교전 중 새로고침하면 마지막 준비 시점으로 복귀'}">${icon('saved')}${v.test ? 'TEST' : '자동 저장'}</span></footer>`}`;
@@ -306,13 +307,19 @@ export class OperationsCenter {
   }
   private setup(v: OperationsView): string {
     const draft = this.draft ?? v.options;
-    return `<section class="ops-setup"><div class="ops-section-heading"><h2>${v.test ? '최종 웨이브 테스트' : '전장 선택'}</h2><span>${MAP_DEFS[draft.map].desc}</span></div><div class="ops-map-picker" role="group" aria-label="전장">${(Object.keys(MAP_DEFS) as RunOptions['map'][]).map(k => button('map', k, `${mapPreview(k)}<span>${MAP_DEFS[k].name}</span>`, MAP_DEFS[k].name, { selected: draft.map === k, hint: `${MAP_DEFS[k].name} · ${MAP_DEFS[k].desc}` })).join('')}</div>
+    return `<section class="ops-setup">${this.themePicker()}<div class="ops-section-heading"><h2>${v.test ? '최종 웨이브 테스트' : '전장 선택'}</h2><span>${MAP_DEFS[draft.map].desc}</span></div><div class="ops-map-picker" role="group" aria-label="전장">${(Object.keys(MAP_DEFS) as RunOptions['map'][]).map(k => button('map', k, `${mapPreview(k)}<span>${MAP_DEFS[k].name}</span>`, MAP_DEFS[k].name, { selected: draft.map === k, hint: `${MAP_DEFS[k].name} · ${MAP_DEFS[k].desc}` })).join('')}</div>
       <div class="ops-rules"><div><h2>난이도</h2><div class="ops-difficulties" role="group" aria-label="난이도">${(Object.keys(DIFFICULTIES) as RunOptions['difficulty'][]).map((k, i) => button('difficulty', k, `${icon('shield')}<span>${DIFFICULTIES[k].name}</span><span class="ops-pips" aria-hidden="true">${'•'.repeat(i + 1)}</span>`, DIFFICULTIES[k].name, { selected: draft.difficulty === k })).join('')}</div></div><div><h2>모드</h2><div class="ops-modes" role="group" aria-label="작전 모드">${(Object.keys(MODES) as RunOptions['mode'][]).map(k => button('mode', k, k === 'bunker' ? this.art('bunker') : icon(modeIcons[k]), MODES[k].name, { selected: draft.mode === k, hint: `${MODES[k].name} · ${MODES[k].desc}` })).join('')}</div><p class="ops-mode-hint">${MODES[draft.mode].desc}</p></div></div>
       ${v.test ? `<div class="ops-section-heading"><h2>테스트 범위</h2><span>${TEST_SCOPES[v.testScope].desc}</span></div>${this.scopes(v)}` : ''}
       ${v.test && draft.mode === 'augment' ? `<div class="ops-section-heading"><h2>테스트 증강 <small>${v.testAugments.length}</small></h2><span>켜 둔 증강으로 출격</span></div><div class="ops-test-augments" role="group" aria-label="테스트 증강">${AUGMENT_KEYS.map(k => button('test-augment', k, `${icon(AUGMENTS[k].icon)}<span>${AUGMENTS[k].name}</span>`, AUGMENTS[k].name, { selected: v.testAugments.includes(k), className: `ops-tier-${AUGMENTS[k].tier}`, tip: `augment:${k}`, hint: `${AUGMENTS[k].name} · ${AUGMENT_TIERS[AUGMENTS[k].tier]} · ${AUGMENTS[k].desc}` })).join('')}</div>` : ''}
       <div class="ops-launch">${v.checkpoint && !v.test ? `<div class="ops-checkpoint">${button('resume', '', `${icon('resume')}<span>이어하기</span><b>W ${String(v.checkpoint.wave).padStart(2, '0')}</b>`, '저장된 작전 이어하기', { className: 'ops-resume', hint: `${MAP_DEFS[v.checkpoint.options.map].name} · ${DIFFICULTIES[v.checkpoint.options.difficulty].name} · ${MODES[v.checkpoint.options.mode].name} · ${v.checkpoint.wave}웨이브 완료 · 기지 ${v.checkpoint.lives}/20 · 병력 ${v.checkpoint.units.length}기` })}<small>새 출격 시 기존 저장 교체</small></div>` : ''}${v.test
         ? button('start', '', `${icon(scopeIcons[v.testScope])}<span>${TEST_SCOPES[v.testScope].name} 테스트</span>`, `${TEST_SCOPES[v.testScope].name} 테스트 시작`, { className: 'ops-deploy', hint: `${MAP_DEFS[draft.map].name}에서 ${MAX_WAVE}웨이브 반복 · ${TEST_SCOPES[v.testScope].name}: ${TEST_SCOPES[v.testScope].desc} · ◆ ${TEST_GOLD.toLocaleString()} · 저장 및 업적 제외` })
         : button('start', '', `${icon('deploy')}<span>출격</span>`, '새 작전 시작', { className: 'ops-deploy', hint: v.checkpoint ? '새 작전 시작 · 기존 체크포인트를 교체합니다' : '새 작전 시작' })}</div></section>`;
+  }
+  private themePicker(): string {
+    return `<div class="ops-theme-picker" role="group" aria-label="게임 테마">${(Object.keys(THEMES) as ThemeKey[]).map(key => {
+      const theme = THEMES[key];
+      return button('theme', key, `<span class="theme-preview" aria-hidden="true"><img src="${unitPortraitUrl('marine', key)}" alt=""><img src="${unitPortraitUrl(key === 'bishoujo' ? 'zealot' : 'sniper', key)}" alt=""></span><span class="theme-copy"><small>${theme.caption}</small><b>${theme.name}</b></span><span class="theme-selected" aria-hidden="true">${activeTheme() === key ? '✦' : '◇'}</span>`, theme.name + ' 테마', { selected: activeTheme() === key, className: `theme-card theme-card-${key}`, hint: `${theme.description} · 즉시 적용 · 선택 자동 저장` });
+    }).join('')}</div>`;
   }
   private tactics(v: OperationsView): string {
     const u = v.selected, next = v.test ? MAX_WAVE : v.wave + 1;
