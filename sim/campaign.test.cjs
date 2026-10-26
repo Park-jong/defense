@@ -39,6 +39,47 @@ function checkpoint() {
     pending: ['power', 'haste', 'range'], rewarded: 0, tutorial: 4, usedKinds: ['bunker', 'marine'] };
 }
 
+test('일반·벙커 모드에서 고스트 탑승 저장을 검증하고 스킬과 사거리까지 복원한다', () => {
+  for (const mode of ['standard', 'bunker']) {
+    const save = checkpoint(); save.options.mode = mode;
+    save.units[1].k = 'ghost'; save.units[1].skills = [{ key: 'lockdown', cd: 4 }, { key: 'c10', cd: 2 }];
+    save.usedKinds = ['bunker', 'ghost'];
+    assert.equal(rules.validateSave(save), true);
+    const store = memory(); assert.equal(rules.writeStored(rules.SAVE_KEY, save, store), true);
+    const s = setup(mode); s.restoreCheckpoint(rules.readSave(store));
+    const bunker = s.towers.find(t => t.k === 'bunker'), ghost = bunker.passengers[2];
+    assert.equal(ghost.k, 'ghost'); assert.equal(ghost.host, bunker);
+    assert.equal(ghost.base.visible, false);
+    assert.deepEqual(JSON.parse(JSON.stringify(s.savedUnits())), save.units);
+    const outside = { ...ghost, host: undefined };
+    assert.equal(s.stats(ghost).range, s.stats(outside).range + 24);
+  }
+});
+
+test('벙커 모드는 고스트 배치와 탑승을 허용하고 대형 유닛의 저장은 거부한다', () => {
+  const s = setup('bunker'), bunker = place(s, 'bunker'), ghost = place(s, 'ghost', 8, 1);
+  assert.equal(ghost.k, 'ghost'); assert.equal(s.board(bunker.id, 0, ghost.id), true);
+  assert.equal(s.recruit(bunker.id, 1, 'ghost'), true);
+  const save = checkpoint(); save.units[1].k = 'goliath'; save.units[1].skills = [];
+  assert.equal(rules.validateSave(save), false);
+});
+
+test('주둔 화면은 고스트 구매·기존 병력 탑승·락다운과 C-10 일괄 장착 아이콘을 제공한다', () => {
+  const { SupplyShop } = createSourceLoader({ './unitArt': { unitPortraitUrl: k => k }, './commandIcons': { commandIconUrl: k => k }, './shop.css': {} })('./shop');
+  const shop = Object.create(SupplyShop.prototype);
+  const s = setup(), bunker = place(s, 'bunker'), ghost = place(s, 'ghost', 8, 1);
+  s.selected = bunker;
+  const empty = shop.garrisonView(s.shopState());
+  assert.match(empty, /data-action="recruit"[^>]*data-unit="ghost"/);
+  assert.match(empty, new RegExp(`data-action="board"[^>]*data-unit="${ghost.id}"`));
+  s.board(bunker.id, 0, ghost.id);
+  const occupied = shop.garrisonView(s.shopState());
+  for (const key of ['lockdown', 'c10']) {
+    assert.match(occupied, new RegExp(`data-action="equip-unit"[^>]*data-key="${key}"`));
+    assert.match(occupied, new RegExp(`data-action="batch-equip"[^>]*data-key="${key}"`));
+  }
+});
+
 test('예고와 실제 편성은 1~100웨이브에서 같고 특수 적과 보스 등장 시점을 지킨다', () => {
   for (let w = 1; w <= 100; w++) {
     const s = setup(w > 50 ? 'endless' : 'standard'); s.wave = w - 1; s.startWave();
@@ -710,7 +751,7 @@ test('종족 선택은 진행 중 배치·하차·재배치를 비용 없이 취
   assert.equal(s.gold, gold); assert.equal(s.towers.length, 1);
   const bunker = setup('bunker'); bunker.selectFaction('protoss');
   assert.equal(bunker.faction, 'terran');
-  assert.deepEqual(bunker.commands().filter(c => c.enabled).map(c => c.id), ['build:marine', 'build:firebat', 'build:bunker']);
+  assert.deepEqual(bunker.commands().filter(c => c.enabled).map(c => c.id), ['build:marine', 'build:firebat', 'build:ghost', 'build:bunker']);
   s.over = true; s.selectFaction('terran'); assert.equal(s.faction, 'protoss');
 });
 

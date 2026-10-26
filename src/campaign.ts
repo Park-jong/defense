@@ -5,6 +5,7 @@ import { TOWER_DEFS, type TowerKey } from './data/units';
 import { createMapRuntime } from './game/map';
 import { EquippedSkill, SKILL_DEFS, SKILL_SLOTS, UnitBuff } from './catalog';
 import { AugmentKey, AugmentOffer, isAugment } from './augments';
+import { isInfantry } from './bunker';
 
 export const DIFFICULTIES = {
   easy: { name: '쉬움', hp: .7, speed: .9, gold: 220 },
@@ -14,7 +15,7 @@ export const DIFFICULTIES = {
 export const MODES = {
   standard: { name: '방어 작전', desc: '50웨이브 방어' },
   endless: { name: '무한 방어', desc: '50웨이브 이후에도 계속 진행' },
-  bunker: { name: '벙커 부대', desc: '벙커·마린·파이어뱃만 사용' },
+  bunker: { name: '벙커 부대', desc: '벙커·마린·파이어뱃·고스트만 사용' },
   budget: { name: '제한 예산', desc: '시작 1,500미네랄 · 처치/클리어/보급 수입 없음' },
   augment: { name: '증강 작전', desc: '10·20·30웨이브마다 증강 선택 · 50웨이브 방어' },
 };
@@ -88,7 +89,7 @@ export function rewardChoices(mode: RunOptions['mode'], random: () => number = M
   return keys.slice(0, 3);
 }
 export function allowedUnit(key: TowerKey, mode: RunOptions['mode']): boolean {
-  return mode !== 'bunker' || ['bunker', 'marine', 'firebat'].includes(key);
+  return mode !== 'bunker' || key === 'bunker' || isInfantry(key);
 }
 /** damage는 종합 피해, boss는 그중 보스에게 준 피해다. 라인 피해는 damage - boss. */
 export interface UnitRecord { id: string; k: TowerKey; damage: number; boss: number; kills: number }
@@ -159,7 +160,7 @@ export function validateSave(v: unknown): v is RunSave {
     } else {
       const host = v.units.find((h: any) => h.id === u.hostId);
       const slot = `${u.hostId}:${u.slot}`;
-      if (!['marine', 'firebat'].includes(u.k) || !host || host.k !== 'bunker' || host.hostId || host.c !== u.c || host.r !== u.r || !integer(u.slot, 0, v.augments?.includes('fortress') ? 5 : 3) || slots.has(slot)) return false;
+      if (!isInfantry(u.k) || !host || host.k !== 'bunker' || host.hostId || host.c !== u.c || host.r !== u.r || !integer(u.slot, 0, v.augments?.includes('fortress') ? 5 : 3) || slots.has(slot)) return false;
       slots.add(slot);
     }
   }

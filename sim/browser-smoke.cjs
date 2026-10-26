@@ -153,7 +153,7 @@ async function dialogFits(page) {
       { key: 'canyon', entrances: [72], buildable: false });
     await mobile.getByRole('button', { name: '훈련 건너뛰기', exact: true }).click();
     assert.equal(await mobile.getByRole('button', { name: '프로토스 병력 9종 [R]', exact: true }).isDisabled(), true);
-    assert.deepEqual(await scene(mobile, s => s.commands().filter(c => c.enabled).map(c => c.id)), ['build:marine', 'build:firebat', 'build:bunker']);
+    assert.deepEqual(await scene(mobile, s => s.commands().filter(c => c.enabled).map(c => c.id)), ['build:marine', 'build:firebat', 'build:ghost', 'build:bunker']);
     await press(mobile, '8');
     await cellClick(mobile, 6, 3, true); await cellClick(mobile, 6, 3, true);
     assert.equal(await scene(mobile, s => s.towers[0].k), 'bunker');

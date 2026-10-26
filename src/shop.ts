@@ -240,7 +240,7 @@ export class SupplyShop {
     const selected = state.units.find(u => u.id === state.selectedId);
     const bunkers = state.units.filter(u => u.k === 'bunker');
     const bunker = bunkers.find(u => u.id === selected?.id || u.id === selected?.hostId) ?? bunkers[0];
-    if (!bunker) return `<section class="bunker-empty"><img src="${unitPortraitUrl('bunker')}" alt="벙커" width="128" height="128"><h3>먼저 빈 벙커를 건설하세요.</h3><p>마린·파이어뱃 4기를 조합해 나만의 방어 거점을 만드세요.</p><button type="button" class="shop-purchase" data-action="choose" data-key="bunker" ${state.gold < placeCost('bunker') ? 'disabled' : ''}>벙커 건설 · ◆ ${placeCost('bunker')}</button></section>`;
+    if (!bunker) return `<section class="bunker-empty"><img src="${unitPortraitUrl('bunker')}" alt="벙커" width="128" height="128"><h3>먼저 빈 벙커를 건설하세요.</h3><p>마린·파이어뱃·고스트를 조합해 나만의 방어 거점을 만드세요.</p><button type="button" class="shop-purchase" data-action="choose" data-key="bunker" ${state.gold < placeCost('bunker') ? 'disabled' : ''}>벙커 건설 · ◆ ${placeCost('bunker')}</button></section>`;
     const available = state.units.filter(u => !u.hostId && isInfantry(u.k));
     const preferred = this.boarding?.bunkerId === bunker.id ? this.boarding.slot : -1;
     const targetSlot = preferred >= 0 && preferred < bunkerCapacity() && !bunker.passengers[preferred]
@@ -256,7 +256,7 @@ export class SupplyShop {
           <div class="bunker-slot-header"><span>사격구 ${String(slot + 1).padStart(2, '0')}</span><b>${unit ? '● 주둔 중' : focused ? '▼ 탑승 대상' : '비어 있음'}</b></div>
           <button type="button" class="garrison-portrait ${focused ? 'is-active' : ''}" data-action="${unit ? 'select' : 'select-slot'}" data-key="${unit?.id ?? bunker.id}" data-slot="${slot}" aria-pressed="${focused}" aria-label="${slot + 1}번 사격구 · ${unit ? `${TOWER_DEFS[unit.k].name} Lv.${unit.lvl} 선택` : '탑승 위치로 선택'}">
             <img src="${unit ? unitPortraitUrl(unit.k) : commandIconUrl('empty')}" alt="" width="68" height="68"><strong>${unit ? TOWER_DEFS[unit.k].name : '빈 사격구'}</strong>
-            <small>${unit ? `Lv.${unit.lvl} · 스킬 ${unit.skills.length}/${SKILL_SLOTS}` : '마린 · 파이어뱃 탑승'}</small></button>
+            <small>${unit ? `Lv.${unit.lvl} · 스킬 ${unit.skills.length}/${SKILL_SLOTS}` : '마린 · 파이어뱃 · 고스트 탑승'}</small></button>
           ${unit ? `<div class="garrison-commands" aria-label="${slot + 1}번 병력 명령">${this.garrisonButton('upgrade', unit.id, '강화', commandIconUrl('upgrade'), {
             disabled: unit.lvl >= maxUnitLevel() || state.gold < unitUpgradeCost(unit), active: unit.lvl >= maxUnitLevel(),
             meta: unit.lvl >= maxUnitLevel() ? 'MAX' : `◆ ${unitUpgradeCost(unit)}`, detail: unit.lvl >= maxUnitLevel() ? '최대 강화 완료' : `Lv.${unit.lvl} → Lv.${unit.lvl + 1}${state.gold < unitUpgradeCost(unit) ? ' · 미네랄 부족' : ''}`,

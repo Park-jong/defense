@@ -140,7 +140,6 @@
 .garrison-portrait small { align-self:start; font-size:9px; color:#a0b88c; line-height:1.6; }
 .garrison-slot .garrison-portrait.is-active { border-color:#9cbe73; }
 .garrison-commands,.garrison-recruits { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; }
-.garrison-recruits { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .supply-shop .garrison-action { display:flex; position:relative; flex-direction:column; align-items:center; justify-content:center; gap:4px; min-width:0; min-height:84px; padding:5px 2px; background:linear-gradient(#26382c,#16251b); border-color:#61784e; text-align:center; }
 .garrison-action img { width:34px; height:34px; object-fit:contain; }
 .garrison-action>span { font-size:10px; line-height:1.4; word-break:keep-all; }

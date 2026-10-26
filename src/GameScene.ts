@@ -958,7 +958,7 @@ export class GameScene extends Phaser.Scene {
       t.passengers.slice(0, 4).forEach((crew, i) => {
         cells[i] = crew ? make('crew:' + crew.id, `${TOWER_DEFS[crew.k].name} Lv.${crew.lvl}`, 'unit_' + crew.k,
           '탑승 병력을 선택합니다. 다음 명령 칸에서 하차 없이 강화·스킬을 장착할 수 있습니다.', () => this.selectUnit(crew.id))
-          : make('empty:' + i, '빈 사격구', 'cmd_empty', '마린·파이어뱃 아이콘으로 병력을 구매하면 자동으로 탑승합니다.', () => {}, false);
+          : make('empty:' + i, '빈 사격구', 'cmd_empty', '마린·파이어뱃은 아래 아이콘으로, 고스트는 주둔 상세 관리에서 구매해 탑승시킬 수 있습니다.', () => {}, false);
       });
       const slot = t.passengers.findIndex(p => !p);
       (['marine', 'firebat'] as const).forEach((key, i) => {
@@ -970,7 +970,7 @@ export class GameScene extends Phaser.Scene {
       cells[6] = make('upgrade-crew:' + t.id, '병력 일괄 강화', 'cmd_upgrade',
         `${plan.ids.length}기를 각 1단계 강화합니다. 최대 강화 병력은 제외하고, 총비용이 부족하면 전체 보류합니다.`,
         () => this.applyOrder({ type: 'upgrade' }, { bunkerId: t.id }), !!plan.ids.length && this.gold >= plan.cost, plan.cost);
-      cells[7] = make('garrison:' + t.id, '주둔 상세 관리', 'cmd_manage', '병력 이동·하차와 벙커별 일괄 스킬을 관리합니다.', () => this.openShop('garrison'));
+      cells[7] = make('garrison:' + t.id, '주둔 상세 관리', 'cmd_manage', '마린·파이어뱃·고스트 구매, 병력 이동·하차와 벙커별 일괄 스킬을 관리합니다.', () => this.openShop('garrison'));
     } else {
       const cost = this.upgradeCost(t), max = t.lvl >= maxUnitLevel();
       cells[0] = { ...make('upgrade:' + t.id, '일반 강화', 'cmd_upgrade', max ? `최대 Lv.${maxUnitLevel()} 강화가 완료되었습니다.`

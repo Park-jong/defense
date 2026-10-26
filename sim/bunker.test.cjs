@@ -44,8 +44,50 @@ function place(s, k, c = 6, r = 1) {
   return s.towers.at(-1);
 }
 function enemy(x, y) {
-  return { x, y, type: 'tank', seg: 1, hp: 10000, max: 10000, slow: 1, slowT: 0, burnT: 0, burnDps: 0, vulnerableT: 0 };
+  return { x, y, type: 'tank', seg: 1, hp: 10000, max: 10000, slow: 1, slowT: 0, stunT: 0, burnT: 0, burnDps: 0, vulnerableT: 0 };
 }
+
+test('고스트는 혼합 벙커에 140미네랄로 탑승하고 사거리 보너스와 자동 스킬을 적용한다', () => {
+  const s = setup(), b = place(s, 'bunker');
+  s.recruit(b.id, 0, 'marine'); s.recruit(b.id, 1, 'firebat');
+  const gold = s.gold;
+  assert.equal(s.recruit(b.id, 2, 'ghost'), true);
+  const ghost = b.passengers[2];
+  assert.equal(s.gold, gold - TOWER_DEFS.ghost.cost);
+  assert.equal(ghost.host, b); assert.equal(ghost.base.visible, false);
+  assert.equal(s.stats(ghost).range, TOWER_DEFS.ghost.range + 24);
+  s.selected = ghost;
+  assert.equal(s.equipSkill('lockdown'), true);
+  assert.deepEqual(s.applyOrder({ type: 'skill', key: 'c10' }, { bunkerId: b.id }), { count: 1, cost: 130 });
+  const target = enemy(ghost.x + TOWER_DEFS.ghost.range + 12, ghost.y);
+  s.enemies = [target]; s.towerAct(ghost, .05);
+  assert.equal(s.projs.length, 1); assert.equal(s.projs[0].k, 'ghost');
+  assert.equal(target.stunT, 3);
+  assert.equal(target.hp, target.max - TOWER_DEFS.ghost.dmg * 7);
+  assert.deepEqual(ghost.skills.map(skill => skill.cd), [10, 9]);
+  assert.equal(b.passengers[0].skills.length, 0); assert.equal(b.passengers[1].skills.length, 0);
+  assert.equal(s.recruit(b.id, 2, 'ghost'), false);
+  s.gold = TOWER_DEFS.ghost.cost - 1;
+  assert.equal(s.recruit(b.id, 3, 'ghost'), false);
+  assert.equal(s.gold, TOWER_DEFS.ghost.cost - 1); assert.equal(b.passengers[3], null);
+});
+
+test('기존 고스트는 강화·스킬·쿨다운·투자액을 유지한 채 무료 탑승과 하차가 가능하다', () => {
+  const s = setup(), b = place(s, 'bunker'), ghost = place(s, 'ghost', 8, 1);
+  s.upgradeUnit(ghost.id); s.equipSkill('lockdown', ghost.id);
+  ghost.cd = .4; ghost.skills[0].cd = 6;
+  const saved = { id: ghost.id, spent: ghost.spent, gold: s.gold, range: s.stats(ghost).range };
+  assert.equal(s.board(b.id, 0, ghost.id), true);
+  assert.equal(s.board(b.id, 1, ghost.id), false);
+  assert.equal(s.cellFree(8, 1), true);
+  assert.equal(s.stats(ghost).range, saved.range + 24);
+  assert.equal(s.beginUnload(ghost.id), true); s.finishUnload(9, 1);
+  assert.equal(ghost.host, undefined); assert.equal(b.passengers[0], null);
+  assert.equal(ghost.base.visible, true); assert.equal(ghost.barrel.visible, true);
+  assert.equal(ghost.lvl, 2); assert.equal(ghost.cd, .4); assert.equal(ghost.skills[0].cd, 6);
+  assert.equal(ghost.id, saved.id); assert.equal(ghost.spent, saved.spent);
+  assert.equal(s.gold, saved.gold); assert.equal(s.stats(ghost).range, saved.range);
+});
 
 test('빈 벙커는 40미네랄만 차감하고 공격하지 않는다', () => {
   const s = setup(150), b = place(s, 'bunker');
