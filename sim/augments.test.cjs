@@ -238,3 +238,14 @@ test('왕관 사냥꾼은 보스에게 주는 병력 피해를 30% 늘리고 보
   s.damageEnemy(boss, 10, 'normal', t.id); assert.equal(boss.hp, 987);
   boss.pulse = 0; boss.age = 0; boss.shield = 0; s.enemyAct(boss, .1); assert.ok(Math.abs(boss.shield - boss.max * .09) < 1e-9);
 });
+
+test('내 목숨을 아이어에 이후 질럿은 전장에 1기만 배치할 수 있고, 판매하면 다시 배치할 수 있다', () => {
+  const s = setup(['aiur']), first = place(s, 'zealot'), gold = s.gold;
+  assert.ok(first); assert.equal(s.building, null);
+  s.building = 'zealot'; s.placeTower(8, 1);
+  assert.equal(s.towers.filter(t => t.k === 'zealot').length, 1); assert.equal(s.gold, gold);
+  s.chooseBuild('zealot'); assert.equal(s.building, null);
+  s.selected = first; s.sell(); assert.ok(place(s, 'zealot', 8, 1));
+  aug.setActiveAugments([]); const plain = setup(); place(plain, 'zealot'); place(plain, 'zealot', 8, 1);
+  assert.equal(plain.towers.length, 2);
+});

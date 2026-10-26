@@ -22,7 +22,7 @@ export const AUGMENTS = {
   stasis: { name: '정지장', tier: 'gold', icon: 'freeze', desc: '시간 교란이 둔화 대신 3초 완전 정지 (보스 1초)' },
   factory: { name: '군수 공장', tier: 'prism', icon: 'mineral', desc: '모든 병력 배치·강화 비용 -25%' },
   yamato: { name: '야마토 프로토콜', tier: 'prism', icon: 'yamato', faction: 'terran', unit: 'cruiser', desc: '배틀크루저 기본 공격이 사거리 끝까지 관통하는 야마토포로 변경 · 보스 피해 2배 · 스킬 비활성화' },
-  aiur: { name: '내 목숨을 아이어에', tier: 'prism', icon: 'psiBlades', faction: 'protoss', unit: 'zealot', desc: '질럿을 모두 판매 · 이후 질럿 사거리 +100, 피해 4배, 기본 공격이 사거리 안 범위 공격 · 질럿 모든 비용 3배' },
+  aiur: { name: '내 목숨을 아이어에', tier: 'prism', icon: 'psiBlades', faction: 'protoss', unit: 'zealot', desc: '질럿을 모두 판매 · 이후 질럿은 1기만 배치, 사거리 +100, 피해 4배, 기본 공격이 사거리 안 범위 공격 · 질럿 모든 비용 3배' },
   storm: { name: '폭풍의 눈', tier: 'prism', icon: 'psionicStorm', faction: 'protoss', unit: 'highTemplar', desc: '하이 템플러의 사이오닉 스톰이 웨이브마다 첫 2회 즉시 발동' },
   xelnaga: { name: '젤나가 맙소사', tier: 'prism', icon: 'warp', faction: 'protoss', desc: '프로토스 모든 유닛 피해 2배 · 대가로 5웨이브마다 아몬 출현' },
   elite: { name: '정예 소대', tier: 'prism', icon: 'medal', desc: '병력 6기 이하일 때 모든 병력 공격력·공격 속도 +60%' },
@@ -45,6 +45,8 @@ export const AMON_SCALE = .8;
 /** 야마토 프로토콜의 관통 폭(맵 한 칸 대비). */
 export const YAMATO_WIDTH = .7;
 export const AIUR_RANGE = 100;
+/** 내 목숨을 아이어에 이후 전장에 둘 수 있는 질럿 수. */
+export const AIUR_LIMIT = 1;
 export const STORM_FREE_CASTS = 2;
 export const ELITE_LIMIT = 6;
 export const RELOCATE_COST = 20;

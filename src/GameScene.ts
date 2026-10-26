@@ -15,7 +15,7 @@ import { ShopState, SupplyShop } from './shop';
 import { levelStats, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
 import { BUNKER_BARREL_LENGTH, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
 import { createMapRuntime, highGroundRangeBonus, type MapRuntime, type Point } from './game/map';
-import { Army, FORTRESS_RANGE, HANGAR_INTERCEPTORS, INVESTMENT_GOLD, SIEGE_RANGE, STASIS_BOSS_TIME, STASIS_TIME, bossDamageMultiplier, bountyMultiplier, bunkerCapacity, clearBonusMultiplier, commanderCooldownScale, maxLives, maxUnitLevel, AIUR_RANGE, AMON_LEAK, AMON_SCALE, AUGMENTS, AUGMENT_WAVES, AugmentKey, AugmentOffer, YAMATO_WIDTH, STORM_FREE_CASTS, amonDue, augmentEligible, augmentOffer, branchCost, damageMultiplier, drawAugment, eliteBonus, placeCost, relocateCost, setActiveAugments, skillCost, skillLocked, hasAugment } from './augments';
+import { AIUR_LIMIT, Army, FORTRESS_RANGE, HANGAR_INTERCEPTORS, INVESTMENT_GOLD, SIEGE_RANGE, STASIS_BOSS_TIME, STASIS_TIME, bossDamageMultiplier, bountyMultiplier, bunkerCapacity, clearBonusMultiplier, commanderCooldownScale, maxLives, maxUnitLevel, AIUR_RANGE, AMON_LEAK, AMON_SCALE, AUGMENTS, AUGMENT_WAVES, AugmentKey, AugmentOffer, YAMATO_WIDTH, STORM_FREE_CASTS, amonDue, augmentEligible, augmentOffer, branchCost, damageMultiplier, drawAugment, eliteBonus, placeCost, relocateCost, setActiveAugments, skillCost, skillLocked, hasAugment } from './augments';
 import { ACHIEVEMENTS, allowedUnit, awardAchievements, Bonuses, bossPattern, Branch, BranchState, COMMANDERS, hasBranch, CommanderKey, DEFAULT_OPTIONS, DIFFICULTIES, newStats, normalizeStats, Profile, PROFILE_KEY, readProfile, readSave, REWARDS, RewardKey, rewardChoices, RunOptions, RunSave, RunStats, SavedUnit, SAVE_KEY, clearSave, TargetMode, TestScope, validateSave, wavePlan, writeStored } from './campaign';
 import { BattleAudio } from './audio';
 import { CombatEffects } from './combatEffects';
@@ -800,8 +800,8 @@ export class GameScene extends Phaser.Scene {
     if (this.unloading || this.relocating) { cells[8] = cancel; return cells; }
     const t = this.selected;
     if (!t) return FACTION_TOWERS[this.faction].map((key, i) => ({
-      ...make('build:' + key, TOWER_DEFS[key].name, 'unit_' + key, TOWER_DEFS[key].desc + '\n아이콘 선택 후 빈 구역에 배치하세요.',
-        () => this.chooseBuild(key), allowedUnit(key, this.options.mode) && (this.gold >= placeCost(key) || this.building === key), placeCost(key)),
+      ...make('build:' + key, TOWER_DEFS[key].name, 'unit_' + key, TOWER_DEFS[key].desc + (this.buildLimited(key) ? '\n내 목숨을 아이어에 · 질럿은 1기만 배치할 수 있습니다.' : '\n아이콘 선택 후 빈 구역에 배치하세요.'),
+        () => this.chooseBuild(key), allowedUnit(key, this.options.mode) && !this.buildLimited(key) && (this.gold >= placeCost(key) || this.building === key), placeCost(key)),
       active: this.building === key, hotkey: this.kb(String(i + 1)),
     }));
     if (t.k === 'bunker') {
@@ -903,8 +903,14 @@ export class GameScene extends Phaser.Scene {
     else if (e.key === 's' || e.key === 'S') this.sell();
   }
 
+  /** 내 목숨을 아이어에: 질럿은 전장에 1기까지만 둘 수 있다. */
+  private buildLimited(k: TowerKey): boolean {
+    return k === 'zealot' && hasAugment('aiur') && this.towers.filter(t => t.k === 'zealot').length >= AIUR_LIMIT;
+  }
+
   private chooseBuild(k: TowerKey, force = false): void {
-    if (!allowedUnit(k, this.options.mode)) return;
+    if (this.buildLimited(k) && this.building === k) this.building = null;
+    if (!allowedUnit(k, this.options.mode) || this.buildLimited(k)) return;
     if (this.over) return;
     this.faction = TOWER_DEFS[k].faction;
     this.building = (!force && this.building === k) ? null : k;
@@ -1019,13 +1025,14 @@ export class GameScene extends Phaser.Scene {
     const k = this.building;
     if (!k) return;
     const d = TOWER_DEFS[k];
+    if (this.buildLimited(k)) { this.building = null; return; }
     if (!allowedUnit(k, this.options.mode) || !this.cellFree(c, r) || this.gold < placeCost(k)) return;
     this.runLaunched = true;
     this.gold -= placeCost(k);
     const t = this.createTower(k, c, r);
     this.floatText(t.x, t.y, d.name, '#c7dfaa');
     if (k === 'bunker') { this.building = null; this.selected = t; }
-    else if (this.gold < placeCost(k)) this.building = null;
+    else if (this.gold < placeCost(k) || this.buildLimited(k)) this.building = null;
   }
 
   private createTower(k: TowerKey, c: number, r: number): Tower {
@@ -1749,7 +1756,7 @@ export class GameScene extends Phaser.Scene {
     const h = this.hover;
     const preview = this.unloading?.k ?? this.building;
     if (h && preview && !this.over) {
-      const d = TOWER_DEFS[preview], ok = this.cellFree(h.c, h.r) && (!!this.unloading || this.gold >= placeCost(preview));
+      const d = TOWER_DEFS[preview], ok = this.cellFree(h.c, h.r) && (!!this.unloading || this.gold >= placeCost(preview) && !this.buildLimited(preview));
       const highGround = highGroundRangeBonus(this.map, h.c, h.r);
       const color = ok ? highGround ? 0xf3c77e : 0xa9e875 : 0xe37962;
       const x = (h.c + .5) * T, y = MAP_Y + (h.r + .5) * T;
