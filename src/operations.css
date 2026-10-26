@@ -423,3 +423,12 @@
 .ops-augment-chips span { display:grid; place-items:center; width:34px; height:34px; border:1px solid var(--tier); border-radius:8px; background:#18291e; }
 .ops-augment-chips .ops-icon { width:26px; height:26px; }
 @media (max-width:640px) { .ops-test-augments { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+/* 상단 패널의 보유 증강: 등급 테두리 아이콘, 마우스를 올리면 설명 창. */
+.mission-augments { display:flex; flex:none; align-items:center; gap:4px; padding-left:6px; border-left:1px solid #3d4b3f; }
+.mission-augments span { display:grid; place-items:center; box-sizing:border-box; width:32px; height:32px; border:1px solid var(--tier); border-radius:6px; background:#18291e; box-shadow:inset 0 0 8px color-mix(in srgb,var(--tier) 30%,transparent); }
+.mission-augments .ops-icon { width:24px; height:24px; }
+.mission-ribbon.side .mission-augments { position:absolute; top:52px; right:0; z-index:1; height:30px; box-sizing:border-box; padding:0 4px; gap:3px; background:#1b2320; border:1px solid #596150; }
+.mission-ribbon.side .mission-augments span { width:24px; height:24px; }
+.mission-ribbon.side .mission-augments .ops-icon { width:18px; height:18px; }
+.ops-tip .ops-tip-tier { color:var(--tier); }
+
