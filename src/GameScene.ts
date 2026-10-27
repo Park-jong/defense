@@ -13,7 +13,7 @@ import { loadCommandIcons } from './commandIcons';
 import { addConsoleChrome, CONSOLE_RISE, consoleContains, loadBishoujoConsoleChrome, loadConsoleChrome } from './consoleChrome';
 import { DamageKind, DamageNumbers } from './damageNumbers';
 import { ShopState, SupplyShop } from './shop';
-import { levelStats, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
+import { canSpecialize, levelStats, OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
 import { BUNKER_BARREL_LENGTH, BUNKER_PORTS, BUNKER_RANGE_BONUS, InfantryKey, isInfantry } from './bunker';
 import { createMapRuntime, highGroundRangeBonus, type MapRuntime, type Point } from './game/map';
 import { YAMATO_CHARGE_EVERY, YAMATO_CHARGE_POWER, ANALYSIS_BONUS, RESONANCE_HASTE, RESONANCE_RADIUS, bondInterest, sellRate, AIUR_LIMIT, Army, FORTRESS_RANGE, HANGAR_INTERCEPTORS, INVESTMENT_GOLD, SIEGE_RANGE, STASIS_BOSS_TIME, STASIS_TIME, bossDamageMultiplier, bountyMultiplier, bunkerCapacity, clearBonusMultiplier, commanderCooldownScale, maxLives, maxUnitLevel, AIUR_RANGE, AMON_LEAK, AMON_SCALE, AUGMENTS, AUGMENT_WAVES, AugmentKey, AugmentOffer, YAMATO_WIDTH, STORM_FREE_CASTS, amonDue, augmentEligible, augmentOffer, branchCost, damageMultiplier, drawAugment, eliteBonus, placeCost, relocateCost, setActiveAugments, skillCost, skillLocked, hasAugment } from './augments';
@@ -492,11 +492,11 @@ export class GameScene extends Phaser.Scene {
     if (this.tutorial === 4) { this.profile.tutorialDone = true; this.persistProfile(); }
   }
 
-  private specialize(key: Branch): boolean {
-    const t = this.selected;
+  private specialize(key: Branch, id?: string): boolean {
+    const t = id === undefined ? this.selected : this.towers.find(t => t.id === id);
     // 이중 특화 증강이 있으면 이미 고른 갈래와 다른 갈래를 한 번 더 고를 수 있다.
-    const second = !!t?.branch && hasAugment('dualBranch') && t.branch !== 'both' && t.branch !== key;
-    if (!t || this.over || t.k === 'bunker' || t.lvl < 3 || t.branch && !second || this.gold < branchCost(t.k)) return false;
+    if (!t || this.over || !canSpecialize(t, key) || this.gold < branchCost(t.k)) return false;
+    const second = !!t.branch;
     const cost = branchCost(t.k); this.gold -= cost; t.spent += cost; t.branch = second ? 'both' : key;
     this.audio.play('build'); this.opsNotice = `${specialization(t.k, key)!.name} 특화가 적용되었습니다.`; this.saveCheckpoint(false); return true;
   }
@@ -995,7 +995,7 @@ export class GameScene extends Phaser.Scene {
       cells[3] = make('sell:' + t.id, '유닛 회수', 'cmd_sell', `투자한 미네랄의 ${Math.round(sellRate() * 100)}%인 ${this.sellValue(t)}을 돌려받습니다.`,
         () => { if (this.selected?.id === t.id) this.sell(); });
       cells[3].hotkey = this.kb('S');
-      cells[4] = make('manage', '부대 일괄 관리', 'cmd_manage', '전장과 모든 벙커의 병력을 함께 강화하거나 스킬을 일괄 장착합니다.', () => this.openShop('manage'));
+      cells[4] = make('manage', '부대 일괄 관리', 'cmd_manage', '전장과 모든 벙커의 병력을 함께 강화·특화하거나 스킬을 일괄 장착합니다.', () => this.openShop('manage'));
       cells[5] = make('tactics', '전술 / 특화', 'cmd_manage', '공격 대상 우선순위와 Lv.3 이상 특화를 선택합니다.', () => this.operations?.show('tactics'));
       if (!t.host) cells[7] = make('relocate', '재배치', 'cmd_unload', `준비 시간에 빈 칸을 지정하면 ${relocateCost(t.k)}미네랄로 이동합니다.`, () => this.beginRelocate(), !this.waveActive && this.gold >= relocateCost(t.k), relocateCost(t.k));
       if (t.host) {
@@ -1137,6 +1137,7 @@ export class GameScene extends Phaser.Scene {
     if (!plan.ids.length || this.gold < plan.cost) return { count: 0, cost: 0 };
     for (const id of plan.ids) {
       if (order.type === 'upgrade') this.upgradeUnit(id);
+      else if (order.type === 'branch') this.specialize(order.key, id);
       else this.equipSkill(order.key, id);
     }
     return { count: plan.ids.length, cost: plan.cost };

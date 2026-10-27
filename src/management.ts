@@ -1,15 +1,19 @@
 import { MAX_UNIT_LEVEL } from './data/rules';
 import { TOWER_DEFS, type TowerKey } from './data/units';
 import { EquippedSkill, SKILL_DEFS, SKILL_SLOTS, SkillKey } from './catalog';
-import { maxUnitLevel, skillCost, skillLocked, upgradePrice } from './augments';
+import { branchCost, hasAugment, maxUnitLevel, skillCost, skillLocked, upgradePrice } from './augments';
+import { hasBranch, type Branch, type BranchState } from './campaign';
 
 export { MAX_UNIT_LEVEL } from './data/rules';
 export interface ManagedUnit {
-  id: string; k: TowerKey; lvl: number; skills: EquippedSkill[]; hostId?: string;
+  id: string; k: TowerKey; lvl: number; skills: EquippedSkill[]; hostId?: string; branch?: BranchState;
 }
 export interface UnitScope { bunkerId?: string; kind?: TowerKey }
-export type UnitOrder = { type: 'upgrade' } | { type: 'skill'; key: SkillKey };
+export type UnitOrder = { type: 'upgrade' } | { type: 'skill'; key: SkillKey } | { type: 'branch'; key: Branch };
 export interface OrderResult { count: number; cost: number }
+
+export const canSpecialize = (unit: Pick<ManagedUnit, 'k' | 'lvl' | 'branch'>, key: Branch): boolean =>
+  unit.k !== 'bunker' && unit.lvl >= 3 && !hasBranch(unit.branch, key) && (!unit.branch || hasAugment('dualBranch'));
 
 export const unitUpgradeCost = (unit: Pick<ManagedUnit, 'k' | 'lvl'>): number =>
   upgradePrice(unit.k, Math.round(TOWER_DEFS[unit.k].cost * .8 * unit.lvl));
@@ -26,9 +30,10 @@ export function planOrder(units: ManagedUnit[], order: UnitOrder, scope: UnitSco
     if (unit.k === 'bunker' || scope.bunkerId !== undefined && unit.hostId !== scope.bunkerId
       || scope.kind !== undefined && unit.k !== scope.kind) return false;
     if (order.type === 'upgrade') return unit.lvl < maxUnitLevel();
+    if (order.type === 'branch') return canSpecialize(unit, order.key);
     const skill = SKILL_DEFS[order.key];
     return !!skill && skill.unit === unit.k && !skillLocked(unit.k) && unit.skills.length < SKILL_SLOTS && !unit.skills.some(s => s.key === order.key);
   });
   return { ids: eligible.map(unit => unit.id), cost: eligible.reduce((cost, unit) =>
-    cost + (order.type === 'upgrade' ? unitUpgradeCost(unit) : skillCost(order.key)), 0) };
+    cost + (order.type === 'upgrade' ? unitUpgradeCost(unit) : order.type === 'branch' ? branchCost(unit.k) : skillCost(order.key)), 0) };
 }

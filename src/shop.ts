@@ -4,13 +4,13 @@ import { unitPortraitUrl } from './unitArt';
 import { commandIconUrl } from './commandIcons';
 import { BUNKER_INFANTRY, InfantryKey, isInfantry } from './bunker';
 import { OrderResult, planOrder, UnitOrder, UnitScope, unitUpgradeCost } from './management';
-import { BranchState, RunOptions } from './campaign';
+import { Branch, BranchState, hasBranch, RunOptions } from './campaign';
 import { adoptTitles, bindTips, createTip, placeTip, textTip } from './gameTip';
 import { OBSERVATION_BONUSES, supportTraits, vesselAuraBonus } from './support';
-import { bunkerCapacity, maxUnitLevel, placeCost, skillCost, skillLocked } from './augments';
+import { bunkerCapacity, hasAugment, maxUnitLevel, placeCost, skillCost, skillLocked } from './augments';
 import { rememberScroll } from './scrollMemory';
 import './shop.css';
-import { specializationEffects } from './specializations';
+import { specialization, specializationEffects } from './specializations';
 
 /** 설명 창 없이 보이는 글자·아이콘만으로 충분한 상점 요소. */
 const SHOP_SILENT = '.shop-tabs button, .army-unit, .army-stat, .garrison-unload[data-action="tab"]';
@@ -79,10 +79,12 @@ export class SupplyShop {
       if (action === 'upgrade') {
         this.notice = this.actions.upgrade(key!) ? '병력을 한 단계 강화했습니다. 탑승 상태와 스킬은 유지됩니다.' : '강화 단계와 보유 미네랄을 확인해 주세요.';
       }
-      if (action === 'batch-upgrade' || action === 'batch-equip') {
-        const order: UnitOrder = action === 'batch-upgrade' ? { type: 'upgrade' } : { type: 'skill', key: key as SkillKey };
-        const result = this.actions.order(order, { bunkerId: button.dataset.bunker || undefined, kind: (button.dataset.kind || undefined) as TowerKey | undefined });
-        this.notice = result.count ? `${result.count}기 ${order.type === 'upgrade' ? '각 1단계 강화' : SKILL_DEFS[order.key].name + ' 장착'} 완료 · ${result.cost} 미네랄 사용`
+      if (action === 'batch-upgrade' || action === 'batch-equip' || action === 'batch-branch') {
+        const order: UnitOrder = action === 'batch-upgrade' ? { type: 'upgrade' } : action === 'batch-branch' ? { type: 'branch', key: key as Branch } : { type: 'skill', key: key as SkillKey };
+        const kind = (button.dataset.kind || undefined) as TowerKey | undefined;
+        const result = this.actions.order(order, { bunkerId: button.dataset.bunker || undefined, kind });
+        const label = order.type === 'upgrade' ? '각 1단계 강화' : order.type === 'branch' ? `${specialization(kind!, order.key)!.name} 특화` : SKILL_DEFS[order.key].name + ' 장착';
+        this.notice = result.count ? `${result.count}기 ${label} 완료 · ${result.cost} 미네랄 사용`
           : '대상 병력과 총비용을 확인해 주세요. 미네랄이 부족하면 전체 적용이 보류됩니다.';
       }
       if (action === 'recruit') {
@@ -144,7 +146,7 @@ export class SupplyShop {
       <header class="shop-header"><div class="shop-heading">${icon('supply')}<div><h1>보급 상점</h1><p>전투 일시정지</p></div></div><span class="shop-wallet" aria-label="미네랄 ${state.gold}">${icon('mineral')}${state.gold.toLocaleString()}</span><button type="button" class="shop-close" data-action="close" aria-label="전장 복귀" title="전장 복귀 [Esc / B]">${icon('close')}</button></header>
       <nav class="shop-tabs" aria-label="상점 메뉴">${tabs.map(t => `<button type="button" data-action="tab" data-key="${t.key}" class="${this.tab === t.key ? 'is-active' : ''}" aria-pressed="${this.tab === t.key}" aria-label="${t.label}" title="${t.label}">${t.art}<span>${t.name}</span></button>`).join('')}</nav>
       <div class="shop-content">
-        ${this.tab === 'manage' ? `<p class="shop-notice" role="status">${icon(this.notice ? 'saved' : 'help')}${this.notice || '전장과 모든 벙커의 병력을 함께 관리합니다. 유닛 종류별로도 강화·스킬을 적용할 수 있습니다.'}</p>${this.batchControls(state, {}, '전체 부대 일괄 관리')}` : this.tab === 'garrison' ? this.garrisonView(state) : this.armyView(state, selected)}
+        ${this.tab === 'manage' ? `<p class="shop-notice" role="status">${icon(this.notice ? 'saved' : 'help')}${this.notice || '전장과 모든 벙커의 병력을 함께 관리합니다. 유닛 종류별로 강화·스킬·특화를 적용할 수 있습니다.'}</p>${this.batchControls(state, {}, '전체 부대 일괄 관리')}` : this.tab === 'garrison' ? this.garrisonView(state) : this.armyView(state, selected)}
       </div>
       <footer class="shop-footer"><span class="shop-hint">${icon('help')}<span>${this.tab === 'garrison' ? '강화·스킬 아이콘을 누르면 즉시 적용 · 체크 표시는 장착 완료 · 스킬은 자동 사용' : '유닛당 스킬 2개 · 적을 만나면 자동 발동 · 병력 구매는 명령 카드 또는 1–9 키 · 회수 시 비용 70% 환급'}</span></span><kbd>ESC</kbd></footer>`;
     restoreTabs(); restore();
@@ -193,19 +195,32 @@ export class SupplyShop {
       ${skills.length ? `<ul class="army-skill-notes">${skills.map(key => `<li><img src="${commandIconUrl(key)}" alt="" width="18" height="18"><span><b>${SKILL_DEFS[key].name}</b> ${SKILL_DEFS[key].desc} · ↻ ${+(SKILL_DEFS[key].cooldown * spec.skillCooldown).toFixed(2)}초</span></li>`).join('')}</ul>` : ''}</section>`;
   }
 
-  private orderButton(state: ShopState, order: UnitOrder, scope: UnitScope, label: string): string {
+  private orderButton(state: ShopState, order: Exclude<UnitOrder, { type: 'branch' }>, scope: UnitScope, label: string): string {
     const plan = planOrder(state.units, order, scope);
     return `<button type="button" class="shop-purchase" data-action="${order.type === 'upgrade' ? 'batch-upgrade' : 'batch-equip'}" data-key="${order.type === 'upgrade' ? scope.kind ?? 'all' : order.key}" data-bunker="${scope.bunkerId ?? ''}" data-kind="${scope.kind ?? ''}" ${!plan.ids.length || state.gold < plan.cost ? 'disabled' : ''}>${label} · ${plan.ids.length}기${plan.ids.length ? ` · ◆ ${plan.cost}${state.gold < plan.cost ? ' · 부족' : ''}` : ' · 대상 없음'}</button>`;
+  }
+
+  private branchOrders(state: ShopState, scope: UnitScope & { kind: TowerKey }, group: ShopUnit[]): string {
+    return `<div class="shop-batch-branches" role="group" aria-label="${TOWER_DEFS[scope.kind].name} 일괄 특화">${(['power', 'rapid'] as const).map(key => {
+      const spec = specialization(scope.kind, key)!, plan = planOrder(state.units, { type: 'branch', key }, scope);
+      const complete = group.every(u => hasBranch(u.branch, key));
+      const meta = complete ? '완료' : plan.ids.length ? `${plan.ids.length}기 ◆ ${plan.cost}` : group.every(u => u.lvl < 3) ? 'Lv.3 필요' : '대상 없음';
+      return this.garrisonButton('batch-branch', key, spec.name, commandIconUrl(spec.icon), {
+        bunker: scope.bunkerId, kind: scope.kind, active: complete, disabled: !plan.ids.length || state.gold < plan.cost,
+        meta, detail: `${spec.desc} · Lv.3 이상만 적용 · ${hasAugment('dualBranch') ? '이중 특화 가능 · 이미 선택한 갈래 제외' : '선택 후 변경 불가 · 기존 특화 병력 제외'} · 미네랄 부족 시 전체 보류${state.gold < plan.cost ? ' · 미네랄 부족' : ''}`,
+      });
+    }).join('')}</div>`;
   }
 
   private batchControls(state: ShopState, scope: UnitScope, title: string): string {
     const units = state.units.filter(u => u.k !== 'bunker' && (scope.bunkerId === undefined || u.hostId === scope.bunkerId));
     return `<section class="shop-batch" aria-label="${title}">
-      <div class="shop-batch-header"><div><h3>${title}</h3><p>강화는 각 1단계씩 · 최대 강화·이미 장착한 스킬은 제외 · 미네랄 부족 시 전체 보류</p></div>${this.orderButton(state, { type: 'upgrade' }, scope, '전체 강화')}</div>
+      <div class="shop-batch-header"><div><h3>${title}</h3><p>강화는 각 1단계씩 · 특화는 Lv.3부터 · 적용 완료 병력 제외 · 미네랄 부족 시 전체 보류</p></div>${this.orderButton(state, { type: 'upgrade' }, scope, '전체 강화')}</div>
       ${units.length ? `<div class="shop-batch-groups">${TOWER_KEYS.filter(k => units.some(u => u.k === k)).map(k => {
         const group = units.filter(u => u.k === k), kindScope = { ...scope, kind: k };
         return `<section class="shop-batch-group" aria-label="${TOWER_DEFS[k].name} 일괄 관리"><header><img src="${unitPortraitUrl(k)}" alt="" width="44" height="44"><div><h4>${TOWER_DEFS[k].name} · ${group.length}기</h4><p>벙커 탑승 ${group.filter(u => u.hostId).length} · 전장 ${group.filter(u => !u.hostId).length}</p></div></header>
           ${this.orderButton(state, { type: 'upgrade' }, kindScope, '동종 병력 강화')}
+          ${this.branchOrders(state, kindScope, group)}
           ${SKILL_KEYS.filter(key => SKILL_DEFS[key].unit === k).map(key => this.orderButton(state, { type: 'skill', key }, kindScope, SKILL_DEFS[key].name)).join('')}</section>`;
       }).join('')}</div>` : '<p class="shop-batch-empty">병력을 배치하거나 벙커에 구매하면 일괄 관리할 수 있습니다.</p>'}</section>`;
   }
@@ -223,7 +238,7 @@ export class SupplyShop {
       <img src="${image}" alt="" width="36" height="36"><span>${label}</span><small>${options.meta ?? ''}</small>${options.active ? '<b class="garrison-check" aria-hidden="true">✓</b>' : ''}</button>`;
   }
 
-  private garrisonOrder(state: ShopState, bunkerId: string, order: UnitOrder): string {
+  private garrisonOrder(state: ShopState, bunkerId: string, order: Exclude<UnitOrder, { type: 'branch' }>): string {
     const scope = { bunkerId }, plan = planOrder(state.units, order, scope);
     const units = state.units.filter(u => u.hostId === bunkerId && (order.type === 'upgrade' || u.k === SKILL_DEFS[order.key].unit));
     const complete = units.length > 0 && units.every(u => order.type === 'upgrade' ? u.lvl >= maxUnitLevel() : u.skills.some(s => s.key === order.key));

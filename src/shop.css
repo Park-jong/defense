@@ -26,6 +26,9 @@
 .shop-content { flex:1 1 auto; min-height:0; padding:22px 24px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#5f744e transparent; }
 .supply-shop .shop-purchase { width:100%; min-height:37px; font-size:11px; color:#c8e2a2; border-color:#6b8051; background:linear-gradient(#34462b,#22301f); }
 .is-equipped { border-color:#8ca464; }
+.shop-batch-branches { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
+.shop-batch-branches .garrison-action>span { display:none; }
+.shop-batch-branches .garrison-action>small { white-space:normal; overflow-wrap:anywhere; }
 .is-equipped .shop-purchase { opacity:.8!important; }
 .shop-notice { display:flex; align-items:center; gap:8px; min-height:44px; margin:0 0 16px; padding:10px 12px; font-size:11px; line-height:1.6; color:#a5b995; background:#1b2b1d; border:1px solid #3c5034; border-radius:10px; }
 .shop-notice .shop-icon { width:22px; height:22px; }

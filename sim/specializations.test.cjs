@@ -32,6 +32,63 @@ function enemy(s, x, y) {
 function close(actual, expected) { assert.ok(Math.abs(actual - expected) < 1e-8, `${actual} != ${expected}`); }
 afterEach(() => aug.setActiveAugments([]));
 
+test('동종 일괄 특화는 전장과 모든 벙커의 Lv.3 이상 미선택 병력만 적용하고 선택·스킬·투자액을 보존한다', () => {
+  const s = setup(), bunker = place(s, 'bunker');
+  s.recruit(bunker.id, 0, 'marine');
+  const aboard = bunker.passengers[0], field = place(s, 'marine', 7, 1), low = place(s, 'marine', 8, 1);
+  const chosen = place(s, 'marine', 9, 1), other = place(s, 'firebat', 10, 1);
+  for (const t of [aboard, field, chosen, other]) t.lvl = 3;
+  chosen.branch = 'rapid'; s.equipSkill('stim', aboard.id); aboard.skills[0].cd = 7;
+  s.selected = other;
+  const gold = s.gold, spent = [aboard.spent, field.spent];
+  assert.deepEqual(s.applyOrder({ type: 'branch', key: 'power' }, { kind: 'marine' }), { count: 2, cost: aug.branchCost('marine') * 2 });
+  assert.equal(s.gold, gold - aug.branchCost('marine') * 2);
+  assert.deepEqual([aboard.branch, field.branch, low.branch, chosen.branch, other.branch, bunker.branch], ['power', 'power', undefined, 'rapid', undefined, undefined]);
+  assert.deepEqual([aboard.spent, field.spent], spent.map(value => value + aug.branchCost('marine')));
+  assert.equal(aboard.host, bunker); assert.equal(aboard.skills[0].cd, 7); assert.equal(s.selected, other);
+  assert.deepEqual(s.applyOrder({ type: 'branch', key: 'power' }, { kind: 'marine' }), { count: 0, cost: 0 });
+});
+
+test('일괄 특화는 합산 비용이 부족하면 전체 보류하고 증강 비용으로 정확히 결제한다', () => {
+  const s = setup(['inflation', 'aiur']), a = place(s, 'zealot'), b = place(s, 'marine', 7, 1);
+  a.lvl = 5; b.lvl = 3;
+  const cost = aug.branchCost('zealot') + aug.branchCost('marine'), spent = [a.spent, b.spent];
+  assert.equal(aug.branchCost('zealot'), config.TOWER_DEFS.zealot.cost * 6);
+  s.gold = cost - 1;
+  assert.deepEqual(s.applyOrder({ type: 'branch', key: 'rapid' }), { count: 0, cost: 0 });
+  assert.equal(s.gold, cost - 1); assert.deepEqual([a.branch, b.branch], [undefined, undefined]);
+  assert.deepEqual([a.spent, b.spent], spent);
+  s.gold = cost;
+  assert.deepEqual(s.applyOrder({ type: 'branch', key: 'rapid' }), { count: 2, cost });
+  assert.equal(s.gold, 0); assert.deepEqual([a.branch, b.branch], ['rapid', 'rapid']);
+});
+
+test('이중 특화 일괄 명령은 빠진 갈래만 더하고 두 갈래 완료 병력은 다시 결제하지 않는다', () => {
+  const s = setup(['dualBranch']), a = place(s, 'cannon'), b = place(s, 'cannon', 7, 1), c = place(s, 'cannon', 8, 1);
+  for (const t of [a, b, c]) t.lvl = 3;
+  a.branch = 'power'; b.branch = 'rapid'; c.branch = 'both';
+  const cost = aug.branchCost('cannon');
+  assert.deepEqual(s.applyOrder({ type: 'branch', key: 'power' }, { kind: 'cannon' }), { count: 1, cost });
+  assert.deepEqual([a.branch, b.branch, c.branch], ['power', 'both', 'both']);
+  assert.deepEqual(s.applyOrder({ type: 'branch', key: 'rapid' }, { kind: 'cannon' }), { count: 1, cost });
+  assert.deepEqual([a.branch, b.branch, c.branch], ['both', 'both', 'both']);
+  assert.deepEqual(s.applyOrder({ type: 'branch', key: 'rapid' }), { count: 0, cost: 0 });
+});
+
+test('벙커 범위의 일괄 특화는 다른 병력을 제외하고 잘못된 범위와 작전 종료를 거부한다', () => {
+  const s = setup(), bunker = place(s, 'bunker'), other = place(s, 'bunker', 8, 1);
+  s.recruit(bunker.id, 0, 'ghost'); s.recruit(other.id, 0, 'ghost');
+  const field = place(s, 'ghost', 9, 1);
+  for (const t of [bunker.passengers[0], other.passengers[0], field]) t.lvl = 3;
+  assert.deepEqual(s.applyOrder({ type: 'branch', key: 'rapid' }, { bunkerId: 'missing' }), { count: 0, cost: 0 });
+  assert.deepEqual(s.applyOrder({ type: 'branch', key: 'rapid' }, { bunkerId: field.id }), { count: 0, cost: 0 });
+  assert.deepEqual(s.applyOrder({ type: 'branch', key: 'rapid' }, { bunkerId: bunker.id }), { count: 1, cost: aug.branchCost('ghost') });
+  assert.equal(bunker.passengers[0].branch, 'rapid'); assert.equal(other.passengers[0].branch, undefined); assert.equal(field.branch, undefined);
+  s.over = true; const gold = s.gold;
+  assert.deepEqual(s.applyOrder({ type: 'branch', key: 'power' }), { count: 0, cost: 0 });
+  assert.equal(s.gold, gold); assert.equal(field.branch, undefined);
+});
+
 test('17종의 두 전용 특화가 레벨·주둔·이중 특화에서 유효한 전투 수치를 만든다', () => {
   assert.deepEqual(Object.keys(SPECIALIZATIONS).sort(), config.TOWER_KEYS.filter(k => k !== 'bunker').sort());
   assert.equal(new Set(Object.values(SPECIALIZATIONS).flatMap(pair => Object.values(pair).map(def => def.name))).size, 34);
