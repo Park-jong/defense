@@ -5,6 +5,8 @@ Phaser 3 + TypeScript + Vite로 만든 SF 타워 디펜스입니다.
 
 **플레이:** https://park-jong.github.io/defense/
 
+![프런티어 전장에서 12웨이브를 방어하는 장면](docs/images/gameplay.png)
+
 ## 특징
 
 - **병력 18종**: 테란 9종, 프로토스 9종입니다.
