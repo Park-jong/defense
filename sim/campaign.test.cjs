@@ -550,6 +550,91 @@ test('벙커 모드는 금지 유닛 건설을 거부하고 제한 예산은 처
   b.waveActive = true; b.useCommander('supply'); assert.equal(b.gold, gold); assert.equal(b.commander.supply, 0);
 });
 
+test('자동 웨이브는 기본으로 꺼져 있고 켜면 준비 시간 3초 후 한 번만 출격한다', () => {
+  const s = setup(); s.runLaunched = true;
+  s.step(10); assert.equal(s.wave, 0); assert.equal(s.autoWave, false);
+  s.toggleAutoWave(); s.step(2.99); assert.equal(s.wave, 0);
+  s.step(.01); assert.equal(s.wave, 1); assert.equal(s.waveActive, true);
+  const queue = [...s.spawnQ]; s.advanceAutoWave(20);
+  assert.equal(s.wave, 1); assert.deepEqual(s.spawnQ, queue);
+});
+
+test('자동 웨이브는 클리어마다 대기 시간을 새로 주고 끄면 다음 출격을 멈춘다', () => {
+  const s = setup(); s.toggleAutoWave(); s.startWave();
+  s.spawnQ = []; s.step(.01);
+  assert.equal(s.waveActive, false); assert.equal(s.autoWaveLeft, config.AUTO_WAVE_DELAY);
+  s.step(2.99); assert.equal(s.wave, 1);
+  s.step(.01); assert.equal(s.wave, 2);
+  s.spawnQ = []; s.enemies = []; s.step(.01);
+  s.step(2); s.toggleAutoWave(); s.step(10);
+  assert.equal(s.wave, 2); assert.equal(s.waveActive, false);
+});
+
+test('자동 웨이브는 일시정지·관리·선택·이동·명령 입력 중 대기를 보존하고 닫으면 이어 간다', () => {
+  for (const [key, blocked, ready] of [
+    ['paused', true, false], ['shopOpen', true, false], ['operationsOpen', true, false],
+    ['pending', ['power', 'haste', 'range'], []], ['augmentOffer', { cards: ['investment'] }, null],
+    ['relocating', {}, null], ['unloading', {}, null], ['commandConsole', { isOpen: true }, { isOpen: false }],
+    ['runLaunched', false, true],
+  ]) {
+    const s = setup(); s.runLaunched = true; s.toggleAutoWave(); s.advanceAutoWave(1);
+    s[key] = blocked; s.advanceAutoWave(20);
+    assert.equal(s.wave, 0, key); assert.equal(s.autoWaveLeft, 2, key);
+    s[key] = ready; s.advanceAutoWave(2);
+    assert.equal(s.wave, 1, key); assert.equal(s.waveActive, true, key);
+  }
+});
+
+test('수동 출격과 A 키 토글은 자동 웨이브의 진행 상태와 충돌하지 않는다', () => {
+  const s = setup(); s.runLaunched = true;
+  s.onKey({ key: 'a', repeat: false }); assert.equal(s.autoWave, true);
+  s.advanceAutoWave(1); s.onKey({ key: ' ', repeat: false });
+  assert.equal(s.wave, 1); assert.equal(s.waveActive, true); assert.equal(s.autoWaveLeft, config.AUTO_WAVE_DELAY);
+  s.onKey({ key: 'A', repeat: false }); assert.equal(s.autoWave, false);
+  s.onKey({ key: 'a', repeat: true }); assert.equal(s.autoWave, false);
+});
+
+test('자동 웨이브는 승리·패배에서 멈추고 무한·연장·테스트 모드는 기존 웨이브 규칙으로 이어 간다', () => {
+  const normal = setup(); normal.runLaunched = true; normal.wave = 50; normal.toggleAutoWave(); normal.advanceAutoWave(10);
+  assert.equal(normal.wave, 50); assert.equal(normal.waveActive, false);
+  for (const victory of [true, false]) {
+    const s = setup(); s.runLaunched = true; s.toggleAutoWave(); s.endGame(victory); s.advanceAutoWave(10);
+    assert.equal(s.waveActive, false); assert.equal(s.wave, 0);
+    s.toggleAutoWave(); assert.equal(s.autoWave, true);
+  }
+  for (const mode of ['endless', 'continued', 'test']) {
+    const s = setup(mode === 'endless' ? 'endless' : 'standard'); s.runLaunched = true; s.wave = 50;
+    if (mode === 'continued') s.continued = true;
+    if (mode === 'test') s.testMode = true;
+    s.toggleAutoWave(); s.advanceAutoWave(3);
+    assert.equal(s.wave, mode === 'test' ? 50 : 51); assert.equal(s.waveActive, true);
+    if (mode === 'test') assert.equal(s.repeat, 1);
+  }
+});
+
+test('자동 웨이브는 보상 뒤 남은 증강까지 선택한 다음 출격한다', () => {
+  const s = setup('augment'); s.runLaunched = true; s.wave = 10; s.rewarded = 5;
+  s.pending = ['power', 'haste', 'range']; s.augmentOffer = { wave: 10, cards: ['investment'], rerolled: [false] };
+  s.toggleAutoWave(); s.advanceAutoWave(10); assert.equal(s.wave, 10);
+  s.takeReward('power'); s.advanceAutoWave(10); assert.equal(s.wave, 10);
+  s.pickAugment('investment'); assert.equal(s.augmentOffer, null);
+  s.advanceAutoWave(2.99); assert.equal(s.wave, 10);
+  s.advanceAutoWave(.01); assert.equal(s.wave, 11);
+});
+
+test('자동 웨이브 설정은 저장·복원하고 이전 저장은 수동으로 열며 잘못된 값은 거부한다', () => {
+  const store = memory(), oldStorage = global.localStorage; global.localStorage = store;
+  try {
+    const old = setup(); old.restoreCheckpoint(checkpoint()); assert.equal(old.autoWave, false);
+    const s = setup(); s.runLaunched = true; s.toggleAutoWave();
+    const save = rules.readSave(store); assert.equal(save.autoWave, true);
+    const restored = setup(); restored.restoreCheckpoint(save);
+    assert.equal(restored.autoWave, true); assert.equal(restored.autoWaveLeft, config.AUTO_WAVE_DELAY);
+    s.toggleAutoWave(); assert.equal(rules.readSave(store).autoWave, false);
+    for (const value of ['true', 1, null, {}]) assert.equal(rules.validateSave({ ...checkpoint(), autoWave: value }), false);
+  } finally { if (oldStorage === undefined) delete global.localStorage; else global.localStorage = oldStorage; }
+});
+
 test('무한 모드는 50 이후 계속되며 난이도별 적 체력·속도가 실제로 다르다', () => {
   const s = setup('endless'); s.wave = 50; s.startWave(); assert.equal(s.wave, 51);
   const values = [];

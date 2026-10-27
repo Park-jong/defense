@@ -5,6 +5,8 @@ export const MAP_H = ROWS * T;
 /** 맵의 가로 크기. 데스크톱에서는 캔버스 너비와 같고, 모바일에서는 오른쪽에 SIDE_W 패널이 붙는다. */
 export const W = COLS * T;
 export const MAX_WAVE = 50;
+/** 자동 웨이브 진행 시 준비 대기 시간(게임 시간, 초). */
+export const AUTO_WAVE_DELAY = 3;
 export const MAX_UNIT_LEVEL = 5;
 /** 게임 로직 고정 스텝(초). 실제 경과 시간을 이 단위로 나눠 진행한다. */
 export const STEP_SEC = 1 / 60;

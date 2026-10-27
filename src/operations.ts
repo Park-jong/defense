@@ -11,8 +11,10 @@ import { rememberScroll } from './scrollMemory';
 import './operations.css';
 import { isBishoujo } from './themes';
 import { specialization } from './specializations';
+import { AUTO_WAVE_DELAY } from './data/rules';
 
 export interface OperationsView {
+  autoWave: boolean;
   options: RunOptions; wave: number; gold: number; lives: number; active: boolean; over: boolean; paused: boolean;
   selected?: SavedUnit; units: SavedUnit[]; stats: RunStats; profile: Profile;
   commander: Record<CommanderKey, number>; autoCommander: CommanderKey[]; pending: RewardKey[]; checkpoint: RunSave | null;
@@ -32,6 +34,7 @@ export interface OperationsActions {
   faction(key: Faction): void;
   commander(key: CommanderKey): void;
   autoCommander(key: CommanderKey): void;
+  autoWave(): void;
   console(): void;
   testScope(key: TestScope): void;
   testAugment(key: AugmentKey): void;
@@ -185,7 +188,7 @@ export class OperationsCenter {
       const cooldown = Math.ceil(v.commander[k]);
       const auto = v.autoCommander.includes(k), autoText = auto ? ' · 자동 사용 중' : '';
       return button('commander', k, `${icon(k)}${cooldown > 0 ? `<span class="mission-cooldown" aria-hidden="true">${cooldown}</span>` : ''}`, COMMANDERS[k].name + (cooldown > 0 ? ` ${cooldown}초` : '') + autoText, { disabled: v.over || v.paused || !v.active || cooldown > 0 || v.options.mode === 'budget' && k === 'supply', className: auto ? 'is-auto' : '', tip: `commander:${k}`, hint: `${COMMANDERS[k].name} · ${COMMANDERS[k].desc} · 재사용 ${COMMANDERS[k].cooldown}초${cooldown > 0 ? ` · 남은 ${cooldown}초` : ''}${autoText} · 우클릭(길게 누르기)으로 자동 사용 ${auto ? '끄기' : '켜기'}` });
-    }).join('')}</div></div>${augmentChips(v.augments, 'mission-augments')}${touchConsole() ? `<div class="mission-console">${button('console', '', icon('console'), '명령 입력', { hint: '명령 입력 · 명령어를 입력해 실행' })}</div>` : ''}${forecast}${tutorial}</div>`;
+    }).join('')}</div>${button('auto-wave', '', icon('autoWave'), `자동 웨이브 진행${touchConsole() ? '' : ' [A]'}`, { selected: v.autoWave, disabled: v.over, className: v.autoWave ? 'is-auto' : '', hint: `자동 웨이브 진행 ${v.autoWave ? '켜짐' : '꺼짐'} · 클릭하여 ${v.autoWave ? '끄기' : '켜기'} · 준비 시간 ${AUTO_WAVE_DELAY}초 후 다음 웨이브 시작(배속 적용) · 일시정지·관리·보상·증강 선택 중에는 대기` })}</div>${augmentChips(v.augments, 'mission-augments')}${touchConsole() ? `<div class="mission-console">${button('console', '', icon('console'), '명령 입력', { hint: '명령 입력 · 명령어를 입력해 실행' })}</div>` : ''}${forecast}${tutorial}</div>`;
     if (html !== this.cache) {
       this.ribbon.innerHTML = html; this.cache = html;
       // 쿨타임 숫자가 바뀔 때마다 버튼을 새로 그리므로, 자동 사용 빛의 회전 위상을 시계에 맞춰 끊김 없이 잇는다.
@@ -275,6 +278,7 @@ export class OperationsCenter {
     if (a === 'open') { this.show(key); return; }
     if (a === 'console') { this.actions.console(); return; }
     if (a === 'faction') { this.actions.faction(key as Faction); this.update(); return; }
+    if (a === 'auto-wave') { this.actions.autoWave(); this.update(); return; }
     if (a === 'close') { this.close(); return; }
     if (a === 'tab') this.section = key;
     if (a === 'map' || a === 'difficulty' || a === 'mode') this.draft = { ...(this.draft ?? this.actions.view().options), [a]: key };

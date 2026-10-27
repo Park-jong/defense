@@ -43,7 +43,7 @@
 .mission-ribbon.side .mission-toolbar { justify-content:space-between; gap:3px; }
 .mission-ribbon.side .mission-actions { gap:3px; }
 .mission-ribbon.side .mission-factions { padding-right:4px; margin-right:0; }
-.mission-ribbon.side button { flex:0 1 42px; width:42px; height:42px; }
+.mission-ribbon.side button { flex:0 1 38px; width:38px; height:42px; }
 .mission-ribbon.side .mission-forecast { position:absolute; top:52px; left:0; width:100%; height:30px; box-sizing:border-box; padding:0 8px; justify-content:flex-start; flex-wrap:nowrap; overflow:hidden; pointer-events:auto; background:#1b2320; border:1px solid #596150; }
 .mission-ribbon.side .field-tutorial { position:absolute; top:52px; left:0; width:100%; height:30px; flex:none; border-radius:0; padding:0 3px 0 8px; gap:5px; }
 .mission-ribbon.side .field-tutorial>.ops-icon { width:22px; height:22px; }

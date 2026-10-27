@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { AUTO_WAVE_DELAY } from './data/rules';
 import {
   CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE, COLS, CONSOLE_Y, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, FINAL_BOSS_HP_MULT, FONT, GAME_W, H, MAP_H, MAP_Y, MAX_CATCHUP_SEC, MAX_WAVE, MOBILE_LAYOUT, RENDER_SCALE, RIBBON_BAND, ROWS, SIDE_RIBBON_H, SIDE_W, STEP_SEC, T, TEST_GOLD, TOP_BAR_H, TOWER_DEFS, TowerKey, VIEW_H, W,
 } from './config';
@@ -90,6 +91,8 @@ export class GameScene extends Phaser.Scene {
   private spawnQ: (EnemyKey | 'amon')[] = [];
   private spawnT = 0;
   private waveActive = false;
+  private autoWave = false;
+  private autoWaveLeft = AUTO_WAVE_DELAY;
   private building: TowerKey | null = null;
   private faction: Faction = 'terran';
   private selected: Tower | null = null;
@@ -220,6 +223,7 @@ export class GameScene extends Phaser.Scene {
     this.towers = []; this.enemies = []; this.projs = []; this.armyMemo = undefined;
     this.nextUnitId = 0; this.unloading = null;
     this.spawnQ = []; this.spawnT = 0; this.waveActive = false;
+    this.autoWave = false; this.autoWaveLeft = AUTO_WAVE_DELAY;
     this.building = null; this.selected = null; this.hover = null; this.faction = 'terran';
     this.speed = 1; this.paused = false; this.over = false; this.bossLeaked = false;
     this.continued = false; this.victory = false;
@@ -309,7 +313,7 @@ export class GameScene extends Phaser.Scene {
 
   private operationsView(): OperationsView {
     const units = this.savedUnits();
-    return { options: this.options, wave: this.wave, gold: this.gold, lives: this.lives, active: this.waveActive, over: this.over,
+    return { options: this.options, wave: this.wave, gold: this.gold, lives: this.lives, active: this.waveActive, autoWave: this.autoWave, over: this.over,
       selected: units.find(u => u.id === this.selected?.id), units, stats: this.runStats, profile: this.profile,
       commander: this.commander, autoCommander: [...this.autoCommander], pending: this.pending, checkpoint: this.checkpoint, tutorial: this.tutorial, notice: this.opsNotice, test: this.testMode, testScope: this.testScope, augments: [...this.augments], augmentOffer: this.augmentOffer, amonSince: this.amonSince, testAugments: [...this.testAugments], paused: this.paused, faction: this.faction };
   }
@@ -327,6 +331,7 @@ export class GameScene extends Phaser.Scene {
       faction: key => this.selectFaction(key),
       commander: key => this.useCommander(key),
       autoCommander: key => this.toggleAutoCommander(key),
+      autoWave: () => this.toggleAutoWave(),
       console: () => this.commandConsole?.toggle(),
       testScope: key => { if (!this.waveActive) this.testScope = key; },
       testAugment: key => { if (!this.testAugments.delete(key)) this.testAugments.add(key); },
@@ -351,7 +356,7 @@ export class GameScene extends Phaser.Scene {
     if (this.testMode || this.over || this.waveActive || !this.runLaunched) return;
     const save: RunSave = { version: 1, options: { ...this.options }, wave: this.wave, gold: this.gold, lives: this.lives,
       units: this.savedUnits(), bonuses: { ...this.bonuses }, stats: this.runStats, commander: { ...this.commander },
-      pending: [...this.pending], rewarded: this.rewarded, tutorial: this.tutorial, usedKinds: [...this.usedKinds],
+      pending: [...this.pending], rewarded: this.rewarded, tutorial: this.tutorial, usedKinds: [...this.usedKinds], autoWave: this.autoWave,
       augments: [...this.augments], augmentSeen: [...this.augmentSeen], augmentOffer: this.augmentOffer && structuredClone(this.augmentOffer), amonSince: this.amonSince, cheated: this.cheated, continued: this.continued };
     if (!validateSave(save)) { if (notify) this.opsNotice = '현재 상태를 저장할 수 없습니다.'; return; }
     if (writeStored(SAVE_KEY, save)) {
@@ -368,6 +373,7 @@ export class GameScene extends Phaser.Scene {
     setActiveAugments(this.augments);
     this.wave = save.wave; this.gold = save.gold; this.lives = save.lives;
     this.continued = save.continued ?? false;
+    this.autoWave = save.autoWave ?? false; this.autoWaveLeft = AUTO_WAVE_DELAY;
     const units = new Map<string, Tower>();
     for (const u of save.units) {
       const t = this.createTower(u.k, u.c, u.r);
@@ -878,16 +884,16 @@ export class GameScene extends Phaser.Scene {
 
   private refreshUI(): void {
     const remaining = this.enemies.length + this.spawnQ.length;
-    const hud = `${this.wave}/${this.gold}/${this.lives}/${remaining}/${this.paused}/${this.over}`;
+    const hud = `${this.wave}/${this.gold}/${this.lives}/${remaining}/${this.paused}/${this.over}/${this.autoWave}/${Math.ceil(this.autoWaveLeft)}`;
     if (this.uiCache.hud !== hud) {
       this.uiCache.hud = hud;
       this.hud.setText(`WAVE  ${String(this.wave).padStart(2, '0')} / ${this.options.mode === 'endless' || this.continued ? '∞' : MAX_WAVE}`);
       this.mineralTxt.setText(this.gold.toLocaleString());
       this.lifeTxt.setText(`${Math.max(0, this.lives)} / ${maxLives()}`);
       this.lifeTxt.setColor(this.lives <= 5 ? '#e29a7f' : isBishoujo() ? '#efb9dd' : '#b7dc8e');
-      this.goBtn.set(this.over ? '작전 종료' : this.waveActive ? `${MOBILE_LAYOUT ? '교전' : '교전 중'} · 남은 적 ${remaining}` : `▶  웨이브 시작${this.kb('  [SPACE]')}`);
+      this.goBtn.set(this.over ? '작전 종료' : this.waveActive ? `${MOBILE_LAYOUT ? '교전' : '교전 중'} · 남은 적 ${remaining}` : this.autoWave ? `자동 · ${Math.ceil(this.autoWaveLeft)}초 후 시작` : `▶  웨이브 시작${this.kb('  [SPACE]')}`);
     }
-    this.goBtn.en(!this.waveActive && !this.over && !this.paused && !this.shopOpen && !this.operationsOpen && !this.pending.length && !this.augmentOffer && (this.testMode || this.options.mode === 'endless' || this.continued || this.wave < MAX_WAVE));
+    this.goBtn.en(this.canStartWave());
     this.shopBtn.en(!this.over);
     const t = this.selected, k = t?.k ?? this.building;
     let title: string, msg: string;
@@ -1053,6 +1059,7 @@ export class GameScene extends Phaser.Scene {
     if (e.key >= '1' && e.key <= '9') this.chooseBuild(FACTION_TOWERS[this.faction][+e.key - 1], true);
     else if (e.key === 'Escape') this.cancelCommand();
     else if (e.key === ' ') this.startWave();
+    else if (e.key.toLowerCase() === 'a') this.toggleAutoWave();
     else if (e.key === 'p' || e.key === 'P') this.togglePause();
     else if (e.key === 'u' || e.key === 'U') this.upgrade();
     else if (e.key === 's' || e.key === 'S') this.sell();
@@ -1309,8 +1316,27 @@ export class GameScene extends Phaser.Scene {
       ?? { id: 'commander', k: 'marine', x: W / 2, y: MAP_Y + MAP_H / 2 };
   }
 
+  private canStartWave(): boolean {
+    return !this.over && !this.paused && !this.shopOpen && !this.operationsOpen && !this.pending.length && !this.augmentOffer && !this.waveActive
+      && (this.testMode || this.options.mode === 'endless' || this.continued || this.wave < MAX_WAVE);
+  }
+
+  private toggleAutoWave(): void {
+    if (this.over) return;
+    this.autoWave = !this.autoWave; this.autoWaveLeft = AUTO_WAVE_DELAY;
+    this.operations?.update(); this.saveCheckpoint(false);
+  }
+
+  private advanceAutoWave(dt: number): void {
+    if (!this.autoWave || this.waveActive || this.over) { this.autoWaveLeft = AUTO_WAVE_DELAY; return; }
+    if (!this.runLaunched || !this.canStartWave() || this.relocating || this.unloading || this.commandConsole?.isOpen) return;
+    this.autoWaveLeft = Math.max(0, this.autoWaveLeft - dt);
+    if (this.autoWaveLeft < 1e-8) this.startWave();
+  }
+
   private startWave(): void {
-    if (this.over || this.paused || this.shopOpen || this.operationsOpen || this.pending.length || this.augmentOffer || this.waveActive || (!this.testMode && this.options.mode !== 'endless' && !this.continued && this.wave >= MAX_WAVE)) return;
+    if (!this.canStartWave()) return;
+    this.autoWaveLeft = AUTO_WAVE_DELAY;
     this.runLaunched = true; this.saveCheckpoint(false); this.cancelCommand();
     if (this.testMode) this.repeat++; else this.wave++;
     const w = this.wave, scope = this.testMode ? this.testScope : 'all';
@@ -1422,6 +1448,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private step(dt: number): void {
+    this.advanceAutoWave(dt);
     this.combatEffects?.update(dt);
     if (this.waveActive) {
       this.runStats.seconds += dt;
@@ -1528,6 +1555,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private completeWave(): void {
+    this.autoWaveLeft = AUTO_WAVE_DELAY;
     const bonus = this.options.mode === 'budget' ? 0 : Math.round((CLEAR_BONUS_BASE + this.wave * CLEAR_BONUS_PER_WAVE) * clearBonusMultiplier());
     this.gold += bonus;
     this.banner(`구역 확보 · +${bonus} 미네랄`);

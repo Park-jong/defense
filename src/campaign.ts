@@ -109,6 +109,8 @@ export interface RunSave {
   version: 1; options: RunOptions; wave: number; gold: number; lives: number; units: SavedUnit[];
   /** 50웨이브 승리 후 원래 작전 규칙을 유지하며 계속 플레이 중. */
   continued?: boolean;
+  /** 준비 시간 후 다음 웨이브 자동 시작. 이전 저장은 수동 진행으로 복원한다. */
+  autoWave?: boolean;
   bonuses: Bonuses; stats: RunStats; commander: Record<CommanderKey, number>;
   pending: RewardKey[]; rewarded: number; tutorial: number; usedKinds: TowerKey[];
   /** 증강 모드: 고른 증강, 한 번이라도 출현한 증강, 고르는 중인 선택지, 젤나가 맙소사를 고른 웨이브. */
@@ -141,6 +143,7 @@ export function validOptions(v: unknown): v is RunOptions { return obj(v) && has
 export function validateSave(v: unknown): v is RunSave {
   if (!obj(v) || v.version !== 1 || !validOptions(v.options) || !integer(v.wave, 0, 10000)
     || v.continued !== undefined && typeof v.continued !== 'boolean' || v.continued === true && v.wave < MAX_WAVE
+    || v.autoWave !== undefined && typeof v.autoWave !== 'boolean'
     || v.options.mode !== 'endless' && !v.continued && v.wave >= MAX_WAVE || !num(v.gold) || !integer(v.lives, 1, v.augments?.includes('glassCannon') ? 10 : 20)
     || !Array.isArray(v.units) || v.units.length > COLS * ROWS * 5) return false;
   const ids = new Set<string>(), occupied = new Set<string>(), slots = new Set<string>();

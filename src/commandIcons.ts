@@ -2,6 +2,7 @@ import type Phaser from 'phaser';
 import { SKILL_DEFS, SKILL_KEYS } from './catalog';
 
 const glyphs: Record<string, string> = {
+  autoWave: '<path d="M47 20a20 20 0 0 0-34 9m0-11v11h11M17 44a20 20 0 0 0 34-9m0 11V35H40"/><path d="m28 24 12 8-12 8Z"/>',
   terran: '<path d="M12 15h40v10H38v27H26V25H12Z" fill="#648d82"/><path d="M8 11h48M21 55h22M17 31l-6 7 10 9m26-16 6 7-10 9"/>',
   protoss: '<path d="m32 7 8 15 13 8-13 5-8 22-8-22-13-5 13-8Z" fill="#a57f36"/><path d="m32 14 5 15-5 19-5-19Z" fill="#b9efff"/><path d="M16 12 9 27l8 17m31-32 7 15-8 17"/>',
   upgrade: '<path d="M14 19 32 10l18 9-3 24-15 12-15-12Z" fill="#53737a"/><path d="m22 30 10-9 10 9m-20 9 10-9 10 9"/>',
