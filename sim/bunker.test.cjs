@@ -437,13 +437,19 @@ test('화상 숫자는 짧게 합산하고 직격이나 처치 전에 남은 피
 
 test('연사 숫자는 서로 다른 위치에서 떠오르고 최대 160개를 재사용하며 정지·만료·장면 종료를 처리한다', () => {
   const { numbers, views } = damageRenderer(), target = { x: 120, y: 180, r: 12 };
-  for (let i = 0; i < 240; i++) numbers.hit(target, 10 + i);
+  for (let i = 0; i < 240; i++) {
+    if (i % 32 === 0) numbers.beginFrame();
+    numbers.hit(target, 10 + i);
+  }
   assert.equal(views.length, 160); assert.equal(numbers.active.length, 160);
   assert.ok(new Set(views.map(v => v.x + '/' + v.y)).size > 1);
   const before = views[0].y; numbers.update(.1); assert.ok(views[0].y < before);
   const after = views[0].y; numbers.update(0); assert.equal(views[0].y, after);
   numbers.update(2); assert.ok(views.every(v => !v.visible && !v.active));
-  for (let i = 0; i < 100; i++) numbers.hit(target, 1);
+  for (let i = 0; i < 100; i++) {
+    if (i % 32 === 0) numbers.beginFrame();
+    numbers.hit(target, 1);
+  }
   assert.equal(views.length, 160); assert.equal(numbers.active.length, 100);
   numbers.destroy(); assert.ok(views.every(v => v.destroyed)); assert.equal(numbers.active.length, 0);
 });

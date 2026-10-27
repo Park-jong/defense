@@ -16,6 +16,9 @@ export class DamageNumbers {
   private free: Phaser.GameObjects.BitmapText[] = [];
   private burns = new Map<Target, { amount: number; age: number }>();
   private serial = 0;
+  private emitted = 0;
+
+  beginFrame(): void { this.emitted = 0; }
 
   constructor(private scene: Phaser.Scene) {
     if (scene.cache.bitmapFont.exists(FONT_KEY)) return;
@@ -84,14 +87,15 @@ export class DamageNumbers {
   }
 
   private spawn(target: Target, amount: number, kind: DamageKind): void {
+    if (this.active.length >= MAX_POPUPS || this.emitted >= 32 || typeof document !== 'undefined' && document.hidden) return;
+    this.emitted++;
     const heavy = amount >= 80;
     const size = kind === 'burn' ? 15 : heavy ? 30 : kind === 'skill' ? 23 : 19;
     const color = kind === 'burn' ? 0xffa15c : heavy ? 0xffd16b : kind === 'skill' ? 0x8eeaff : 0xfff1d5;
     const text = amount >= 1 ? Math.round(amount).toLocaleString('en-US') : Math.max(.1, amount).toFixed(1);
     const lane = this.serial++ % 7 - 3;
     const x = target.x + lane * 5, y = target.y - (target.r ?? 12) - 9 - this.serial % 3 * 5;
-    const view = this.free.pop() ?? (this.active.length >= MAX_POPUPS ? this.active.shift()!.view
-      : this.scene.add.bitmapText(0, 0, FONT_KEY, '', size).setOrigin(.5).setDepth(24));
+    const view = this.free.pop() ?? this.scene.add.bitmapText(0, 0, FONT_KEY, '', size).setOrigin(.5).setDepth(24);
     view.setText(text).setFontSize(size).setPosition(x, y).setTint(color).setAlpha(1).setScale(.7).setVisible(true).setActive(true);
     this.active.push({ view, age: 0, life: heavy ? .95 : kind === 'burn' ? .65 : .8,
       x, y, drift: lane * 9, rise: heavy ? 68 : 44, color });

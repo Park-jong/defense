@@ -32,8 +32,11 @@ export class CombatEffects {
   private flashes = new Map<Target, HitFlash>();
   private flashFree: Image[] = [];
   private serial = 0;
+  private emitted = 0;
 
   constructor(private scene: Phaser.Scene) { this.makeTextures(); }
+
+  beginFrame(): void { this.emitted = 0; }
 
   launch(key: TowerKey, origin: Point, angle: number, view: Image, gun: Gun): boolean {
     if (!hasWeaponEffects(key)) return false;
@@ -223,8 +226,10 @@ export class CombatEffects {
 
   private spawn(texture: string, x: number, y: number, width: number, height: number,
     life: number, color: number, style: ParticleStyle = {}): void {
-    const view = this.free.pop() ?? (this.particles.length >= MAX_PARTICLES
-      ? this.particles.shift()!.view : this.scene.add.image(0, 0, texture));
+    // A full pool drops cosmetic emissions instead of repeatedly shifting/reconfiguring live particles.
+    if (this.particles.length >= MAX_PARTICLES || this.emitted >= 96) return;
+    this.emitted++;
+    const view = this.free.pop() ?? this.scene.add.image(0, 0, texture);
     view.setTexture(texture).setPosition(x, y).setOrigin(.5).setDisplaySize(width, height)
       .setTint(color).setAlpha(style.alpha ?? 1).setRotation(style.angle ?? 0)
       .setBlendMode(style.add ? 'ADD' : 'NORMAL').setDepth(style.depth ?? 8).setVisible(true).setActive(true);

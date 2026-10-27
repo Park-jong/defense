@@ -12,6 +12,9 @@ export const MAX_UNIT_LEVEL = 5;
 export const STEP_SEC = 1 / 60;
 /** 창이 가려져 루프가 드물게 돌 때 한 번에 따라잡는 최대 시간(초). */
 export const MAX_CATCHUP_SEC = 60;
+/** Yield to input/rendering even after a long stall. Unprocessed time stays queued. */
+export const MAX_STEPS_PER_FRAME = 12;
+export const SIMULATION_BUDGET_MS = 8;
 /** 웨이브 클리어 보너스 = BASE + PER_WAVE * 웨이브. */
 export const CLEAR_BONUS_BASE = 17;
 export const CLEAR_BONUS_PER_WAVE = 4;

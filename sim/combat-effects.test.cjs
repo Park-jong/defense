@@ -103,9 +103,26 @@ test('집중 포격에도 효과 이미지는 상한 안에서 재사용하고 �
   fx.forget(shot); fx.update(2);
   assert.equal(fx.particles.length, 0); assert.equal(fx.flights.size, 0); assert.equal(fx.flashes.size, 0);
   const allocated = views.length;
+  fx.beginFrame();
   fx.impact('cannon', targets[0], gun, 55); assert.equal(views.length, allocated);
   fx.destroy(); assert.ok(views.slice(external).every(v => v.destroyed));
   assert.equal(fx.recoils.size, 0);
+});
+
+test('연속 포격은 프레임당 96개·동시 320개를 지키고 포화된 잔상을 계속 교체하지 않는다', () => {
+  const { s, image, views } = fixture(), fx = new CombatEffects(s), target = enemy(image, 100, 100);
+  const external = views.length;
+  for (let frame = 0; frame < 3; frame++) {
+    fx.beginFrame(); const count = fx.particles.length;
+    for (let i = 0; i < 1000; i++) fx.impact('cannon', target, { x: 0, y: 0 }, 55);
+    assert.equal(fx.particles.length - count, 96);
+  }
+  const oldest = fx.particles[0];
+  fx.beginFrame();
+  for (let i = 0; i < 1000; i++) fx.impact('cannon', target, { x: 0, y: 0 }, 55);
+  assert.equal(fx.particles.length, 320);
+  assert.equal(views.length - external, 320);
+  assert.equal(fx.particles[0], oldest);
 });
 
 test('비행 중 표적이 먼저 죽으면 실제 투사체와 연결된 표시 상태를 함께 제거한다', () => {

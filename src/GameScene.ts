@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { AUTO_WAVE_DELAY } from './data/rules';
+import { AUTO_WAVE_DELAY, MAX_STEPS_PER_FRAME, SIMULATION_BUDGET_MS } from './data/rules';
+import { RouteDistances, VisualBudget } from './game/performance';
 import {
   CLEAR_BONUS_BASE, CLEAR_BONUS_PER_WAVE, COLS, CONSOLE_Y, ENEMY_DEFS, EnemyKey, FACTIONS, FACTION_TOWERS, Faction, FINAL_BOSS_HP_MULT, FONT, GAME_W, H, MAP_H, MAP_Y, MAX_CATCHUP_SEC, MAX_WAVE, MOBILE_LAYOUT, RENDER_SCALE, RIBBON_BAND, ROWS, SIDE_RIBBON_H, SIDE_W, STEP_SEC, T, TEST_GOLD, TOP_BAR_H, TOWER_DEFS, TowerKey, VIEW_H, W,
 } from './config';
@@ -108,6 +109,8 @@ export class GameScene extends Phaser.Scene {
   private touchUI = false;
   private lastTick = 0;
   private stepAcc = 0;
+  private routeDistances = new RouteDistances();
+  private visualBudget = new VisualBudget();
   private bossLeaked = false;
   private testMode = false;
   /** power overwhelming 입력 횟수: 입력할 때마다 모든 병력 공격력 2배씩 중첩(상한 10,000). 다시 출격하면 0. */
@@ -228,6 +231,7 @@ export class GameScene extends Phaser.Scene {
     this.speed = 1; this.paused = false; this.over = false; this.bossLeaked = false;
     this.continued = false; this.victory = false;
     this.lastTick = 0; this.stepAcc = 0;
+    this.routeDistances = new RouteDistances(); this.visualBudget = new VisualBudget();
     this.touchUI = window.matchMedia('(pointer: coarse)').matches;
     this.uiCache = {};
     this.fields = []; this.shopOpen = false;
@@ -250,6 +254,7 @@ export class GameScene extends Phaser.Scene {
     this.gfx = this.add.graphics().setDepth(10);
     const emitter = (tint: number, speed: number, life: number) => this.add.particles(0, 0, 'spark', {
       speed: { min: speed * .3, max: speed }, lifespan: life, scale: { start: 1.3, end: 0 }, tint, emitting: false,
+      maxParticles: 160, maxAliveParticles: 160,
     }).setDepth(20);
     this.fxBoom = emitter(0xff8a65, 200, 450);
     this.fxDie = emitter(0xef9a9a, 130, 400);
@@ -974,7 +979,7 @@ export class GameScene extends Phaser.Scene {
           slot < 0 ? '사격구 4칸이 모두 사용 중입니다.' : '병력 1기를 구매해 이 벙커의 빈 사격구에 바로 배치합니다.',
           () => this.recruit(t.id, slot, key), slot >= 0 && this.gold >= placeCost(key), placeCost(key));
       });
-      const plan = planOrder(this.shopState().units, { type: 'upgrade' }, { bunkerId: t.id });
+      const plan = this.planUnitOrder({ type: 'upgrade' }, { bunkerId: t.id });
       cells[6] = make('upgrade-crew:' + t.id, '병력 일괄 강화', 'cmd_upgrade',
         `${plan.ids.length}기를 각 1단계 강화합니다. 최대 강화 병력은 제외하고, 총비용이 부족하면 전체 보류합니다.`,
         () => this.applyOrder({ type: 'upgrade' }, { bunkerId: t.id }), !!plan.ids.length && this.gold >= plan.cost, plan.cost);
@@ -1121,6 +1126,11 @@ export class GameScene extends Phaser.Scene {
         hostId: t.host?.id, branch: t.branch, passengers: t.passengers.map(p => p?.id ?? null) })) };
   }
 
+  /** Order prices need ownership and levels, not two full combat stat calculations per unit. */
+  private planUnitOrder(order: UnitOrder, scope: UnitScope = {}): ReturnType<typeof planOrder> {
+    return planOrder(this.towers.map(t => ({ id: t.id, k: t.k, lvl: t.lvl, skills: t.skills, branch: t.branch, hostId: t.host?.id })), order, scope);
+  }
+
   private openShop(tab: 'army' | 'garrison' | 'manage' = 'army'): void {
     if (this.over || this.shopOpen || this.operationsOpen) return;
     this.shopOpen = true; this.hover = null;
@@ -1140,7 +1150,7 @@ export class GameScene extends Phaser.Scene {
 
   private applyOrder(order: UnitOrder, scope: UnitScope = {}): OrderResult {
     if (this.over || scope.bunkerId !== undefined && !this.towers.some(t => t.id === scope.bunkerId && t.k === 'bunker')) return { count: 0, cost: 0 };
-    const plan = planOrder(this.shopState().units, order, scope);
+    const plan = this.planUnitOrder(order, scope);
     if (!plan.ids.length || this.gold < plan.cost) return { count: 0, cost: 0 };
     for (const id of plan.ids) {
       if (order.type === 'upgrade') this.upgradeUnit(id);
@@ -1164,7 +1174,7 @@ export class GameScene extends Phaser.Scene {
     return {
       // 증강의 병력 피해 배율까지 넣어 정보창·보급 상점의 공격력과 실제 피해가 같은 값이 되게 한다.
       dmg: this.cheatPower(base.dmg * power * (1 + this.bonuses.power) * spec.damage) * damageMultiplier(t.k, this.army()),
-      range: this.supportRange(t) + (t.host ? BUNKER_RANGE_BONUS + (hasAugment('fortress') ? FORTRESS_RANGE : 0) : 0),
+      range: this.targetRange(t),
       rate: base.rate * spec.interval * (t.k === 'cannon' && hasAugment('siegeMode') ? 1.2 : 1) / haste,
       splash: Math.max((d.splash ?? 0) * (1 + .1 * l) * spec.splash, spec.splashRadius) * this.splashAugment(t.k),
       slow: d.slow ? Math.max(.08, Math.min(.9, Math.max(.2, d.slow - .08 * l) + spec.slow)) : 0,
@@ -1182,6 +1192,9 @@ export class GameScene extends Phaser.Scene {
   private supportRange(t: StatsUnit): number {
     return levelStats(t.k, t.lvl).range + this.bonuses.range + highGroundRangeBonus(this.map, t.c ?? -1, t.r ?? -1) + specializationEffects(t.k, t.branch, !!t.host).range
       + (t.k === 'zealot' && hasAugment('aiur') ? AIUR_RANGE : 0) + (t.k === 'cannon' && hasAugment('siegeMode') ? SIEGE_RANGE : 0);
+  }
+  private targetRange(t: StatsUnit): number {
+    return this.supportRange(t) + (t.host ? BUNKER_RANGE_BONUS + (hasAugment('fortress') ? FORTRESS_RANGE : 0) : 0);
   }
   private upgradeCost(t: Tower): number { return unitUpgradeCost(t); }
   private sellValue(t: Tower): number { return Math.round(t.spent * sellRate()); }
@@ -1407,8 +1420,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private floatText(x: number, y: number, txt: string, color: string): void {
-    const t = this.add.text(x, y - 10, txt, { fontFamily: FONT, fontSize: '14px', fontStyle: 'bold', color }).setOrigin(.5).setDepth(22);
-    this.tweens.add({ targets: t, y: y - 40, alpha: 0, duration: 800, onComplete: () => t.destroy() });
+    this.effect(() => this.add.text(x, y - 10, txt, { fontFamily: FONT, fontSize: '14px', fontStyle: 'bold', color }).setOrigin(.5).setDepth(22),
+      { y: y - 40, alpha: 0, duration: 800 });
   }
 
   private banner(msg: string): void {
@@ -1423,12 +1436,11 @@ export class GameScene extends Phaser.Scene {
     const now = performance.now();
     const elapsed = this.lastTick ? Math.min(MAX_CATCHUP_SEC, (now - this.lastTick) / 1000) : 0;
     this.lastTick = now;
+    this.visualBudget.beginFrame();
+    this.combatEffects?.beginFrame();
+    this.damageNumbers?.beginFrame();
     if (!this.paused && !this.over && !this.shopOpen && !this.operationsOpen) {
-      this.stepAcc += elapsed;
-      while (this.stepAcc >= STEP_SEC && !this.over && !this.operationsOpen) {
-        for (let i = 0; i < this.speed && !this.over && !this.operationsOpen; i++) this.step(STEP_SEC);
-        this.stepAcc -= STEP_SEC;
-      }
+      this.advanceSimulation(elapsed);
     } else this.stepAcc = 0;
     // Let the last impact settle after victory/defeat, without advancing the battle itself.
     if (this.over && !this.paused && !this.shopOpen && !this.operationsOpen) this.combatEffects?.update(Math.min(.05, elapsed));
@@ -1445,6 +1457,16 @@ export class GameScene extends Phaser.Scene {
     if (this.saveClock >= 2) { this.saveCheckpoint(false); this.saveClock = 0; }
     this.refreshUI();
     this.drawOverlay();
+  }
+
+  private advanceSimulation(elapsed: number): void {
+    this.stepAcc = Math.min(MAX_CATCHUP_SEC * this.speed, this.stepAcc + elapsed * this.speed);
+    const started = performance.now();
+    for (let steps = 0; this.stepAcc >= STEP_SEC && !this.over && !this.operationsOpen && !this.paused && !this.shopOpen; steps++) {
+      if (steps >= MAX_STEPS_PER_FRAME || steps > 0 && performance.now() - started >= SIMULATION_BUDGET_MS) break;
+      this.stepAcc -= STEP_SEC;
+      this.step(STEP_SEC);
+    }
   }
 
   private step(dt: number): void {
@@ -1659,9 +1681,9 @@ export class GameScene extends Phaser.Scene {
     }
     if (best?.dead) best = this.findTarget(t);
     if (!best) return;
-    const st = this.stats(t);
     t.barrel.rotation = ['frost', 'sniper', 'templar', 'highTemplar'].includes(t.k) ? 0 : Math.atan2(best.y - t.y, best.x - t.x);
     if (t.cd > 0) return;
+    const st = this.stats(t);
     t.cd = st.rate;
     if (t.k === 'sniper') { t.charge = { target: best, left: DRAGOON_CHARGE_TIME }; return; }
     this.fire(t, best, st);
@@ -1713,27 +1735,25 @@ export class GameScene extends Phaser.Scene {
     }
     if (t.host) {
       const scale = t.k === 'firebat' ? 1 : .6;
-      const flame = this.add.image(muzzleX, muzzleY, 'bunker_muzzle').setOrigin(0, .5).setRotation(angle).setScale(scale).setDepth(12);
-      this.tweens.add({ targets: flame, scaleX: scale * 1.3, scaleY: scale * .65, alpha: 0,
-        duration: t.k === 'firebat' ? 150 : 90, onComplete: () => flame.destroy() });
+      this.effect(() => this.add.image(muzzleX, muzzleY, 'bunker_muzzle').setOrigin(0, .5).setRotation(angle).setScale(scale).setDepth(12),
+        { scaleX: scale * 1.3, scaleY: scale * .65, alpha: 0, duration: t.k === 'firebat' ? 150 : 90 });
     } else if (t.k === 'firebat') {
       for (const port of FIREBAT_MUZZLES) {
         const x = t.x + port.x * Math.cos(angle) - port.y * Math.sin(angle);
         const y = t.y + port.x * Math.sin(angle) + port.y * Math.cos(angle);
         const length = Math.max(18, Math.min(80, Math.hypot(best.x - x, best.y - y)));
-        const flame = this.add.image(x, y, 'firebat_flame').setOrigin(0, .5)
-          .setRotation(Math.atan2(best.y - y, best.x - x)).setScale(length / 68, .75).setDepth(12);
-        this.tweens.add({ targets: flame, scaleX: length / 60, scaleY: 1, alpha: 0,
-          duration: 220, onComplete: () => flame.destroy() });
+        this.effect(() => this.add.image(x, y, 'firebat_flame').setOrigin(0, .5)
+          .setRotation(Math.atan2(best.y - y, best.x - x)).setScale(length / 68, .75).setDepth(12),
+          { scaleX: length / 60, scaleY: 1, alpha: 0, duration: 220 });
       }
     } else if (t.k === 'templar') {
       this.archonBurst(muzzleX, muzzleY, 24);
     } else if (t.k === 'sniper') {
-      const flare = this.add.image(muzzleX, muzzleY, 'dragoon_charge').setScale(.8).setDepth(12);
-      this.tweens.add({ targets: flare, scale: 1.25, alpha: 0, duration: 180, onComplete: () => flare.destroy() });
+      this.effect(() => this.add.image(muzzleX, muzzleY, 'dragoon_charge').setScale(.8).setDepth(12),
+        { scale: 1.25, alpha: 0, duration: 180 });
     } else {
-      const flash = this.add.circle(muzzleX, muzzleY, 5, d.proj, .7).setDepth(9);
-      this.tweens.add({ targets: flash, scale: 1.8, alpha: 0, duration: 160, onComplete: () => flash.destroy() });
+      this.effect(() => this.add.circle(muzzleX, muzzleY, 5, d.proj, .7).setDepth(9),
+        { scale: 1.8, alpha: 0, duration: 160 });
     }
     if (t.k === 'frost' || t.k === 'templar') {
       this.tweens.add({ targets: t.barrel, scale: { from: 1.1, to: 1 }, duration: 220 });
@@ -1757,17 +1777,17 @@ export class GameScene extends Phaser.Scene {
       if (along >= 0 && along <= st.range && across <= half) { hits.push(e); this.damageEnemy(e, st.dmg * power * (e.type === 'boss' ? 2 : 1), 'skill', t.id); }
     }
     if (charged) { this.yamatoChargeFx(t, bow, end, half, hits); return; }
-    const core = this.add.circle(bow.x, bow.y, 6, 0xffda8a, .85).setStrokeStyle(2, 0xfff2c8).setDepth(12);
-    this.tweens.add({ targets: core, scale: 2.2, alpha: 0, duration: 300, onComplete: () => core.destroy() });
+    this.effect(() => this.add.circle(bow.x, bow.y, 6, 0xffda8a, .85).setStrokeStyle(2, 0xfff2c8).setDepth(12),
+      { scale: 2.2, alpha: 0, duration: 300 });
     this.skillBeam(bow, end, SKILL_DEFS.yamato.color, half * 2);
   }
 
   /** 5발째 강화 포격: 주황 포선 대신 붉은 외광·흰 심지의 3겹 포선, 포구로 빨려드는 충전 고리, 명중마다 충격파, 끝점 대폭발과 화면 흔들림. */
   private yamatoChargeFx(t: Tower, bow: Point, end: Point, half: number, hits: Enemy[]): void {
-    const gather = this.add.circle(bow.x, bow.y, 24, 0xff6a4a, .25).setStrokeStyle(3, 0xffc0a0).setDepth(12);
-    this.tweens.add({ targets: gather, scale: { from: 1.6, to: .2 }, alpha: { from: .9, to: 0 }, duration: 260, onComplete: () => gather.destroy() });
-    const flash = this.add.circle(bow.x, bow.y, 12, 0xffffff, .95).setStrokeStyle(3, 0xff7a5a).setDepth(13);
-    this.tweens.add({ targets: flash, scale: 4, alpha: 0, duration: 520, onComplete: () => flash.destroy() });
+    this.effect(() => this.add.circle(bow.x, bow.y, 24, 0xff6a4a, .25).setStrokeStyle(3, 0xffc0a0).setDepth(12),
+      { scale: { from: 1.6, to: .2 }, alpha: { from: .9, to: 0 }, duration: 260 });
+    this.effect(() => this.add.circle(bow.x, bow.y, 12, 0xffffff, .95).setStrokeStyle(3, 0xff7a5a).setDepth(13),
+      { scale: 4, alpha: 0, duration: 520 });
     this.skillBeam(bow, end, 0xff4b3a, half * 4);
     this.skillBeam(bow, end, 0xffe2b0, half * 1.6);
     this.skillBeam(bow, end, 0xffffff, 3);
@@ -1780,13 +1800,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   private findTarget(t: Tower, eligible: (enemy: Enemy) => boolean = () => true): Enemy | null {
-    const range = this.stats(t).range;
+    const range = this.targetRange(t), rangeSquared = range * range;
     let best: Enemy | null = null, bp = -Infinity, bestObservationRank = Infinity;
     for (const e of this.enemies) {
-      if (e.dead || Math.hypot(e.x - t.x, e.y - t.y) > range || !eligible(e)) continue;
-      const route = e.route ?? this.map.waypoints, nx = route[Math.min(e.seg, route.length - 1)];
-      let remaining = Math.hypot(nx.x - e.x, nx.y - e.y);
-      for (let i = e.seg; i < route.length - 1; i++) remaining += Math.hypot(route[i + 1].x - route[i].x, route[i + 1].y - route[i].y);
+      const dx = e.x - t.x, dy = e.y - t.y;
+      if (e.dead || dx * dx + dy * dy > rangeSquared || !eligible(e)) continue;
+      const remaining = t.target === 'strong' || t.target === 'weak' ? 0 : this.routeDistances.remaining(e, e.route ?? this.map.waypoints);
       const p = t.target === 'strong' ? e.hp : t.target === 'weak' ? -e.hp : t.target === 'boss' ? (e.type === 'boss' ? 1e9 : 0) - remaining : -remaining;
       // Spread first, then add a distinct observer's analysis before refreshing our own.
       const rank = t.k !== 'observer' ? 0 : weaknessBonus(e) === 0 ? -1
@@ -1818,34 +1837,43 @@ export class GameScene extends Phaser.Scene {
   }
 
   private skillRing(x: number, y: number, radius: number, color: number): void {
-    const ring = this.add.circle(x, y, 6, color, .12).setStrokeStyle(1.5, color, .8).setDepth(11);
-    this.tweens.add({ targets: ring, scale: radius / 6, alpha: 0, duration: 500, onComplete: () => ring.destroy() });
+    this.effect(() => this.add.circle(x, y, 6, color, .12).setStrokeStyle(1.5, color, .8).setDepth(11),
+      { scale: radius / 6, alpha: 0, duration: 500 });
   }
 
   private skillBeam(from: { x: number; y: number }, to: { x: number; y: number }, color: number, width = 2): void {
-    const beam = this.add.graphics().setDepth(12);
-    beam.lineStyle(width + 4, color, .2).lineBetween(from.x, from.y, to.x, to.y);
-    beam.lineStyle(width, color, .9).lineBetween(from.x, from.y, to.x, to.y);
-    this.tweens.add({ targets: beam, alpha: 0, duration: 360, onComplete: () => beam.destroy() });
+    this.effect(() => this.add.graphics().setDepth(12)
+      .lineStyle(width + 4, color, .2).lineBetween(from.x, from.y, to.x, to.y)
+      .lineStyle(width, color, .9).lineBetween(from.x, from.y, to.x, to.y),
+      { alpha: 0, duration: 360 });
+  }
+
+  private effect(create: () => Phaser.GameObjects.GameObject, tween: Omit<Phaser.Types.Tweens.TweenBuilderConfig, 'targets'>): void {
+    const release = this.visualBudget.acquire();
+    if (!release) return;
+    const view = create();
+    this.tweens.add({ ...tween, targets: view, onComplete: () => { view.destroy(); release(); } });
   }
 
   private archonBurst(x: number, y: number, radius: number): void {
-    const glow = this.add.image(x, y, 'shot_templar').setDepth(20).setScale(radius / 24);
-    this.tweens.add({ targets: glow, scale: radius / 15, alpha: 0, duration: 250, onComplete: () => glow.destroy() });
-    const arcs = this.add.graphics().setPosition(x, y).setDepth(21);
-    arcs.lineStyle(2, 0x64cfff, .85).strokeCircle(0, 0, radius * .7);
-    for (let i = 0; i < 8; i++) {
-      const a = i * Math.PI / 4, c = Math.cos(a), s = Math.sin(a);
-      const points = [
-        { x: c * 5, y: s * 5 },
-        { x: c * radius * .4 - s * 5, y: s * radius * .4 + c * 5 },
-        { x: c * radius * .65 + s * 4, y: s * radius * .65 - c * 4 },
-        { x: c * radius, y: s * radius },
-      ];
-      arcs.lineStyle(4, 0x237dff, .35).strokePoints(points, false);
-      arcs.lineStyle(1.2, 0xd8ffff, .95).strokePoints(points, false);
-    }
-    this.tweens.add({ targets: arcs, scale: 1.15, alpha: 0, duration: 220, onComplete: () => arcs.destroy() });
+    this.effect(() => this.add.image(x, y, 'shot_templar').setDepth(20).setScale(radius / 24),
+      { scale: radius / 15, alpha: 0, duration: 250 });
+    this.effect(() => {
+      const arcs = this.add.graphics().setPosition(x, y).setDepth(21);
+      arcs.lineStyle(2, 0x64cfff, .85).strokeCircle(0, 0, radius * .7);
+      for (let i = 0; i < 8; i++) {
+        const a = i * Math.PI / 4, c = Math.cos(a), s = Math.sin(a);
+        const points = [
+          { x: c * 5, y: s * 5 },
+          { x: c * radius * .4 - s * 5, y: s * radius * .4 + c * 5 },
+          { x: c * radius * .65 + s * 4, y: s * radius * .65 - c * 4 },
+          { x: c * radius, y: s * radius },
+        ];
+        arcs.lineStyle(4, 0x237dff, .35).strokePoints(points, false);
+        arcs.lineStyle(1.2, 0xd8ffff, .95).strokePoints(points, false);
+      }
+      return arcs;
+    }, { scale: 1.15, alpha: 0, duration: 220 });
   }
 
   private autoSkill(t: Tower, key: SkillKey, target: Enemy): void {
@@ -1908,8 +1936,8 @@ export class GameScene extends Phaser.Scene {
         }, target);
         const angle = Math.atan2(victim.y - t.y, victim.x - t.x), reach = 29 * (UNIT_WORLD_SCALE.cruiser ?? 1);
         const bow = { x: t.x + Math.cos(angle) * reach, y: t.y + Math.sin(angle) * reach };
-        const core = this.add.circle(bow.x, bow.y, 6, 0xffda8a, .85).setStrokeStyle(2, 0xfff2c8).setDepth(12);
-        this.tweens.add({ targets: core, scale: 2.5, alpha: 0, duration: 360, onComplete: () => core.destroy() });
+        this.effect(() => this.add.circle(bow.x, bow.y, 6, 0xffda8a, .85).setStrokeStyle(2, 0xfff2c8).setDepth(12),
+          { scale: 2.5, alpha: 0, duration: 360 });
         this.skillBeam(bow, victim, d.color, 9); this.skillRing(victim.x, victim.y, 55, d.color);
         this.damageEnemy(victim, st.dmg * 12, 'skill', t.id); this.fxBoom.explode(30, victim.x, victim.y);
         break;
@@ -1973,8 +2001,8 @@ export class GameScene extends Phaser.Scene {
       if (!enhanced && p.k === 'templar') this.archonBurst(e.x, e.y, st.splash);
       else if (!enhanced) {
         this.fxBoom.explode(14, e.x, e.y);
-        const ring = this.add.circle(e.x, e.y, 6, 0xff8a65, .3).setStrokeStyle(2, 0xff8a65).setDepth(21);
-        this.tweens.add({ targets: ring, scale: st.splash / 6, alpha: 0, duration: 300, onComplete: () => ring.destroy() });
+        this.effect(() => this.add.circle(e.x, e.y, 6, 0xff8a65, .3).setStrokeStyle(2, 0xff8a65).setDepth(21),
+          { scale: st.splash / 6, alpha: 0, duration: 300 });
       }
       for (const o of this.enemies) {
         if (o.dead || Math.hypot(o.x - e.x, o.y - e.y) > st.splash) continue;
