@@ -708,11 +708,30 @@ test('튜토리얼은 실제 배치·강화·스킬·탑승 완료로만 진행�
   const b = place(s, 'bunker', 7); s.board(b.id, 0, m.id); s.advanceTutorial(); assert.equal(s.tutorial, 4); assert.equal(s.profile.tutorialDone, true);
 });
 
+test('테스트 모드는 배치·주둔·일괄 강화·특화·스킬·재배치·회수 후에도 미네랄이 무제한이다', () => {
+  for (const mode of ['standard', 'budget', 'bunker']) {
+    const s = setup(mode); s.testMode = true; s.gold = config.TEST_GOLD;
+    const bunker = place(s, 'bunker'), marine = place(s, 'marine', 8, 1);
+    assert.equal(s.gold, Infinity);
+    assert.equal(s.recruit(bunker.id, 0, 'marine'), true);
+    for (let i = 0; i < 2; i++) assert.equal(s.applyOrder({ type: 'upgrade' }).count, 2);
+    assert.equal(s.applyOrder({ type: 'branch', key: 'power' }).count, 2);
+    assert.equal(s.applyOrder({ type: 'skill', key: 'stim' }).count, 2);
+    s.selected = marine;
+    assert.equal(s.beginRelocate(), true); s.finishRelocate(9, 1);
+    assert.deepEqual([marine.c, marine.r], [9, 1]);
+    assert.equal(s.gold, Infinity); assert.equal(s.shopState().gold.toLocaleString(), '∞');
+    assert.ok(Number.isFinite(marine.spent));
+    s.sell(); assert.equal(s.gold, Infinity);
+    assert.equal(s.towers.includes(marine), false);
+  }
+});
+
 test('테스트 모드는 실제 작전 저장과 영구 업적에 영향을 주지 않는다', () => {
   const store = memory(), oldStorage = global.localStorage; global.localStorage = store;
   try {
     rules.writeStored(rules.SAVE_KEY, checkpoint(), store); const before = store.getItem(rules.SAVE_KEY);
-    const s = setup(); s.testMode = true; s.runLaunched = true; s.saveCheckpoint(true); s.wave = 50; s.endGame(true);
+    const s = setup(); s.testMode = true; s.gold = config.TEST_GOLD; s.runLaunched = true; s.saveCheckpoint(true); s.wave = 50; s.endGame(true);
     assert.equal(store.getItem(rules.SAVE_KEY), before); assert.equal(store.getItem(rules.PROFILE_KEY), null);
   } finally { if (oldStorage === undefined) delete global.localStorage; else global.localStorage = oldStorage; }
 });

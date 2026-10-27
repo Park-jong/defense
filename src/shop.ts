@@ -143,7 +143,7 @@ export class SupplyShop {
       { key: 'manage', name: '일괄', label: '일괄 관리', art: icon('manage') },
     ];
     this.dialog.innerHTML = `
-      <header class="shop-header"><div class="shop-heading">${icon('supply')}<div><h1>보급 상점</h1><p>전투 일시정지</p></div></div><span class="shop-wallet" aria-label="미네랄 ${state.gold}">${icon('mineral')}${state.gold.toLocaleString()}</span><button type="button" class="shop-close" data-action="close" aria-label="전장 복귀" title="전장 복귀 [Esc / B]">${icon('close')}</button></header>
+      <header class="shop-header"><div class="shop-heading">${icon('supply')}<div><h1>보급 상점</h1><p>전투 일시정지</p></div></div><span class="shop-wallet" aria-label="미네랄 ${state.gold === Infinity ? '무제한' : state.gold}">${icon('mineral')}${state.gold.toLocaleString()}</span><button type="button" class="shop-close" data-action="close" aria-label="전장 복귀" title="전장 복귀 [Esc / B]">${icon('close')}</button></header>
       <nav class="shop-tabs" aria-label="상점 메뉴">${tabs.map(t => `<button type="button" data-action="tab" data-key="${t.key}" class="${this.tab === t.key ? 'is-active' : ''}" aria-pressed="${this.tab === t.key}" aria-label="${t.label}" title="${t.label}">${t.art}<span>${t.name}</span></button>`).join('')}</nav>
       <div class="shop-content">
         ${this.tab === 'manage' ? `<p class="shop-notice" role="status">${icon(this.notice ? 'saved' : 'help')}${this.notice || '전장과 모든 벙커의 병력을 함께 관리합니다. 유닛 종류별로 강화·스킬·특화를 적용할 수 있습니다.'}</p>${this.batchControls(state, {}, '전체 부대 일괄 관리')}` : this.tab === 'garrison' ? this.garrisonView(state) : this.armyView(state, selected)}
